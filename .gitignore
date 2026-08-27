@@ -38,3 +38,6 @@ npm-debug.log*
 .vscode/
 .idea/
 *.swp
+
+# Vite
+vite.config.ts.timestamp-*
