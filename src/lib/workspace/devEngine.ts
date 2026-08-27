@@ -64,6 +64,8 @@ export function createDevEngine(store: Writable<WorkspaceState>): ResearchEngine
 				id: id('set'),
 				setupId: input.setupId,
 				count: 42,
+				completeCount: 42,
+				partialCount: 0,
 				from: input.from ?? '2015-01-02',
 				to: input.to ?? '2026-08-25'
 			};
@@ -98,10 +100,14 @@ export function createDevEngine(store: Writable<WorkspaceState>): ResearchEngine
 		async focusInstance(input: FocusInstanceInput): Promise<void> {
 			mutate((ws) => {
 				const panelId = input.panelId ?? ws.panels[ws.panels.length - 1]?.id ?? '';
-				// focusInstance is agent-driven and only ever moves the focused
-				// panel — it must not silently clear the human's hand-picked
+				// focusInstance is agent-driven and only ever moves
+				// focusedInstance — it must not touch the human's hand-picked
 				// selection (types.ts's FocusState.selected).
-				ws.focus = { panelId, selected: ws.focus?.selected ?? [] };
+				ws.focus = {
+					panelId,
+					selected: ws.focus?.selected ?? [],
+					focusedInstance: { ticker: input.ticker, date: input.date }
+				};
 			});
 		},
 		async getWorkspace(): Promise<WorkspaceState> {
