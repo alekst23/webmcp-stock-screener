@@ -71,6 +71,29 @@ in T-1001-5 — not part of the permanent API surface.
 | `message` | `str` | |
 | `sample` | `PriceBar` | one row read from the mock panel |
 
+### `PatternResearchEngine` — query engine contract (T-1001-3, extended by T-1001-4)
+
+`backend/domain/contracts/engine.py`. Implemented by a pandas/numpy infra
+adapter; a `MockPatternResearchEngine` fake lives in
+`backend/tests/mocks/` for callers' tests.
+
+| Method | Signature | Description |
+|----------------|------|-------------|
+| `define_study` | `(name, expression) -> Study` | raises `ExpressionError` (with catalog) on an unsupported function |
+| `define_setup` | `(name, steps) -> Setup` | |
+| `find_instances` | `(setup, from_date, to_date, min_market_cap, sectors) -> InstanceSet` | applies the partial-match fallback and dedup rules from `spec.md` |
+
+### `Study`, `SetupStep`, `Setup` — pattern domain models (T-1001-3)
+
+`backend/domain/models/pattern.py`. Backend-side mirror of the frontend's
+`StudySummary`/`SetupStep`/`SetupSummary` types.
+
+### `Instance`, `InstanceSet` — result domain models (T-1001-3)
+
+`backend/domain/models/instance.py`. `InstanceSet.complete_count` /
+`partial_count` are stored fields (not derived), matching the
+`InstanceSetSummary` breakdown documented above.
+
 ## Data Flow
 
 Partial-match fallback happens inside `findInstances` only — sampling,

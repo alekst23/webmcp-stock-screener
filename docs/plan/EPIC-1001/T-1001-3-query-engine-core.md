@@ -46,6 +46,36 @@ so that I can begin investigating a hypothesis.
 - `docs/plan.md` — engine architecture and the reasoning behind treating
   the parser and temporal matcher as the highest-risk pieces
 
+## Solution Approach
+
+Implements the "Study definition," "Temporal setup definition," and
+"Instance search" scenarios from `spec.md` — including the behaviors
+decided in the design interview, which sit on top of this ticket's
+original AC: the partial-match fallback (fewer than 5 completed matches
+triggers inclusion of in-progress matches, each carrying a completion
+score), repeated occurrences counting as separate instances, and only the
+earliest valid completion counting for a single pattern start.
+
+A `PatternResearchEngine` Protocol (domain layer) defines the contract;
+the real implementation (infra layer, this ticket's actual coding work)
+is a pandas/numpy adapter over the mock panel from T-1001-1 — `rolling`,
+`groupby('ticker')`, `shift`, and vectorized boolean masks do the
+window/lookback bookkeeping that would otherwise be hand-rolled and
+error-prone. `define_study` validates an expression's functions against a
+fixed catalog and raises `ExpressionError` (carrying the catalog) on an
+unsupported one — mirroring the same self-correction contract already
+built into the frontend's WebMCP tool layer (`src/lib/webmcp/types.ts`'s
+`ExpressionError`).
+
+**Contracts introduced:**
+- `Study`, `SetupStep`, `Setup` → `backend/domain/models/pattern.py`
+- `Instance`, `InstanceSet` → `backend/domain/models/instance.py`
+- `ExpressionError` → `backend/domain/errors.py`
+- `PatternResearchEngine` (Protocol) → `backend/domain/contracts/engine.py`
+  — `define_study`, `define_setup`, `find_instances`
+
+**Config vars introduced:** none.
+
 ## Technical Considerations
 
 Correctness on edge cases (window boundaries, insufficient history near
