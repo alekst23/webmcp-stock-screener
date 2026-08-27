@@ -43,6 +43,23 @@ Needed shape — `focusInstance` (agent-driven) must not mutate `selected`
 |----------------|------|-------------|
 | `excludedPartialCount` | `number \| undefined` | new — present when the input set contained partial instances that were excluded from the statistic |
 
+### `PriceBar` — backend panel row schema (T-1001-1)
+
+`backend/domain/models/price.py`. One adjusted daily OHLCV row — the
+shared schema the mock generator and the real EODHD pipeline (T-1001-9)
+both must produce, so swapping one panel for the other requires no
+downstream code changes.
+
+| Field | Type | Description |
+|----------------|------|-------------|
+| `ticker` | `str` | |
+| `date` | `date` | |
+| `open` | `float` | adjusted |
+| `high` | `float` | adjusted |
+| `low` | `float` | adjusted |
+| `close` | `float` | adjusted |
+| `volume` | `int` | |
+
 ## Data Flow
 
 Partial-match fallback happens inside `findInstances` only — sampling,

@@ -50,6 +50,30 @@ real backfill.
 - `docs/plan.md` — data volume estimates, panel schema decisions
 - `docs/reference/data-provider.md` — real data source's field conventions
   to match
+- `docs/design/pattern-research-workbench/spec.md` — "Instance search"
+  scenarios this ticket's known pattern instances exist to test
+- `docs/design/pattern-research-workbench/technical.md` — `PriceBar` contract
+
+## Solution Approach
+
+Establishes the panel **schema** shared by the mock generator now and the
+real EODHD pipeline later (T-1001-9) — the swap only works if both conform
+to the same shape. Mostly a standalone generator script, not application
+logic: `backend/scripts/generate_mock_panel.py` produces a small (~20-30
+ticker) synthetic universe as Parquet, with a fixed set of hand-authored
+known pattern instances (documented as a plain fixture list, not a domain
+model, since they exist purely for T-1001-3's tests to assert against). A
+second script pulls a handful of real tickers from EODHD's free tier (no
+payment needed — free tier covers roughly a year of history, enough to
+check field shapes) and diffs its structure against the synthetic schema.
+
+**Contracts introduced:** `PriceBar` (`backend/domain/models/price.py`) —
+one adjusted daily OHLCV row: ticker, date, open/high/low/close, volume.
+The row shape both pipelines must produce.
+
+**Config vars introduced:** `EODHD_API_KEY` — free-tier key, used only by
+the schema sanity-check script, documented in `backend/.env.example` with
+an empty placeholder. Not the paid key (that's T-1001-9's concern).
 
 ## Technical Considerations
 
