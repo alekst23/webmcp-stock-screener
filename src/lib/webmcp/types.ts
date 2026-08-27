@@ -25,12 +25,17 @@ export interface InstanceEvent {
 	ticker: string;
 	// ISO date of the event anchor (t=0), i.e. the day the final step completed.
 	date: string;
+	// Fraction of setup steps satisfied (0-1). Absent or 1 for a fully
+	// completed instance; present and <1 for a partial/in-progress match.
+	completeness?: number;
 }
 
 export interface InstanceSetSummary {
 	id: string;
 	setupId: string;
 	count: number;
+	completeCount: number;
+	partialCount: number;
 	from: string;
 	to: string;
 	// Set this split was derived from, if any.
@@ -46,8 +51,12 @@ export interface PanelSummary {
 
 export interface FocusState {
 	panelId: string;
-	// Instances the human has selected/highlighted by hand.
+	// Instances the human has selected/highlighted by hand. Set only via
+	// direct UI interaction — focusInstance (agent-driven) never touches this.
 	selected: InstanceEvent[];
+	// Set only via focusInstance; independent of `selected` so an agent
+	// zooming in never silently overwrites the human's multi-select.
+	focusedInstance: InstanceEvent | null;
 }
 
 export interface WorkspaceState {
@@ -97,6 +106,9 @@ export interface MeasureResult {
 	mean: number;
 	hitRate: number;
 	baseRate?: { median: number; hitRate: number };
+	// Present when the input set contained partial instances excluded from
+	// the statistic (a forward return doesn't exist yet for an unresolved match).
+	excludedPartialCount?: number;
 }
 
 export interface SplitInstancesInput {
@@ -123,6 +135,19 @@ export interface FocusInstanceInput {
 	ticker: string;
 	date: string;
 	panelId?: string;
+}
+
+// Mirrors backend/tests/mocks/mock_pattern_research_engine.py's
+// SUPPORTED_FUNCTIONS — a deliberate, small, documented duplication (a
+// list of names, not parsing/evaluation logic) so defineStudy/defineSetup
+// can validate synchronously without a network call, per the client-side
+// tool split in docs/plan.md. Keep the two lists in sync by hand; they're
+// short enough that this is cheaper than a shared network round trip.
+export const FUNCTION_CATALOG = ['sma', 'ema', 'atr', 'highest', 'lowest', 'days_since'];
+
+export interface ApiClientConfig {
+	// Base URL of the FastAPI backend for the 5 networked tools.
+	baseUrl: string;
 }
 
 // Thrown by the engine when an expression fails to parse; the catalog is

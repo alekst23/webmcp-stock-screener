@@ -41,6 +41,8 @@ function fakeEngine(): ResearchEngine {
 				id: id('set'),
 				setupId: input.setupId,
 				count: 42,
+				completeCount: 42,
+				partialCount: 0,
 				from: '2015-01-02',
 				to: '2026-08-25'
 			};

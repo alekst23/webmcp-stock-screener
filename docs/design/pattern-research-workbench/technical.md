@@ -104,6 +104,21 @@ above.
 `partial_count` are stored fields (not derived), matching the
 `InstanceSetSummary` breakdown documented above.
 
+### `FUNCTION_CATALOG` / `SUPPORTED_FUNCTIONS` — deliberately duplicated (T-1001-5)
+
+`src/lib/webmcp/types.ts`'s `FUNCTION_CATALOG` mirrors
+`backend/tests/mocks/mock_pattern_research_engine.py`'s
+`SUPPORTED_FUNCTIONS` (and, once T-1001-3's real engine exists, whatever
+canonical list it uses). Kept in sync by hand — a list of ~6-12 function
+names, not parsing logic, so this is cheap duplication in exchange for
+`defineStudy`/`defineSetup` staying client-side per `docs/plan.md`'s
+architecture split.
+
+### `ApiClientConfig` — frontend backend-URL contract (T-1001-5)
+
+`src/lib/webmcp/types.ts`. `{ baseUrl: string }` — where the fetch-based
+`ResearchEngine` implementation sends the 5 networked tool calls.
+
 ## Data Flow
 
 Partial-match fallback happens inside `findInstances` only — sampling,

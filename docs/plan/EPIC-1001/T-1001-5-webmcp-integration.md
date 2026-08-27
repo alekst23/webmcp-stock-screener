@@ -47,6 +47,38 @@ session.
 - `docs/tools.md` — full tool surface and design rules
 - `docs/plan.md` — client/server split rationale
 
+## Solution Approach
+
+Implements a concrete `ResearchEngine` (the frontend TS interface already
+in `src/lib/webmcp/types.ts`): `defineStudy`/`defineSetup`/`getWorkspace`/
+`focusInstance` run purely in-memory client-side (per `docs/plan.md`'s
+split); the other 5 methods call the FastAPI backend's endpoints
+(`PatternResearchEngine`, T-1001-3/T-1001-4) over `fetch()`. Replaces the
+placeholder engine `tools.test.ts` currently uses in isolation.
+
+**Genuine ambiguity resolved:** `defineStudy`/`defineSetup` must
+synchronously reject an unsupported expression with the full function
+catalog (per `spec.md`), but run with no network call. Resolution: a
+small, deliberately duplicated `FUNCTION_CATALOG` constant on the frontend
+(just the ~6-12 function *names*, not real parsing/evaluation logic) lets
+local validation happen without a round trip. The two lists (frontend
+`FUNCTION_CATALOG`, backend `SUPPORTED_FUNCTIONS`) are kept in sync by
+hand — cheap, since only names are duplicated, not logic.
+
+**Contracts introduced/updated** (already applied to
+`src/lib/webmcp/types.ts` as part of this design phase, since they were
+identified during the spec interview before this ticket existed):
+- `InstanceEvent.completeness`, `InstanceSetSummary.completeCount`/
+  `partialCount`, `FocusState.focusedInstance` (independent of `selected`),
+  `MeasureResult.excludedPartialCount`
+- `FUNCTION_CATALOG` — shared validation constant
+- `ApiClientConfig` — `{ baseUrl: string }`, backend base URL for the
+  fetch-based engine implementation
+
+**Config vars introduced:** none new on the backend; frontend needs the
+deployed API's base URL, supplied via `ApiClientConfig` at engine
+construction time (build-time env var, not a secret).
+
 ## Technical Considerations
 
 This is the point where the platform spike (T-1001-2) and the engine
