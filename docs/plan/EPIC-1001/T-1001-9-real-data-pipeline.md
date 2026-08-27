@@ -47,6 +47,30 @@ so that findings are meaningful rather than illustrative.
 - `docs/plan.md` — deferred-payment sequencing decision, survivorship-bias
   disclosure requirement
 
+## Solution Approach
+
+Replaces T-1001-1's mock `panel.parquet` with a real one built the same
+way — same `PriceBar` schema (T-1001-1/T-1001-3), so nothing downstream
+changes. Backfill uses EODHD's per-ticker range endpoint (1 API call per
+ticker, any date length — confirmed in `data-provider.md`, not the
+bulk-by-day endpoint, which is for the nightly delta only). Nightly delta
+via the bulk-by-exchange endpoint as a Render Cron Job, appending to the
+same disk T-1001-8's Web Service reads. Sector/market-cap metadata comes
+from a free Nasdaq screener CSV export, not EODHD (outside its plan).
+As-of date surfaces through a small addition to `getWorkspace`'s response
+(or an adjacent endpoint) so the UI can display it per spec.md's
+Preconditions.
+
+**Contracts introduced:** `TickerMetadata` →
+`backend/domain/models/universe.py` — `ticker`, `sector`, `market_cap`,
+`as_of`.
+
+**Config vars introduced:** none new — reuses `EODHD_API_KEY` from
+T-1001-1, but the underlying EODHD account must be upgraded to the paid
+EOD Historical Data plan ($19.99/mo) for this ticket; the free tier used
+in T-1001-1 is insufficient for full-universe/full-history backfill. This
+is an account-tier change, not a different key.
+
 ## Technical Considerations
 
 This is the paid step (~$20/month). Confirm explicit go-ahead before

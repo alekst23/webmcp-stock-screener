@@ -132,6 +132,18 @@ architecture split.
 | `input` | `unknown` | the call's raw input |
 | `summary` | `string` | one-line human-readable result summary, not raw JSON |
 
+### `TickerMetadata` — universe classification (T-1001-9)
+
+`backend/domain/models/universe.py`. Sourced from a free Nasdaq screener
+CSV export, not EODHD.
+
+| Field | Type | Description |
+|----------------|------|-------------|
+| `ticker` | `str` | |
+| `sector` | `str \| None` | |
+| `market_cap` | `float \| None` | |
+| `as_of` | `date` | |
+
 ## Data Flow
 
 Partial-match fallback happens inside `findInstances` only — sampling,
