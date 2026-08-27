@@ -3,7 +3,7 @@
 **Depends on**: —
 **Blocks**: —
 **Issue**: #1
-**Design**: (not started — run /at-epic-design EPIC-1001)
+**Design**: docs/design/pattern-research-workbench/
 
 ## Description
 
