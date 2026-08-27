@@ -119,6 +119,19 @@ architecture split.
 `src/lib/webmcp/types.ts`. `{ baseUrl: string }` — where the fetch-based
 `ResearchEngine` implementation sends the 5 networked tool calls.
 
+### `AgentActivityEvent` — activity feed contract (T-1001-7)
+
+`src/lib/workspace/activity.ts`. Populated by extending `register.ts`'s
+`execute()` wrapper — every tool call appends one entry, in order.
+
+| Field | Type | Description |
+|----------------|------|-------------|
+| `id` | `string` | |
+| `toolName` | `string` | |
+| `timestamp` | `string` | ISO |
+| `input` | `unknown` | the call's raw input |
+| `summary` | `string` | one-line human-readable result summary, not raw JSON |
+
 ## Data Flow
 
 Partial-match fallback happens inside `findInstances` only — sampling,

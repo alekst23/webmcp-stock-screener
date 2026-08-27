@@ -42,6 +42,26 @@ analysis.
 
 - `docs/plan.md` — agent activity feed rationale, hand-rolled
   visualization decision
+- `docs/design/pattern-research-workbench/spec.md` — "Grid visualization,"
+  "Instance focus," and cross-actor visibility scenarios
+
+## Solution Approach
+
+Implements `spec.md`'s "Grid visualization" (incl. the partial-instance
+display case), "Instance focus," and the activity-feed half of "Shared
+workspace & collaboration." Small-multiples grid and focus chart render
+from `InstanceWindow` data (T-1001-4) via hand-rolled canvas/SVG — no
+charting library, per `docs/plan.md`. The activity feed is populated by
+extending `register.ts`'s existing `execute()` wrapper (already the single
+choke point every tool call passes through, per `docs/tools.md`) to append
+an `AgentActivityEvent` before returning — this is additive to
+already-built code, not a rewrite.
+
+**Contracts introduced:** `AgentActivityEvent` →
+`src/lib/workspace/activity.ts` — `id`, `toolName`, `timestamp`, `input`,
+`summary`.
+
+**Config vars introduced:** none.
 
 ## Out of Scope
 
