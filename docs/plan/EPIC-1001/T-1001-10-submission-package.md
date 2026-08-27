@@ -40,6 +40,22 @@ deadline.
 - `docs/reference/webmcp-challenge.md` — exact submission requirements, judging
   criteria, deadline
 
+## Solution Approach
+
+No code — this ticket is a checklist against
+`docs/reference/webmcp-challenge.md`'s stated requirements: flip the
+GitHub repo from private to public and add an OSS license file (LICENSE);
+write the text description covering WebMCP fit, UX improvement, novel
+human-agent collaboration, and implementation approach; record a ≤3-minute
+narrated demo video on YouTube using the real data from T-1001-9 (not the
+mock panel); do a final live check of the deployed app on the actual
+target browser/platform used throughout the epic (recorded in T-1001-2);
+complete and submit the Devpost form before the deadline.
+
+**Contracts introduced:** none.
+
+**Config vars introduced:** none.
+
 ## Out of Scope
 
 Any further feature work — this ticket is about packaging and submitting
