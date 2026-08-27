@@ -40,6 +40,26 @@ a WebMCP-capable browser being available at all times.
 
 - `docs/plan.md` — client-side workspace state design, anonymous/no-auth
   session decision
+- `docs/design/pattern-research-workbench/spec.md` — "Shared workspace &
+  collaboration" scenarios (happy path, persistence, cross-actor visibility)
+
+## Solution Approach
+
+Implements `spec.md`'s "Shared workspace & collaboration" scenarios: a
+Svelte store holding `WorkspaceState` (already defined in
+`src/lib/webmcp/types.ts` — no new shape needed), a persistence layer that
+serializes it to `localStorage` on every mutation and rehydrates on load,
+and a dev-only panel (route-gated or env-gated, not shipped in the
+production build's primary UI) that lets a developer call any tool
+function directly and see the resulting state change — this is what makes
+the rest of the epic buildable without depending on Chrome Canary access
+day to day.
+
+**Contracts introduced:** none new — reuses `WorkspaceState` from
+`types.ts` directly as both the in-memory store shape and the persisted
+JSON shape.
+
+**Config vars introduced:** none.
 
 ## Out of Scope
 
