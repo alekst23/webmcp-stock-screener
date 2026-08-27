@@ -81,9 +81,9 @@ T-1001-6 ───────────────────────�
   reasoning behind deferring paid data
 - `docs/tools.md` — the 9-tool WebMCP surface, availability rules, design
   rules
-- `docs/webmcp-guide.md` — WebMCP API surface, browser support status,
+- `docs/reference/webmcp-guide.md` — WebMCP API surface, browser support status,
   security model, known limitations
-- `docs/webmcp-challenge.md` — hackathon submission requirements, judging
+- `docs/reference/webmcp-challenge.md` — hackathon submission requirements, judging
   criteria, deadline
 - `docs/reference/data-provider.md` — real data source, endpoints, cost,
   volume
