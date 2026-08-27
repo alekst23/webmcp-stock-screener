@@ -60,6 +60,17 @@ downstream code changes.
 | `close` | `float` | adjusted |
 | `volume` | `int` | |
 
+### `SpikePingResponse` — throwaway spike DTO (T-1001-2)
+
+`backend/api/schemas/spike.py`. Proves a WebMCP tool's `execute()` can
+reach a live deployed backend. Superseded by the real tool endpoints wired
+in T-1001-5 — not part of the permanent API surface.
+
+| Field | Type | Description |
+|----------------|------|-------------|
+| `message` | `str` | |
+| `sample` | `PriceBar` | one row read from the mock panel |
+
 ## Data Flow
 
 Partial-match fallback happens inside `findInstances` only — sampling,

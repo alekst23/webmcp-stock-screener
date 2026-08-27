@@ -47,6 +47,24 @@ of the system on top of it.
   known limitations
 - `docs/plan.md` — why this is the top risk in the project
 
+## Solution Approach
+
+Deliberately throwaway proof-of-concept, superseded by T-1001-5. A minimal
+FastAPI endpoint (`GET /api/spike/ping`) reads a couple of rows directly
+from T-1001-1's mock Parquet panel and returns them — no read abstraction
+here; a proper panel-reading contract belongs to T-1001-3. On the
+frontend, a temporary tool (not one of the 9 product tools — reusing e.g.
+`sampleInstances` wouldn't work cleanly since it requires an instance set
+that doesn't exist until T-1001-3/4 exist) is registered whose `execute()`
+calls that endpoint. Backend deployed to Render; a real agent on the
+target WebMCP platform invokes the tool to prove the full round trip.
+
+**Contracts introduced:** `SpikePingResponse`
+(`backend/api/schemas/spike.py`) — API-layer DTO (not a domain model):
+`message: str`, `sample: PriceBar`.
+
+**Config vars introduced:** none.
+
 ## Technical Considerations
 
 This may require a browser flag or a signup-gated preview program. The
