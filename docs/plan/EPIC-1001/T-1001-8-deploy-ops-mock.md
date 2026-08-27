@@ -37,6 +37,28 @@ before the paid data pipeline is in the critical path.
 
 - `docs/plan.md` — hosting decisions, HTTPS requirement, rate-limiting
   decision
+- `docs/design/pattern-research-workbench/spec.md` — Preconditions section
+  (deployed, reachable backend is a stated precondition for the whole
+  feature)
+
+## Solution Approach
+
+Pure infra/config, no new domain contracts. Render Web Service running
+the FastAPI app (uvicorn) with the mock panel from T-1001-1 on its
+persistent disk; frontend static build deployed to Cloudflare Pages or
+Vercel (either is fine per `docs/plan.md` — only the backend needs
+Render). CORS restricted to the deployed frontend origin. Rate limiting
+via a small FastAPI middleware (e.g. `slowapi`), sufficient at this scale
+per `docs/plan.md`'s risk mitigation — no custom implementation needed.
+
+**Contracts introduced:** none.
+
+**Config vars introduced:**
+- `CORS_ALLOWED_ORIGINS` (backend) — comma-separated origins, default: the
+  deployed frontend's URL once known; must not default to `*` in
+  production, only during local dev.
+- `PUBLIC_API_BASE_URL` (frontend, SvelteKit public env convention) — the
+  deployed backend's URL, feeds `ApiClientConfig.baseUrl` (T-1001-5).
 
 ## Out of Scope
 
