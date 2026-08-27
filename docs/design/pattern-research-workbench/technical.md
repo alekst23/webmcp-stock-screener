@@ -82,6 +82,16 @@ adapter; a `MockPatternResearchEngine` fake lives in
 | `define_study` | `(name, expression) -> Study` | raises `ExpressionError` (with catalog) on an unsupported function |
 | `define_setup` | `(name, steps) -> Setup` | |
 | `find_instances` | `(setup, from_date, to_date, min_market_cap, sectors) -> InstanceSet` | applies the partial-match fallback and dedup rules from `spec.md` |
+| `sample_instances` | `(instance_set, n, strategy, horizon_days) -> list[Instance]` | T-1001-4 |
+| `measure` | `(instance_set, horizon_days, metric, compare_to_base_rate) -> MeasureResult` | T-1001-4 — excludes partial instances |
+| `split_instances` | `(instance_set, mode, expression, horizon_days, threshold) -> list[InstanceSet]` | T-1001-4 |
+| `get_instance_windows` | `(instance_set, n, strategy, window) -> list[InstanceWindow]` | T-1001-4 — backs `showGrid`'s data needs |
+
+### `MeasureResult`, `BaseRateResult`, `InstanceWindow` — stats models (T-1001-4)
+
+`backend/domain/models/measurement.py`. `MeasureResult.excluded_partial_count`
+mirrors the frontend `MeasureResult` field of the same name documented
+above.
 
 ### `Study`, `SetupStep`, `Setup` — pattern domain models (T-1001-3)
 

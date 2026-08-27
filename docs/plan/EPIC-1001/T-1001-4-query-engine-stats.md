@@ -45,6 +45,31 @@ where it fails.
 
 - `docs/tools.md` — `measure`/`splitInstances`/`sampleInstances`/`showGrid`
   contracts
+- `docs/design/pattern-research-workbench/spec.md` — "Instance sampling,"
+  "Outcome measurement," "Instance splitting," "Grid visualization"
+  scenarios
+
+## Solution Approach
+
+Implements the four scenario groups above from `spec.md`, extending
+T-1001-3's `PatternResearchEngine` Protocol rather than defining a
+separate one — this is the same engine, incrementally specified. Key
+behavior from the design interview: `measure` excludes partial (in-progress)
+instances from the statistic and reports how many were excluded via
+`MeasureResult.excluded_partial_count`, since a forward return doesn't
+exist yet for an unresolved pattern. Base-rate comparison runs the same
+metric over the broader universe panel for the same period. Grid data
+(`get_instance_windows`) returns price bars only — no chart rendering,
+that's T-1001-7.
+
+**Contracts introduced:**
+- `MeasureResult`, `BaseRateResult`, `InstanceWindow` →
+  `backend/domain/models/measurement.py`
+- `PatternResearchEngine` extended with `sample_instances`, `measure`,
+  `split_instances`, `get_instance_windows` →
+  `backend/domain/contracts/engine.py`
+
+**Config vars introduced:** none.
 
 ## Out of Scope
 

@@ -1,8 +1,9 @@
 from datetime import date
 
-from domain.contracts.engine import PatternResearchEngine
+from domain.contracts.engine import PatternResearchEngine, SampleStrategy, SplitMode
 from domain.errors import ExpressionError
-from domain.models.instance import InstanceSet
+from domain.models.instance import Instance, InstanceSet
+from domain.models.measurement import InstanceWindow, MeasureResult
 from domain.models.pattern import Setup, SetupStep, Study
 
 SUPPORTED_FUNCTIONS = ["sma", "ema", "atr", "highest", "lowest", "days_since"]
@@ -55,3 +56,48 @@ class MockPatternResearchEngine(PatternResearchEngine):
 			from_date=from_date or date(2015, 1, 2),
 			to_date=to_date or date(2026, 8, 25),
 		)
+
+	def sample_instances(
+		self,
+		instance_set: InstanceSet,
+		n: int = 12,
+		strategy: SampleStrategy = "recent",
+		horizon_days: int | None = None,
+	) -> list[Instance]:
+		return instance_set.instances[:n]
+
+	def measure(
+		self,
+		instance_set: InstanceSet,
+		horizon_days: int,
+		metric: str | None = None,
+		compare_to_base_rate: bool = True,
+	) -> MeasureResult:
+		return MeasureResult(
+			metric=metric or "fwd_return",
+			horizon_days=horizon_days,
+			count=instance_set.complete_count,
+			median=0.0,
+			mean=0.0,
+			hit_rate=0.0,
+			excluded_partial_count=instance_set.partial_count or None,
+		)
+
+	def split_instances(
+		self,
+		instance_set: InstanceSet,
+		mode: SplitMode,
+		expression: str | None = None,
+		horizon_days: int | None = None,
+		threshold: float | None = None,
+	) -> list[InstanceSet]:
+		return []
+
+	def get_instance_windows(
+		self,
+		instance_set: InstanceSet,
+		n: int = 12,
+		strategy: SampleStrategy = "recent",
+		window: tuple[int, int] = (-20, 20),
+	) -> list[InstanceWindow]:
+		return []
