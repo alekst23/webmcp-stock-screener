@@ -1,7 +1,7 @@
 # T-1001-7: Frontend visualization
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1001-6, T-1001-5
 **Blocks**: —
 **Issue**: #1

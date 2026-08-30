@@ -38,14 +38,18 @@ import {
 } from '../webmcp/types';
 
 // Backend JSON shapes (snake_case, matching the Pydantic domain models in
-// backend/domain/models/ directly -- see api/schemas/research.py).
-interface BackendInstance {
+// backend/domain/models/ directly -- see api/schemas/research.py). Exported
+// (not just used internally) because T-1001-7's grid/chart components need
+// the full instance set -- not just the InstanceSetSummary in
+// WorkspaceState -- to call fetchInstanceWindows below; see this module's
+// header comment and getBackendInstanceSet.
+export interface BackendInstance {
 	ticker: string;
 	date: string;
 	completeness: number;
 }
 
-interface BackendInstanceSet {
+export interface BackendInstanceSet {
 	id: string;
 	setup_id: string;
 	instances: BackendInstance[];
@@ -55,6 +59,37 @@ interface BackendInstanceSet {
 	to_date: string;
 	parent_id?: string | null;
 	label?: string | null;
+}
+
+// domain/models/price.py's PriceBar -- field names already match camelCase
+// 1:1 (single-word fields), so no snake_case mapping is needed here unlike
+// the other Backend* shapes above.
+export interface BackendPriceBar {
+	ticker: string;
+	date: string;
+	open: number;
+	high: number;
+	low: number;
+	close: number;
+	volume: number;
+}
+
+// domain/models/measurement.py's InstanceWindow. Deliberately carries only
+// `ticker`, not the instance's own date/completeness -- see
+// pairWithInstances below for how the UI recovers those.
+interface BackendInstanceWindow {
+	ticker: string;
+	bars: BackendPriceBar[];
+}
+
+// A window paired back up with the instance metadata (date, completeness)
+// the grid/chart/histogram components need -- InstanceWindow itself doesn't
+// carry either (see BackendInstanceWindow above).
+export interface InstanceWindowView {
+	ticker: string;
+	date: string;
+	completeness?: number;
+	bars: BackendPriceBar[];
 }
 
 interface BackendMeasureResult {
@@ -128,6 +163,84 @@ function toMeasureResult(result: BackendMeasureResult): MeasureResult {
 	};
 }
 
+// Keyed by the exact ResearchEngine object createApiEngine returns, so
+// getBackendInstanceSet (below) can reach a given engine's private
+// instanceSetCache without adding a method to the ResearchEngine interface
+// itself -- that interface is the WebMCP tool contract and T-1001-7 must
+// leave it unchanged (see this module's header comment and the ticket's
+// "data-fetching gap" note). A WeakMap rather than a field on the returned
+// object keeps ResearchEngine's own shape exactly as T-1001-5 shipped it.
+const instanceSetCacheByEngine = new WeakMap<ResearchEngine, Map<string, BackendInstanceSet>>();
+
+// UI-only escape hatch for T-1001-7's grid/chart/histogram components: they
+// only have a PanelSummary/InstanceSetSummary (from WorkspaceState) to work
+// from, but fetchInstanceWindows below needs the full BackendInstanceSet
+// (concrete instance list) the same way showGrid/measure/etc. do internally.
+export function getBackendInstanceSet(
+	engine: ResearchEngine,
+	instanceSetId: string
+): BackendInstanceSet | undefined {
+	return instanceSetCacheByEngine.get(engine)?.get(instanceSetId);
+}
+
+// InstanceWindow (see BackendInstanceWindow above) carries only `ticker` --
+// not the instance's date or completeness the grid/histogram need (anchor
+// alignment, partial-instance display). get_instance_windows samples
+// internally with this same n/strategy, so the windows come back in the
+// same order sample_instances would have produced them; consuming each
+// ticker's instances in that order (via the per-ticker queue below)
+// recovers the pairing without the backend contract having to change.
+function pairWithInstances(
+	instances: BackendInstance[],
+	windows: BackendInstanceWindow[]
+): InstanceWindowView[] {
+	const byTicker = new Map<string, BackendInstance[]>();
+	for (const inst of instances) {
+		const bucket = byTicker.get(inst.ticker);
+		if (bucket) {
+			bucket.push(inst);
+		} else {
+			byTicker.set(inst.ticker, [inst]);
+		}
+	}
+	return windows.map((w) => {
+		const inst = byTicker.get(w.ticker)?.shift();
+		return {
+			ticker: w.ticker,
+			date: inst?.date ?? '',
+			completeness: inst?.completeness,
+			bars: w.bars
+		};
+	});
+}
+
+// The UI-only fetch T-1001-7 needs to actually render a panel: showGrid
+// (above) only returns a bare PanelSummary handle to the agent -- correct
+// for the WebMCP tool contract, but it means grid/chart/histogram
+// components must fetch the bar data themselves, independent of whichever
+// tool call created the panel. Reuses the same POST-JSON pattern as this
+// module's internal post() (see createApiEngine below), but as a
+// standalone function since it doesn't need that closure's store/mutate
+// access -- it's pure data fetching for rendering, not a workspace mutation.
+export async function fetchInstanceWindows(
+	config: ApiClientConfig,
+	instanceSet: BackendInstanceSet,
+	n?: number,
+	strategy?: 'random' | 'recent' | 'best' | 'worst',
+	window?: [number, number]
+): Promise<InstanceWindowView[]> {
+	const response = await fetch(`${config.baseUrl}/api/research/instance-windows`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ instance_set: instanceSet, n, strategy, window })
+	});
+	if (!response.ok) {
+		throw new Error(`research backend returned ${response.status}: ${response.statusText}`);
+	}
+	const windows = (await response.json()) as BackendInstanceWindow[];
+	return pairWithInstances(instanceSet.instances, windows);
+}
+
 export function createApiEngine(
 	store: Writable<WorkspaceState>,
 	config: ApiClientConfig
@@ -190,7 +303,7 @@ export function createApiEngine(
 		return new Error(`research backend returned ${response.status}: ${message}`);
 	}
 
-	return {
+	const engine: ResearchEngine = {
 		async defineStudy(input: DefineStudyInput): Promise<StudySummary> {
 			assertKnownFunctions(input.expression);
 			const study: StudySummary = { id: id('study'), ...input };
@@ -291,4 +404,6 @@ export function createApiEngine(
 			return get(store);
 		}
 	};
+	instanceSetCacheByEngine.set(engine, instanceSetCache);
+	return engine;
 }
