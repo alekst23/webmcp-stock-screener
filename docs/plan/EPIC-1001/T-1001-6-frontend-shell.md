@@ -1,7 +1,7 @@
 # T-1001-6: Frontend shell
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1001-7
 **Issue**: #1

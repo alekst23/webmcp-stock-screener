@@ -1,7 +1,7 @@
 # T-1001-1: Mock data layer
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1001-2, T-1001-3
 **Issue**: #1
@@ -84,3 +84,27 @@ does not need to be large or complete.
 ## Out of Scope
 
 The real paid backfill and nightly delta job (T-1001-9).
+
+## Implementation Notes
+
+- `backend/scripts/generate_mock_panel.py` builds a 25-ticker (`MOCK01`-`MOCK25`),
+  2023-01-03 to 2025-12-31 synthetic panel as `PriceBar` rows, written to
+  `backend/data/mock/panel.parquet`. All randomness flows through one
+  `numpy.random.default_rng(seed)` consumed in a fixed order, so a given
+  seed always reproduces byte-identical output (AC5).
+- `backend/scripts/known_pattern_instances.py` hand-authors 3 known
+  gap-up -> range-contraction -> breakout instances at fixed ticker/date
+  locations (`MOCK01`/2023-06-05, `MOCK02`/2024-03-04, `MOCK03`/2025-01-13),
+  for T-1001-3's temporal-matcher tests to assert against (AC2).
+- **Mismatch found and corrected (AC3/AC4):** EODHD's per-ticker EOD
+  endpoint returns raw `close` plus a separately back-adjusted
+  `adjusted_close`, but does **not** return adjusted `open`/`high`/`low` —
+  only `close` is adjusted directly. Naively mapping EODHD's raw
+  open/high/low onto `PriceBar` (which commits every OHLC field to the
+  adjusted basis) would put O/H/L on a different price basis than C across
+  any split or ex-dividend date. `backend/scripts/fetch_eodhd_sample.py`'s
+  `eodhd_row_to_price_bar` corrects this by scaling open/high/low by the
+  same `adjusted_close / close` ratio that produced the adjusted close.
+  Verified by `tests/functional/test_price_schema_conformance.py` against
+  a realistic EODHD row fixture (no live API key available in this
+  environment — see `backend/.env.example`).

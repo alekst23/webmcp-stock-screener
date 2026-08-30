@@ -39,3 +39,6 @@ npm-debug.log*
 .idea/
 *.swp
 .worktrees/
+
+# Vite
+vite.config.ts.timestamp-*

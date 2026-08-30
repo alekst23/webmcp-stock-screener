@@ -1,0 +1,72 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { env } from '$env/dynamic/public';
+	import { workspaceStore } from '$lib/workspace/store';
+	import { activityStore } from '$lib/workspace/activity';
+	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
+	import { connectWebmcp } from '$lib/webmcp/register';
+	import WorkspaceView from '$lib/workspace/WorkspaceView.svelte';
+	import GridPanel from '$lib/workspace/GridPanel.svelte';
+	import FocusChart from '$lib/workspace/FocusChart.svelte';
+	import HistogramPanel from '$lib/workspace/HistogramPanel.svelte';
+	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
+
+	const apiConfig = { baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' };
+
+	// The real fetch-based ResearchEngine (T-1001-5), the same one an agent's
+	// WebMCP tool calls resolve against -- registered here so a real
+	// WebMCP-capable browser sees the live tool surface on this page.
+	const engine = createApiEngine(workspaceStore, apiConfig);
+
+	// The instance selected from a grid cell (AC2), rendered as the larger
+	// detail chart below. Holds the already-fetched InstanceWindowView, not
+	// just a (ticker, date) -- there's no backend request that fetches a
+	// single named instance's window on its own (see FocusChart.svelte).
+	let focusedView = $state<InstanceWindowView | null>(null);
+
+	onMount(() => {
+		void connectWebmcp(engine, activityStore);
+	});
+</script>
+
+<main>
+	<h1>WebMCP Pattern Research Workbench</h1>
+	<p>
+		This is the shared research session — the same workspace state an agent reads and writes through
+		WebMCP tools. It persists in this browser across reloads.
+		<a href="/dev">Dev control surface →</a>
+	</p>
+
+	<ActivityFeed events={$activityStore} />
+
+	{#each $workspaceStore.panels as panel (panel.id)}
+		{#if panel.kind === 'grid'}
+			<GridPanel
+				{panel}
+				{engine}
+				config={apiConfig}
+				store={workspaceStore}
+				onselect={(view) => (focusedView = view)}
+			/>
+		{/if}
+	{/each}
+
+	{#if focusedView}
+		<FocusChart view={focusedView} />
+	{/if}
+
+	{#each $workspaceStore.instanceSets as set (set.id)}
+		<HistogramPanel instanceSetId={set.id} {engine} config={apiConfig} />
+	{/each}
+
+	<WorkspaceView state={$workspaceStore} />
+</main>
+
+<style>
+	main {
+		max-width: 720px;
+		margin: 2rem auto;
+		padding: 0 1rem;
+		font-family: system-ui, sans-serif;
+	}
+</style>
