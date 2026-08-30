@@ -1,7 +1,7 @@
 # T-1001-8: Deploy & ops (mock)
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
+**Status**: Blocked — awaiting live deployment (see runbook)
 **Depends on**: T-1001-4
 **Blocks**: T-1001-9
 **Issue**: #1
@@ -59,8 +59,52 @@ per `docs/plan.md`'s risk mitigation — no custom implementation needed.
   production, only during local dev.
 - `PUBLIC_API_BASE_URL` (frontend, SvelteKit public env convention) — the
   deployed backend's URL, feeds `ApiClientConfig.baseUrl` (T-1001-5).
+- `RATE_LIMIT_DEFAULT` (backend) — optional, `"<count>/<period>"` per the
+  `limits` package's syntax; defaults to `60/minute`. See
+  `backend/.env.example`.
+
+## Implementation notes (discovered while building this)
+
+- **slowapi's `SlowAPIMiddleware` is broken against the FastAPI version
+  this repo pins (`>=0.141.1`).** It locates the matched route by walking
+  `app.routes` and reading each entry's `.endpoint`; FastAPI now lazily
+  wraps `include_router()`-registered routes behind an opaque
+  `_IncludedRouter` with no `.endpoint`, so that walk never finds a match
+  and every request is silently exempted from rate limiting (verified
+  empirically — request counts never reached the configured storage under
+  `SlowAPIMiddleware`). `backend/main.py`'s `RateLimitMiddleware` checks
+  the limit directly via `slowapi`/`limits`' public `Limiter.limiter.hit()`
+  API instead, keyed only by client address, which needs no route
+  resolution and so isn't affected. Decorator-based `@limiter.limit(...)`
+  on an individual route would also have worked (it wraps the function
+  directly rather than walking `app.routes`) but only protects routes that
+  remember to add it — a blanket per-client check applies uniformly to
+  whatever routes exist now or get added later (e.g. T-1001-5's five tool
+  endpoints), matching AC4's "basic protection... on the public backend"
+  intent.
+- Only `GET /api/spike/ping` (T-1001-2) is registered in `backend/main.py`
+  as of this ticket — T-1001-5's five networked tool endpoints hadn't
+  landed yet. The runbook and rate-limit curl example both target that
+  endpoint; re-check `backend/main.py` once T-1001-5 lands and prefer one
+  of its endpoints instead.
+- `render.yaml`'s persistent disk is mounted directly over the path
+  `backend/api/routes/spike.py` already reads
+  (`backend/data/mock/panel.parquet`), so no application code changed to
+  make the deploy config work — the build command generates the panel
+  once (skipped on later deploys once the disk already has it), rehearsing
+  the "generate once, persist across deploys" shape T-1001-9's real
+  backfill + nightly delta job will need.
+- The frontend adapter is configured in `vite.config.ts` (inline in the
+  `sveltekit()` plugin's `adapter` option), not a separate
+  `svelte.config.js` — no such file exists in this repo; that's just how
+  this project's SvelteKit/Vite version wires it, already noted in a
+  pre-existing comment in `vite.config.ts` pointing at this ticket.
 
 ## Out of Scope
 
 The nightly automated data-refresh job — wiring that requires the real
-pipeline (T-1001-9) to exist first.
+pipeline (T-1001-9) to exist first. Also out of scope: actually carrying
+out the deployment (creating the Render/Cloudflare accounts, clicking
+through the dashboards) — see
+`docs/plan/EPIC-1001/T-1001-8-deployment-runbook.md` for those steps,
+which only a human can execute.

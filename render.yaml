@@ -1,0 +1,63 @@
+# T-1001-8: Render Blueprint for the backend Web Service.
+#
+# This is config only -- it is NOT applied to a live Render account by this
+# repo. A human deploys it by following
+# docs/plan/EPIC-1001/T-1001-8-deployment-runbook.md (connect the repo in
+# the Render dashboard, "New +" -> "Blueprint", point it at this file).
+#
+# Serves the mock dataset only (T-1001-1's synthetic panel) -- the real
+# EODHD-backed panel and its nightly refresh belong to T-1001-9 and will
+# extend this service's build/cron config, not replace it.
+
+services:
+  - type: "web"
+    name: "webmcp-pattern-research-api"
+    runtime: "python"
+    # Free tier is fine for validating the deploy itself; upgrade to a paid
+    # plan (avoids the cold-start-after-idle behavior docs/plan.md flags as
+    # a demo-recording risk) before recording the submission video.
+    plan: "free"
+    region: "oregon"
+    rootDir: "backend"
+    # uv isn't preinstalled on Render's native Python runtime; `pip install
+    # uv` puts it on the same venv's PATH the platform already activates.
+    # `uv sync --frozen` installs exactly what uv.lock pins -- no surprise
+    # upgrades on redeploy. The mock panel is a small, deterministic,
+    # seeded build artifact (see scripts/generate_mock_panel.py); generating
+    # it once and leaving it on the persistent disk (skipped on redeploys
+    # once present) rehearses the same "generate once, persist across
+    # deploys" shape T-1001-9's real backfill + nightly delta will use,
+    # which is this ticket's whole point -- validating the architecture
+    # ahead of the real pipeline.
+    buildCommand: >-
+      pip install uv &&
+      uv sync --frozen &&
+      (test -f data/mock/panel.parquet || uv run python scripts/generate_mock_panel.py)
+    startCommand: "uv run uvicorn main:app --host 0.0.0.0 --port $PORT"
+    # Exercises the same panel file the persistent disk is for -- if the
+    # mock panel failed to generate or the disk didn't mount, this fails
+    # closed instead of serving a broken deploy. Swap for a T-1001-5
+    # endpoint once one exists that doesn't depend on route-specific state.
+    healthCheckPath: "/api/spike/ping"
+    envVars:
+      # Secrets/deployment-specific values -- `sync: false` means Render
+      # will NOT populate them from this file; a human sets the real value
+      # once in the Render dashboard (see the runbook). Never commit real
+      # values here.
+      - key: "EODHD_API_KEY"
+        sync: false
+      - key: "CORS_ALLOWED_ORIGINS"
+        sync: false
+      # Non-secret, safe to version: see backend/main.py's
+      # `_rate_limit_default` for the "<count>/<period>" syntax (AC4).
+      - key: "RATE_LIMIT_DEFAULT"
+        value: "60/minute"
+    disk:
+      name: "panel-data"
+      # Mounted over the exact path backend/api/routes/spike.py already
+      # reads (`backend/data/mock/panel.parquet`, i.e. `data/mock/...`
+      # relative to `rootDir: backend`) -- Render persists whatever's at
+      # this path across deploys, so no PANEL_PATH env var/code change is
+      # needed to make the build-time generation above actually durable.
+      mountPath: "/opt/render/project/src/backend/data"
+      sizeGB: 1

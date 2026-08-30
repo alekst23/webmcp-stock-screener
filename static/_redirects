@@ -1,0 +1,7 @@
+# T-1001-8: Cloudflare Pages SPA fallback. The frontend is client-rendered
+# only (ssr = false, no route declares prerender = true -- see
+# vite.config.ts), so a direct load of any route (e.g. bookmarking /spike)
+# must be served the same built shell and let SvelteKit's client-side
+# router take over, rather than 404ing on a path Pages has no static file
+# for.
+/*    /index.html   200
