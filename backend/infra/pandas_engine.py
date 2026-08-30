@@ -12,6 +12,7 @@ candidate anchor. That walk loops over a small number of candidate anchors
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
@@ -21,7 +22,7 @@ import pandas as pd
 
 from domain.contracts.engine import SampleStrategy, SplitMode
 from domain.models.instance import Instance, InstanceSet
-from domain.models.measurement import InstanceWindow, MeasureResult
+from domain.models.measurement import BaseRateResult, InstanceWindow, MeasureResult
 from domain.models.pattern import Setup, SetupStep, Study
 from domain.models.price import PriceBar
 from domain.models.universe import TickerMetadata
@@ -29,6 +30,11 @@ from infra.expression import BASE_FIELDS, ExpressionEvaluator, parse_expression
 
 # Sparse-completed-matches fallback threshold (spec.md "Instance search").
 _PARTIAL_FALLBACK_THRESHOLD = 5
+
+# Base rate (AC3) is computed over a random sample of the whole panel's
+# anchor points rather than every row, so measure() stays fast even on a
+# large real-data panel; 500 draws is plenty to stabilize median/hit-rate.
+_BASE_RATE_SAMPLE_SIZE = 500
 
 _StepStatus = Literal["resolved", "failed", "partial"]
 
@@ -61,6 +67,10 @@ class PandasPatternResearchEngine:
         self._studies: dict[str, Study] = {}  # keyed by name — "referenceable by name"
         self._setups: dict[str, Setup] = {}
         self._next_id = 1
+        # Lazily built, cached on first use (panel is immutable after init).
+        self._ticker_frames_cache: dict[str, pd.DataFrame] | None = None
+        self._date_positions_cache: dict[str, dict[date, int]] | None = None
+        self._full_index_cache: dict[tuple[str, date], int] | None = None
 
     @classmethod
     def from_price_bars(
@@ -248,7 +258,7 @@ class PandasPatternResearchEngine:
             return _StepOutcome("partial", None)
         return _StepOutcome("failed", None)
 
-    # ---- Delivered by T-1001-4 (depends on this ticket) ----
+    # ---- Instance sampling (AC1) ----
 
     def sample_instances(
         self,
@@ -257,7 +267,31 @@ class PandasPatternResearchEngine:
         strategy: SampleStrategy = "recent",
         horizon_days: int | None = None,
     ) -> list[Instance]:
-        raise NotImplementedError("delivered by T-1001-4")
+        if strategy == "recent":
+            return sorted(instance_set.instances, key=lambda inst: inst.date, reverse=True)[:n]
+        if strategy == "random":
+            return random.sample(instance_set.instances, min(n, len(instance_set.instances)))
+        if strategy in ("best", "worst"):
+            if horizon_days is None:
+                raise ValueError(f'sample strategy "{strategy}" requires horizon_days')
+            return self._sample_by_forward_return(instance_set.instances, n, horizon_days, strategy)
+        raise ValueError(f'unknown sample strategy "{strategy}"')
+
+    def _sample_by_forward_return(
+        self, instances: list[Instance], n: int, horizon_days: int, strategy: SampleStrategy
+    ) -> list[Instance]:
+        """Ranks by forward return, silently dropping instances whose return
+        isn't computable yet (e.g. too close to the panel's trailing edge) —
+        there's nothing to rank them by."""
+        scored: list[tuple[float, Instance]] = []
+        for inst in instances:
+            ret = self._forward_return(inst.ticker, inst.date, horizon_days)
+            if ret is not None:
+                scored.append((ret, inst))
+        scored.sort(key=lambda pair: pair[0], reverse=(strategy == "best"))
+        return [inst for _, inst in scored[:n]]
+
+    # ---- Outcome measurement (AC2, AC3) ----
 
     def measure(
         self,
@@ -266,7 +300,77 @@ class PandasPatternResearchEngine:
         metric: str | None = None,
         compare_to_base_rate: bool = True,
     ) -> MeasureResult:
-        raise NotImplementedError("delivered by T-1001-4")
+        # `metric` is a display label only — the only metric this engine
+        # currently computes is closing-price forward return (spec.md gives
+        # no other concrete metric definition to implement against).
+        resolved = [inst for inst in instance_set.instances if inst.completeness >= 1.0]
+        excluded_partial = len(instance_set.instances) - len(resolved)
+        pairs = [(inst.ticker, inst.date) for inst in resolved]
+        count, median, mean, hit_rate = self._summarize_returns(
+            self._forward_returns(pairs, horizon_days)
+        )
+        base_rate = (
+            self._compute_base_rate(instance_set, horizon_days) if compare_to_base_rate else None
+        )
+        return MeasureResult(
+            metric=metric or "forward_return",
+            horizon_days=horizon_days,
+            count=count,
+            median=median,
+            mean=mean,
+            hit_rate=hit_rate,
+            base_rate=base_rate,
+            excluded_partial_count=excluded_partial if excluded_partial > 0 else None,
+        )
+
+    def _compute_base_rate(self, instance_set: InstanceSet, horizon_days: int) -> BaseRateResult:
+        pairs = self._broad_anchor_sample(instance_set.from_date, instance_set.to_date)
+        _, median, _, hit_rate = self._summarize_returns(self._forward_returns(pairs, horizon_days))
+        return BaseRateResult(median=median, hit_rate=hit_rate)
+
+    def _broad_anchor_sample(self, from_date: date, to_date: date) -> list[tuple[str, date]]:
+        """A broad, unbiased sample of (ticker, date) anchor points from the
+        whole panel over the same period — NOT filtered to the setup's own
+        instances, so it represents the base rate (AC3)."""
+        mask = (self._panel["date"] >= from_date) & (self._panel["date"] <= to_date)
+        candidates = list(zip(self._panel.loc[mask, "ticker"], self._panel.loc[mask, "date"]))
+        if len(candidates) > _BASE_RATE_SAMPLE_SIZE:
+            candidates = random.sample(candidates, _BASE_RATE_SAMPLE_SIZE)
+        return candidates
+
+    def _forward_returns(self, pairs: list[tuple[str, date]], horizon_days: int) -> list[float]:
+        returns = []
+        for ticker, on_date in pairs:
+            value = self._forward_return(ticker, on_date, horizon_days)
+            if value is not None:
+                returns.append(value)
+        return returns
+
+    def _summarize_returns(self, returns: list[float]) -> tuple[int, float, float, float]:
+        if not returns:
+            return 0, 0.0, 0.0, 0.0
+        arr = np.array(returns, dtype=float)
+        return len(arr), float(np.median(arr)), float(np.mean(arr)), float((arr > 0).mean())
+
+    def _forward_return(self, ticker: str, on_date: date, horizon_days: int) -> float | None:
+        """(close[i + horizon_days] - close[i]) / close[i], where i is
+        `on_date`'s row position within `ticker`'s own sorted rows. None if
+        `on_date` isn't found or the horizon runs past the panel's edge."""
+        frame = self._ticker_frames().get(ticker)
+        positions = self._date_positions().get(ticker)
+        if frame is None or positions is None or on_date not in positions:
+            return None
+        i = positions[on_date]
+        j = i + horizon_days
+        if j < 0 or j >= len(frame):
+            return None
+        close0 = float(frame.at[i, "close"])
+        closej = float(frame.at[j, "close"])
+        if close0 == 0:
+            return None
+        return (closej - close0) / close0
+
+    # ---- Instance splitting (AC4) ----
 
     def split_instances(
         self,
@@ -276,7 +380,67 @@ class PandasPatternResearchEngine:
         horizon_days: int | None = None,
         threshold: float | None = None,
     ) -> list[InstanceSet]:
-        raise NotImplementedError("delivered by T-1001-4")
+        if mode == "outcome":
+            if horizon_days is None:
+                raise ValueError('split mode "outcome" requires horizon_days')
+            return self._split_by_outcome(instance_set, horizon_days, threshold or 0.0)
+        if mode == "condition":
+            if expression is None:
+                raise ValueError('split mode "condition" requires expression')
+            return self._split_by_condition(instance_set, expression)
+        raise ValueError(f'unknown split mode "{mode}"')
+
+    def _split_by_outcome(
+        self, instance_set: InstanceSet, horizon_days: int, threshold: float
+    ) -> list[InstanceSet]:
+        winners: list[Instance] = []
+        losers: list[Instance] = []
+        for inst in instance_set.instances:
+            if inst.completeness < 1.0:
+                continue  # no resolved forward return to classify by yet
+            ret = self._forward_return(inst.ticker, inst.date, horizon_days)
+            if ret is None:
+                continue
+            (winners if ret > threshold else losers).append(inst)
+        return [
+            self._child_set(instance_set, winners, "winners"),
+            self._child_set(instance_set, losers, "losers"),
+        ]
+
+    def _split_by_condition(self, instance_set: InstanceSet, expression: str) -> list[InstanceSet]:
+        study_expressions = {s.name: s.expression for s in self._studies.values()}
+        evaluator = ExpressionEvaluator(self._panel, study_expressions)
+        condition = evaluator.evaluate_condition(expression)
+        true_group: list[Instance] = []
+        false_group: list[Instance] = []
+        for inst in instance_set.instances:
+            at_anchor = self._condition_at(condition, inst.ticker, inst.date)
+            (true_group if at_anchor else false_group).append(inst)
+        return [
+            self._child_set(instance_set, true_group, f"{expression}: true"),
+            self._child_set(instance_set, false_group, f"{expression}: false"),
+        ]
+
+    def _condition_at(self, condition: pd.Series, ticker: str, on_date: date) -> bool:
+        position = self._full_index().get((ticker, on_date))
+        if position is None:
+            return False
+        return bool(condition.loc[position])
+
+    def _child_set(self, parent: InstanceSet, instances: list[Instance], label: str) -> InstanceSet:
+        return InstanceSet(
+            id=self._new_id("set"),
+            setup_id=parent.setup_id,
+            instances=instances,
+            complete_count=sum(1 for inst in instances if inst.completeness >= 1.0),
+            partial_count=sum(1 for inst in instances if inst.completeness < 1.0),
+            from_date=parent.from_date,
+            to_date=parent.to_date,
+            parent_id=parent.id,
+            label=label,
+        )
+
+    # ---- Grid visualization data (AC5) ----
 
     def get_instance_windows(
         self,
@@ -285,4 +449,58 @@ class PandasPatternResearchEngine:
         strategy: SampleStrategy = "recent",
         window: tuple[int, int] = (-20, 20),
     ) -> list[InstanceWindow]:
-        raise NotImplementedError("delivered by T-1001-4")
+        sampled = self.sample_instances(instance_set, n=n, strategy=strategy)
+        return [self._instance_window(inst, window) for inst in sampled]
+
+    def _instance_window(self, instance: Instance, window: tuple[int, int]) -> InstanceWindow:
+        frame = self._ticker_frames().get(instance.ticker)
+        positions = self._date_positions().get(instance.ticker)
+        if frame is None or positions is None or instance.date not in positions:
+            return InstanceWindow(ticker=instance.ticker, bars=[])
+        anchor = positions[instance.date]
+        # Clip to the panel's edge rather than erroring — a shorter window
+        # for one edge instance shouldn't fail the whole grid.
+        start = max(0, anchor + window[0])
+        end = min(len(frame) - 1, anchor + window[1])
+        bars = [self._row_to_bar(frame.iloc[pos]) for pos in range(start, end + 1)]
+        return InstanceWindow(ticker=instance.ticker, bars=bars)
+
+    def _row_to_bar(self, row: pd.Series) -> PriceBar:
+        return PriceBar(
+            ticker=row["ticker"],
+            date=row["date"],
+            open=float(row["open"]),
+            high=float(row["high"]),
+            low=float(row["low"]),
+            close=float(row["close"]),
+            volume=int(row["volume"]),
+        )
+
+    # ---- Cached lookup structures (built lazily; panel is immutable) ----
+
+    def _ticker_frames(self) -> dict[str, pd.DataFrame]:
+        if self._ticker_frames_cache is None:
+            self._ticker_frames_cache = {
+                str(ticker): frame.reset_index(drop=True)
+                for ticker, frame in self._panel.groupby("ticker", sort=False)
+            }
+        return self._ticker_frames_cache
+
+    def _date_positions(self) -> dict[str, dict[date, int]]:
+        """ticker -> {date: row position within that ticker's own rows}."""
+        if self._date_positions_cache is None:
+            self._date_positions_cache = {
+                ticker: {d: i for i, d in enumerate(frame["date"])}
+                for ticker, frame in self._ticker_frames().items()
+            }
+        return self._date_positions_cache
+
+    def _full_index(self) -> dict[tuple[str, date], int]:
+        """(ticker, date) -> row label in `self._panel` — for aligning with a
+        condition Series computed over the full panel (unlike the per-ticker
+        positions above, used for row-offset windowing/forward-return math)."""
+        if self._full_index_cache is None:
+            self._full_index_cache = dict(
+                zip(zip(self._panel["ticker"], self._panel["date"]), self._panel.index)
+            )
+        return self._full_index_cache

@@ -1,7 +1,7 @@
 # T-1001-4: Query engine stats
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1001-3
 **Blocks**: T-1001-5, T-1001-8
 **Issue**: #1
