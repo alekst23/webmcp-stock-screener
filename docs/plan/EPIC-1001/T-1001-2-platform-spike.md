@@ -1,7 +1,7 @@
 # T-1001-2: Platform spike
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
+**Status**: Blocked — awaiting live human verification (see runbook)
 **Depends on**: T-1001-1
 **Blocks**: T-1001-5
 **Issue**: #1
@@ -74,3 +74,20 @@ for the actual submission demo.
 ## Out of Scope
 
 The full 9-tool surface — one tool is enough to prove the mechanism.
+
+## Implementation Note (scope correction)
+
+The original AC4/Solution Approach text above called for the backend
+"deployed to Render" / "on the hosting platform intended for the project."
+That was corrected during implementation: deploying to Render is T-1001-8's
+job and requires human cloud-account access an autonomous coding agent
+doesn't have. What was actually built and verified here is the backend
+running **locally** (`uv run uvicorn main:app --reload`) with the WebMCP
+tool's `execute()` making a real `fetch()` HTTP request to that
+separately-running local process — a genuine network round trip to a live
+process, just not yet a deployed one. AC1, AC2, and AC5 (the real-agent,
+real-browser half) are unverifiable by an autonomous coding agent and are
+handed off to a human via
+[`T-1001-2-live-verification-runbook.md`](T-1001-2-live-verification-runbook.md).
+This ticket's status stays `Blocked` until that runbook is executed and its
+outcome recorded.
