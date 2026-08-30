@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import adapter from '@sveltejs/adapter-auto';
+import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
@@ -11,9 +11,18 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			// adapter-auto only supports some environments; swap for a specific
-			// adapter once a deploy target is chosen (see T-1001-8).
-			adapter: adapter()
+			// T-1001-8: static output for Cloudflare Pages. Every route already
+			// disables SSR (see src/routes/+layout.ts -- there's no backend
+			// session to render against), so this is a pure client-side SPA: no
+			// route declares `prerender = true`, so `fallback` builds one shell
+			// (build/index.html) that Cloudflare Pages serves for any path not
+			// matching a static asset -- see the routing rule in static/_redirects.
+			adapter: adapter({
+				pages: 'build',
+				assets: 'build',
+				fallback: 'index.html',
+				strict: true
+			})
 		})
 	],
 	test: {
