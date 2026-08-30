@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildTools } from '../webmcp/tools';
-import { createDevEngine } from './devEngine';
+import { createApiEngine } from './apiEngine';
 import { createWorkspaceStore } from './store';
 
 // In-memory Storage so each test gets an isolated backing store instead of
@@ -20,10 +20,54 @@ function memoryStorage(): Storage {
 	};
 }
 
+// These tests exercise the workspace store's contract against the real
+// ResearchEngine implementation (createApiEngine) rather than a
+// devEngine-style fake -- the store/persistence/dev-surface behavior must
+// hold for the engine an agent actually calls through, not just a
+// placeholder. findInstances/showGrid are the only tool calls below that
+// cross the network, so this stubs fetch() rather than running a live
+// backend (src/lib/webmcp/integration.test.ts covers the fetch-layer logic
+// itself in depth).
+function stubResearchFetch(): void {
+	let nextSetId = 1;
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async (url: string, init?: RequestInit) => {
+			const path = new URL(url).pathname;
+			if (path === '/api/research/find-instances') {
+				const body = JSON.parse(init?.body as string) as { setup: { id: string } };
+				const set = {
+					id: `set_${nextSetId++}`,
+					setup_id: body.setup.id,
+					instances: [{ ticker: 'ACME', date: '2024-03-08', completeness: 1 }],
+					complete_count: 1,
+					partial_count: 0,
+					from_date: '2015-01-02',
+					to_date: '2026-08-25'
+				};
+				return { ok: true, json: async () => set };
+			}
+			if (path === '/api/research/instance-windows') {
+				return { ok: true, json: async () => [] };
+			}
+			throw new Error(`stubResearchFetch: unexpected request to ${url}`);
+		})
+	);
+}
+
+function apiEngine(store: ReturnType<typeof createWorkspaceStore>) {
+	return createApiEngine(store, { baseUrl: 'http://localhost:8000' });
+}
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
+
 describe('workspace state visibility', () => {
 	it('reflects defined studies, setups, result sets, panels, and focus/selection in one readable view', async () => {
+		stubResearchFetch();
 		const store = createWorkspaceStore(memoryStorage());
-		const engine = createDevEngine(store);
+		const engine = apiEngine(store);
 
 		const study = await engine.defineStudy({
 			name: 'rel_vol_20',
@@ -57,9 +101,10 @@ describe('workspace state visibility', () => {
 
 describe('workspace persistence', () => {
 	it('restores workspace state after a simulated page reload in the same browser', async () => {
+		stubResearchFetch();
 		const storage = memoryStorage();
 		const storeBeforeReload = createWorkspaceStore(storage);
-		const engine = createDevEngine(storeBeforeReload);
+		const engine = apiEngine(storeBeforeReload);
 
 		const setup = await engine.defineSetup({ steps: [{ condition: 'gap_pct > 4' }] });
 		await engine.findInstances({ setupId: setup.id });
@@ -81,7 +126,7 @@ describe('workspace persistence', () => {
 describe('dev control surface', () => {
 	it('lets a manual tool invocation update the same state view an agent would read', async () => {
 		const store = createWorkspaceStore(memoryStorage());
-		const engine = createDevEngine(store);
+		const engine = apiEngine(store);
 		const defineStudy = buildTools(engine).find((t) => t.name === 'defineStudy');
 		expect(defineStudy, 'defineStudy tool should be registered').toBeDefined();
 

@@ -1,17 +1,20 @@
 <script lang="ts">
+	import { env } from '$env/dynamic/public';
 	import { dev } from '$app/environment';
 	import { workspaceStore } from '$lib/workspace/store';
-	import { createDevEngine } from '$lib/workspace/devEngine';
+	import { createApiEngine } from '$lib/workspace/apiEngine';
 	import { buildTools } from '$lib/webmcp/tools';
 	import WorkspaceView from '$lib/workspace/WorkspaceView.svelte';
 	import type { ToolResult } from '$lib/webmcp/types';
 
-	// T-1001-5 will swap this placeholder engine for a real fetch-based
-	// ResearchEngine wired to the FastAPI backend. Until then this lets a
-	// developer exercise the full tool surface without an AI agent or a
-	// WebMCP-capable browser (AC3), against the same store the human view
-	// reads from (AC4).
-	const engine = createDevEngine(workspaceStore);
+	// Real fetch-based ResearchEngine (T-1001-5), wired to the FastAPI
+	// backend. Lets a developer exercise the full tool surface without an AI
+	// agent or a WebMCP-capable browser (AC3), against the same store the
+	// human view reads from (AC4) and the same live backend an agent's tool
+	// calls would hit.
+	const engine = createApiEngine(workspaceStore, {
+		baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+	});
 	const tools = buildTools(engine);
 
 	let inputs = $state<Record<string, string>>(Object.fromEntries(tools.map((t) => [t.name, '{}'])));

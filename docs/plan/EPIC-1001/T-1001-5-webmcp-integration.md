@@ -1,7 +1,7 @@
 # T-1001-5: WebMCP integration
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1001-2, T-1001-4
 **Blocks**: T-1001-7
 **Issue**: #1
