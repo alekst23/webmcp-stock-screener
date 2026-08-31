@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { alignInstanceWindow } from './visualization';
+	import PriceChart from './PriceChart.svelte';
 	import type { InstanceWindowView } from './apiEngine';
 
 	// AC2: a single instance selected from the grid (GridPanel's onselect),
@@ -14,28 +15,6 @@
 	const CHART_HEIGHT = 220;
 
 	const aligned = $derived(alignInstanceWindow(view));
-
-	function linePath(bars: InstanceWindowView['bars']): string {
-		const closes = bars.map((b) => b.close);
-		if (closes.length === 0) {
-			return '';
-		}
-		const min = Math.min(...closes);
-		const max = Math.max(...closes);
-		const range = max - min || 1;
-		const lastIndex = Math.max(1, closes.length - 1);
-		return closes
-			.map((close, i) => {
-				const x = (i / lastIndex) * CHART_WIDTH;
-				const y = CHART_HEIGHT - ((close - min) / range) * CHART_HEIGHT;
-				return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-			})
-			.join(' ');
-	}
-
-	const anchorX = $derived(
-		(aligned.anchorIndex / Math.max(1, aligned.bars.length - 1)) * CHART_WIDTH
-	);
 </script>
 
 <section class="focus-chart">
@@ -46,10 +25,13 @@
 	{#if aligned.bars.length === 0}
 		<p class="empty">No price data available for this instance.</p>
 	{:else}
-		<svg viewBox="0 0 {CHART_WIDTH} {CHART_HEIGHT}" preserveAspectRatio="none">
-			<line x1={anchorX} y1="0" x2={anchorX} y2={CHART_HEIGHT} class="anchor" />
-			<path d={linePath(aligned.bars)} class="line" />
-		</svg>
+		<PriceChart
+			bars={aligned.bars}
+			anchorIndex={aligned.anchorIndex}
+			width={CHART_WIDTH}
+			height={CHART_HEIGHT}
+			variant="detail"
+		/>
 		<p class="range">
 			{aligned.bars[0]!.date} → {aligned.bars[aligned.bars.length - 1]!.date} ({aligned.bars.length} bars)
 		</p>
@@ -78,21 +60,6 @@
 	.empty {
 		color: #888;
 		font-style: italic;
-	}
-	svg {
-		width: 100%;
-		height: 220px;
-		background: #fafafa;
-	}
-	.line {
-		fill: none;
-		stroke: #2a6;
-		stroke-width: 2;
-	}
-	.anchor {
-		stroke: #999;
-		stroke-width: 1;
-		stroke-dasharray: 3 3;
 	}
 	.range {
 		font-size: 0.8rem;

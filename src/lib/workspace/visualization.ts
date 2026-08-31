@@ -42,3 +42,83 @@ export function alignInstanceWindows(views: InstanceWindowView[]): AlignedWindow
 	return views.map(alignInstanceWindow);
 }
 
+export interface ChartGeometry {
+	min: number;
+	max: number;
+	// Bar index -> SVG x coordinate (viewBox space, not rendered pixels --
+	// PriceChart.svelte's pointer handling converts client coordinates into
+	// this space via the SVG's own bounding rect before calling nearestBarIndex).
+	x: (index: number) => number;
+	// Close price -> SVG y coordinate (viewBox space).
+	y: (close: number) => number;
+	linePath: string;
+	// Same path as linePath, closed down to the chart's bottom edge -- for
+	// PriceChart.svelte's filled-area gradient under the line.
+	areaPath: string;
+}
+
+const EMPTY_GEOMETRY: ChartGeometry = {
+	min: 0,
+	max: 0,
+	x: () => 0,
+	y: () => 0,
+	linePath: '',
+	areaPath: ''
+};
+
+export function computeChartGeometry(
+	bars: BackendPriceBar[],
+	width: number,
+	height: number
+): ChartGeometry {
+	const closes = bars.map((b) => b.close);
+	if (closes.length === 0) {
+		return EMPTY_GEOMETRY;
+	}
+	const min = Math.min(...closes);
+	const max = Math.max(...closes);
+	const range = max - min || 1;
+	const lastIndex = Math.max(1, closes.length - 1);
+	const x = (index: number): number => (index / lastIndex) * width;
+	const y = (close: number): number => height - ((close - min) / range) * height;
+	const linePath = closes
+		.map((close, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(close).toFixed(1)}`)
+		.join(' ');
+	const areaPath = `${linePath} L${x(lastIndex).toFixed(1)},${height} L${x(0).toFixed(1)},${height} Z`;
+	return { min, max, x, y, linePath, areaPath };
+}
+
+// Maps a pointer's x position (already converted into the chart's viewBox
+// coordinate space by the caller) to the nearest bar index, for hover
+// tooltips/crosshairs.
+export function nearestBarIndex(viewBoxX: number, barCount: number, width: number): number {
+	if (barCount === 0) {
+		return 0;
+	}
+	const lastIndex = barCount - 1;
+	const fraction = Math.min(1, Math.max(0, viewBoxX / width));
+	return Math.round(fraction * lastIndex);
+}
+
+// Evenly spaced values between min and max (inclusive), for axis tick
+// labels. Collapses to a single tick when the range is zero or count <= 1.
+export function axisTicks(min: number, max: number, count: number): number[] {
+	if (count <= 1 || min === max) {
+		return [max];
+	}
+	return Array.from({ length: count }, (_, i) => min + ((max - min) * i) / (count - 1));
+}
+
+// Evenly spaced bar indices (inclusive of the first and last bar), for
+// x-axis date labels.
+export function axisTickIndices(barCount: number, count: number): number[] {
+	if (barCount === 0) {
+		return [];
+	}
+	const lastIndex = barCount - 1;
+	if (count <= 1 || lastIndex === 0) {
+		return [0];
+	}
+	return Array.from({ length: count }, (_, i) => Math.round((lastIndex * i) / (count - 1)));
+}
+

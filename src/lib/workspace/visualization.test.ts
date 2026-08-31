@@ -3,7 +3,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { connectWebmcp } from '../webmcp/register';
 import { ok, fail } from '../webmcp/tools';
 import { recordAction, type AgentActivityEvent } from './activity';
-import { alignInstanceWindows } from './visualization';
+import {
+	alignInstanceWindows,
+	axisTickIndices,
+	axisTicks,
+	computeChartGeometry,
+	nearestBarIndex
+} from './visualization';
 import { createApiEngine, type BackendPriceBar, type InstanceWindowView } from './apiEngine';
 import { createWorkspaceStore, selectInstance } from './store';
 import type { ModelContext, ModelContextToolDescriptor } from '../webmcp/types';
@@ -83,6 +89,48 @@ describe('instance focus', () => {
 			ws.focus?.focusedInstance,
 			'the agent-driven focus must survive a human selection untouched'
 		).toEqual({ ticker: 'AGENT_PICK', date: '2024-01-01' });
+	});
+});
+
+describe('chart geometry and hover interaction', () => {
+	it('scales bars into the chart viewport and finds the nearest bar under a pointer', () => {
+		const bars = [bar('X', '2024-01-01', 10), bar('X', '2024-01-02', 20), bar('X', '2024-01-03', 15)];
+
+		const geometry = computeChartGeometry(bars, 100, 50);
+
+		expect(geometry.min).toBe(10);
+		expect(geometry.max).toBe(20);
+		expect(geometry.x(0), 'first bar sits at the left edge').toBe(0);
+		expect(geometry.x(2), 'last bar sits at the right edge').toBe(100);
+		expect(geometry.y(20), 'the max close sits at the top (y=0)').toBe(0);
+		expect(geometry.y(10), 'the min close sits at the bottom (y=height)').toBe(50);
+
+		expect(nearestBarIndex(0, bars.length, 100)).toBe(0);
+		expect(nearestBarIndex(100, bars.length, 100)).toBe(2);
+		expect(
+			nearestBarIndex(51, bars.length, 100),
+			'a pointer just past the midpoint snaps to the middle bar'
+		).toBe(1);
+		expect(
+			nearestBarIndex(-10, bars.length, 100),
+			'a pointer outside the chart clamps to the nearest edge bar'
+		).toBe(0);
+	});
+
+	it('handles an empty bar list without throwing', () => {
+		const geometry = computeChartGeometry([], 100, 50);
+		expect(geometry.linePath).toBe('');
+		expect(geometry.areaPath).toBe('');
+		expect(nearestBarIndex(50, 0, 100)).toBe(0);
+	});
+
+	it('spaces axis ticks evenly across the value and bar-index range', () => {
+		expect(axisTicks(0, 10, 3)).toEqual([0, 5, 10]);
+		expect(axisTicks(5, 5, 3), 'a flat range collapses to one tick').toEqual([5]);
+
+		expect(axisTickIndices(9, 3), 'first, middle, last bar').toEqual([0, 4, 8]);
+		expect(axisTickIndices(1, 3), 'a single bar has only one index to show').toEqual([0]);
+		expect(axisTickIndices(0, 3), 'no bars means no ticks').toEqual([]);
 	});
 });
 

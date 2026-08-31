@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Writable } from 'svelte/store';
 	import { alignInstanceWindows, type AlignedWindow } from './visualization';
+	import PriceChart from './PriceChart.svelte';
 	import {
 		fetchInstanceWindows,
 		resolveBackendInstanceSet,
@@ -87,32 +88,6 @@
 		removePanel(store, panel.id);
 	}
 
-	// Line path indexed to the bar array, not real dates -- this is the
-	// "aligned to its own anchor date" behavior AC1 asks for: two instances
-	// with different bar-array lengths (edge clipping) still both render
-	// with their own t=0 at the correct fraction of the width.
-	function linePath(win: AlignedWindow): string {
-		const closes = win.bars.map((b) => b.close);
-		if (closes.length === 0) {
-			return '';
-		}
-		const min = Math.min(...closes);
-		const max = Math.max(...closes);
-		const range = max - min || 1;
-		const lastIndex = Math.max(1, closes.length - 1);
-		return closes
-			.map((close, i) => {
-				const x = (i / lastIndex) * CHART_WIDTH;
-				const y = CHART_HEIGHT - ((close - min) / range) * CHART_HEIGHT;
-				return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-			})
-			.join(' ');
-	}
-
-	function anchorX(win: AlignedWindow): number {
-		const lastIndex = Math.max(1, win.bars.length - 1);
-		return (win.anchorIndex / lastIndex) * CHART_WIDTH;
-	}
 </script>
 
 {#if !missingData}
@@ -137,10 +112,13 @@
 					class:partial={win.isPartial}
 					onclick={() => handleSelect(win, i)}
 				>
-					<svg viewBox="0 0 {CHART_WIDTH} {CHART_HEIGHT}" preserveAspectRatio="none">
-						<line x1={anchorX(win)} y1="0" x2={anchorX(win)} y2={CHART_HEIGHT} class="anchor" />
-						<path d={linePath(win)} class="line" />
-					</svg>
+					<PriceChart
+						bars={win.bars}
+						anchorIndex={win.anchorIndex}
+						width={CHART_WIDTH}
+						height={CHART_HEIGHT}
+						variant="mini"
+					/>
 					<span class="label"
 						>{win.ticker} — {win.date}{#if win.isPartial}
 							(partial){/if}</span
@@ -202,20 +180,6 @@
 	.cell.partial {
 		border-style: dashed;
 		border-color: #c90;
-	}
-	.cell svg {
-		width: 100%;
-		height: 60px;
-	}
-	.line {
-		fill: none;
-		stroke: #2a6;
-		stroke-width: 1.5;
-	}
-	.anchor {
-		stroke: #999;
-		stroke-width: 1;
-		stroke-dasharray: 2 2;
 	}
 	.label {
 		font-size: 0.7rem;
