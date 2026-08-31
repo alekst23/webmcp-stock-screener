@@ -40,10 +40,36 @@ so that I don't lose the transactional history I was just watching.
 
 ## Solution Approach
 
-Left to ticket design — likely mirrors `store.ts`'s
-read-on-init/write-on-update pattern applied to `activityStore` via a new
-`localStorage` key, rather than folding activity events into
-`WorkspaceState` itself (spec explicitly keeps the log its own store).
+Mirror `store.ts`'s `createWorkspaceStore` pattern exactly, applied to
+`activityStore`'s own key — the log stays its own store, not folded into
+`WorkspaceState` (spec explicitly keeps them separate; `WorkspaceState`
+has no `activity` field and this ticket doesn't add one).
+
+- `src/lib/workspace/activity.ts`: add `STORAGE_KEY =
+  'webmcp-activity-log'` (parallel to `store.ts`'s
+  `'webmcp-workspace-state'`).
+- `createActivityStore()` gains an optional `storage?: Storage` param
+  (default: real `localStorage` when defined, `undefined` otherwise —
+  same fallback `store.ts` uses so tests can pass an isolated in-memory
+  `Storage`). On init, read and `JSON.parse` any persisted array;
+  corrupted/missing data falls back to `[]` (matches `store.ts`'s
+  `readPersisted`'s try/catch — a bad slot must not crash the app on
+  load, AC3). `store.subscribe(...)` writes the full array back on every
+  update, same as `store.ts`.
+- The module-level singleton `export const activityStore =
+  createActivityStore();` stays a no-arg call — it now persists because
+  the default `storage` argument resolves to real `localStorage`.
+- `recordAction` (T-1002-1) is unaffected — it already only calls
+  `activity.update(...)`, which now happens to trigger a `subscribe`
+  write as a side effect of the store itself, not of the recording
+  function.
+
+No new domain contracts — `AgentActivityEvent`'s shape is unchanged
+(T-1002-1 already added `actor`); this ticket only changes how the store
+backing `activityStore` is constructed.
+
+**References:** `src/lib/workspace/activity.ts`, `src/lib/workspace/store.ts`
+(pattern to mirror).
 
 ## Out of Scope
 
