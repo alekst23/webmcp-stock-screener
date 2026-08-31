@@ -1,7 +1,7 @@
 # T-1004-1: WebMCP connection status in the page header
 
 **Design**: docs/design/pattern-research-workbench/
-**Status**: Implemented (pending review/close)
+**Status**: Done
 **Depends on**: —
 **Blocks**: —
 **Issue**: #4
