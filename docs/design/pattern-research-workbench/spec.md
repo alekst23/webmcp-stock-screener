@@ -48,7 +48,10 @@ at every step.
 6. **Instance splitting**: split a result set into labeled sub-sets, either
    by outcome (winners/losers) or by an arbitrary condition.
 7. **Grid visualization**: render a set of instances as small, aligned
-   charts for visual comparison.
+   charts for visual comparison, with a small set of actions attached
+   directly to the panel — not a disconnected control elsewhere on the
+   page. At minimum: toggle a histogram view of that panel's own outcome
+   distribution, and close/remove that specific panel.
 8. **Instance focus**: zoom a panel to a single instance for close
    inspection, independent of what the human has selected by hand.
 9. **Shared workspace & collaboration**: a single visible research session
@@ -114,6 +117,8 @@ at every step.
 |----------|-------|------|------|
 | Happy path | an existing result set | a grid is requested | a panel is created showing a sample of instances as small charts aligned at each instance's anchor date, optionally normalized and overlaid with studies |
 | Includes partial instances | a result set containing partial (in-progress) instances | a grid is requested including them | each partial instance's chart shows the price action that has occurred so far, without implying an outcome that hasn't happened yet |
+| Panel-scoped histogram | an open grid panel tied to an instance set | the panel's histogram action is used | a histogram of that same instance set's outcome distribution is shown, visibly associated with that panel — not a separate, disconnected control |
+| Individual panel removal | one or more open panels | a single panel is closed | only that panel is removed from the workspace; other open panels are unaffected |
 
 ### Instance focus
 
@@ -145,9 +150,12 @@ at every step.
 
 - User accounts, authentication, or any per-user identity — the workspace
   is anonymous and local to one browser.
-- Editing or deleting previously defined studies, setups, result sets, or
-  panels — the workspace is append-only within a session; starting over
-  means defining something new or reloading the page.
+- Editing or deleting previously defined studies, setups, or result sets
+  — the workspace is append-only within a session for these; starting
+  over means defining something new or reloading the page. Panels are the
+  one exception: closing a panel removes that visualization only — the
+  underlying study, setup, or result set it was built from is unaffected
+  and remains in the workspace.
 - Syncing workspace state across tabs, devices, or browsers — state is
   local to the single tab it was created in.
 - Intraday data, options data, or historical fundamentals — the workbench
@@ -164,6 +172,8 @@ at every step.
   rendering is unaffected — only the redundant text snapshot goes away).
 - Editing, deleting, or reordering log entries — the log is append-only,
   matching the workspace's existing append-only model.
+- New panel kinds beyond grid + its histogram toggle.
+- Reordering or resizing panels.
 
 ## Open Questions
 
@@ -171,4 +181,4 @@ None outstanding.
 
 ---
 
-*Implemented by: EPIC-1001, EPIC-1002*
+*Implemented by: EPIC-1001, EPIC-1002, EPIC-1003*
