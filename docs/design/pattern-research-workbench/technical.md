@@ -147,6 +147,24 @@ writes to `activityStore` any other way. It reuses the existing
 `ok`/`fail` `ToolResult` builders are exported so `ChartToolbar.svelte`
 can build the same result shape without re-implementing it.
 
+### `WebmcpStatus` / `formatWebmcpStatus` — header status contract (T-1004-1)
+
+`src/lib/webmcp/status.ts`. Pure formatter backing the header's "WebMCP
+status visible" / "Not WebMCP-capable" scenarios. `connected` is
+`connectWebmcp()`'s resolved value being non-null (i.e.
+`document.modelContext` was present); `toolCount` is
+`buildTools(engine).length` — the full defined tool surface, unaffected by
+feature #10's progressive availability.
+
+| Field | Type | Description |
+|----------------|------|-------------|
+| `connected` | `boolean` | whether `connectWebmcp()` returned a non-null connection |
+| `toolCount` | `number` | `buildTools(engine).length` |
+
+`formatWebmcpStatus(status: WebmcpStatus) -> string` — "WebMCP connected ·
+N tools available" when connected, otherwise a message stating WebMCP
+isn't available in this browser.
+
 ### `TickerMetadata` — universe classification (T-1001-9)
 
 `backend/domain/models/universe.py`. Sourced from a free Nasdaq screener

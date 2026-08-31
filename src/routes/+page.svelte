@@ -5,6 +5,8 @@
 	import { activityStore } from '$lib/workspace/activity';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
 	import { connectWebmcp } from '$lib/webmcp/register';
+	import { buildTools } from '$lib/webmcp/tools';
+	import { formatWebmcpStatus, type WebmcpStatus } from '$lib/webmcp/status';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
@@ -23,13 +25,23 @@
 	// single named instance's window on its own (see FocusChart.svelte).
 	let focusedView = $state<InstanceWindowView | null>(null);
 
+	// Static full tool surface (AC3) -- independent of feature #10's
+	// progressive availability, which only affects what's registered.
+	let webmcpStatus = $state<WebmcpStatus | null>(null);
+
 	onMount(() => {
-		void connectWebmcp(engine, activityStore);
+		const toolCount = buildTools(engine).length;
+		void connectWebmcp(engine, activityStore).then((connection) => {
+			webmcpStatus = { connected: connection !== null, toolCount };
+		});
 	});
 </script>
 
 <main>
 	<h1>WebMCP Pattern Research Workbench</h1>
+	{#if webmcpStatus}
+		<p class="webmcp-status">{formatWebmcpStatus(webmcpStatus)}</p>
+	{/if}
 	<p>
 		This is the shared research session — the same workspace state an agent reads and writes through
 		WebMCP tools. It persists in this browser across reloads.
@@ -63,5 +75,10 @@
 		margin: 2rem auto;
 		padding: 0 1rem;
 		font-family: system-ui, sans-serif;
+	}
+
+	.webmcp-status {
+		font-size: 0.9rem;
+		color: #555;
 	}
 </style>

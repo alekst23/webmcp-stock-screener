@@ -138,6 +138,8 @@ at every step.
 | Human actions are visible | a human triggers an action through a UI control (not the `/dev` testing harness) | the action completes | it appears in the same log as agent actions, in true chronological order relative to them |
 | Failed actions are visible | an action (human or agent) fails | the failure occurs | the log shows the failure with a readable reason, not silently dropped |
 | Log persists across reloads | a session with existing logged actions | the page is reloaded in the same browser | the full log is restored, matching how the rest of workspace state already persists |
+| WebMCP status visible | the page loads | the researcher looks at the page header | it shows whether WebMCP is connected and the total number of tools the app defines (e.g. "WebMCP connected · 11 tools available"), regardless of how many are currently unlocked by workflow state |
+| Not WebMCP-capable | the browser doesn't support `document.modelContext` | the page loads | the header shows that WebMCP isn't available in this browser, rather than a misleading "connected" state |
 
 ### Progressive tool availability
 
@@ -174,6 +176,9 @@ at every step.
   matching the workspace's existing append-only model.
 - New panel kinds beyond grid + its histogram toggle.
 - Reordering or resizing panels.
+- The header's tool count reflecting progressive availability (feature
+  #10) — it shows the full defined tool surface, not what's currently
+  unlocked.
 
 ## Open Questions
 
@@ -181,4 +186,4 @@ None outstanding.
 
 ---
 
-*Implemented by: EPIC-1001, EPIC-1002, EPIC-1003*
+*Implemented by: EPIC-1001, EPIC-1002, EPIC-1003, EPIC-1004*
