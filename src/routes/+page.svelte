@@ -51,7 +51,7 @@
 
 	<ActivityFeed events={$activityStore} />
 
-	<SnapshotPicker store={workspaceStore} />
+	<SnapshotPicker store={workspaceStore} onload={() => (focusedView = null)} />
 
 	<ChartToolbar {engine} activity={activityStore} onclear={() => (focusedView = null)} />
 

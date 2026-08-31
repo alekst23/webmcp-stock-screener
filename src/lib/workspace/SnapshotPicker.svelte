@@ -10,7 +10,10 @@
 	} from './snapshots';
 	import { hasUnsavedChanges } from './snapshotGuard';
 
-	let { store }: { store: Writable<WorkspaceState> } = $props();
+	let {
+		store,
+		onload
+	}: { store: Writable<WorkspaceState>; onload?: () => void } = $props();
 
 	let name = $state('');
 	let snapshots = $state<SnapshotSummary[]>(listSnapshots());
@@ -59,6 +62,13 @@
 		}
 		store.set(loaded);
 		baseline = loaded;
+		// The loaded snapshot's own focus/panels replace the store's, but the
+		// page's separately-fetched focus detail view (keyed off the *old*
+		// focus) doesn't reset itself -- without this, a snapshot whose own
+		// focus.selected points at a different instance renders the previous
+		// chart's data under the new focus state. Mirrors ChartToolbar's
+		// existing onclear callback for the same class of stale-view problem.
+		onload?.();
 	}
 
 	function remove(snapshotName: string): void {
