@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1002 (Unified Action Log)
 **Design**: docs/design/pattern-research-workbench/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1002-1
 **Blocks**: —
 **Issue**: #2
@@ -45,9 +45,11 @@ raw state dump.
 ## Solution Approach
 
 Structural change only, no new contracts — `ActivityFeed.svelte` and
-`+page.svelte` are edited; `WorkspaceView.svelte` is deleted outright
-(the Dead Code Policy doesn't allow leaving it unrendered in the tree
-once nothing imports it).
+`+page.svelte` are edited. `WorkspaceView.svelte` itself is kept, not
+deleted: `src/routes/dev/+page.svelte` also renders it, and the epic's
+Out of Scope explicitly excludes any change to the `/dev` control
+surface — deleting the file would break `/dev` to satisfy AC3, which
+only requires removing the dump from the human-facing page.
 
 - `ActivityFeed.svelte`: each `<li>` gains an actor badge, sourced from a
   small exported pure helper `actorLabel(actor: 'human' | 'agent'):
@@ -66,17 +68,18 @@ once nothing imports it).
   `recordAction`'s `activity.update((events) => [...events, event])`, so
   array order already equals call order (AC2) — the component renders
   `events` as given, no client-side sort.
-- `WorkspaceView.svelte` is deleted; its
-  `<WorkspaceView state={$workspaceStore} />` usage and import are
-  removed from `src/routes/+page.svelte` (AC3). `workspaceStore`'s own
-  import/usage in `+page.svelte` is untouched — `$workspaceStore.panels`,
-  `.instanceSets`, and `.focus` still drive `GridPanel`/`HistogramPanel`/
-  `FocusChart` rendering there, unaffected by removing the raw dump.
+- `<WorkspaceView state={$workspaceStore} />`'s usage and import are
+  removed from `src/routes/+page.svelte` only (AC3); `WorkspaceView.svelte`
+  stays on disk for `/dev`. `workspaceStore`'s own import/usage in
+  `+page.svelte` is untouched — `$workspaceStore.panels`, `.instanceSets`,
+  and `.focus` still drive `GridPanel`/`HistogramPanel`/`FocusChart`
+  rendering there, unaffected by removing the raw dump.
 - No change to `store.ts`, `activity.ts`, `register.ts`, or
   `ChartToolbar.svelte` — those are T-1002-1/T-1002-2's surface.
 
 **References:** `src/lib/workspace/ActivityFeed.svelte`,
-`src/lib/workspace/WorkspaceView.svelte` (deleted), `src/routes/+page.svelte`.
+`src/lib/workspace/WorkspaceView.svelte` (usage removed from `+page.svelte`
+only, file kept for `/dev`), `src/routes/+page.svelte`.
 
 ## Out of Scope
 

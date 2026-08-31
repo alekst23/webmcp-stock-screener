@@ -1,20 +1,27 @@
 <script lang="ts">
-	import type { AgentActivityEvent } from './activity';
+	import { actorLabel, type AgentActivityEvent } from './activity';
 
-	// AC4: every tool call an agent makes, visible to the human in call
-	// order. Populated by register.ts's execute() wrapper -- see activity.ts.
+	// Unified action log (T-1002): every human UI action and agent tool call
+	// appended through recordAction, in call order. Populated by
+	// register.ts's execute() wrapper (actor: 'agent') and ChartToolbar.svelte
+	// (actor: 'human') -- see activity.ts. No client-side sort needed: both
+	// call sites append via the same recordAction, so array order already is
+	// call order.
 	let { events }: { events: AgentActivityEvent[] } = $props();
 </script>
 
 <section class="activity-feed">
-	<h2>Agent activity ({events.length})</h2>
+	<h2>Activity log ({events.length})</h2>
 	{#if events.length === 0}
-		<p class="empty">No tool calls yet.</p>
+		<p class="empty">No activity yet.</p>
 	{:else}
 		<ol>
 			{#each events as event (event.id)}
 				<li>
 					<time>{new Date(event.timestamp).toLocaleTimeString()}</time>
+					<span class="actor" class:actor-human={event.actor === 'human'}
+						>{actorLabel(event.actor)}</span
+					>
 					<strong>{event.toolName}</strong> — {event.summary}
 				</li>
 			{/each}
@@ -55,5 +62,20 @@
 		color: #888;
 		margin-right: 0.5rem;
 		font-variant-numeric: tabular-nums;
+	}
+	.actor {
+		display: inline-block;
+		min-width: 3.5rem;
+		margin-right: 0.4rem;
+		padding: 0.05rem 0.35rem;
+		border-radius: 3px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-align: center;
+		color: #fff;
+		background: #6b7280;
+	}
+	.actor-human {
+		background: #2563eb;
 	}
 </style>

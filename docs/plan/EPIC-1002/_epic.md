@@ -30,9 +30,9 @@ instead of inferring history from a static end-state snapshot.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1002-1 | Unify action recording | — | Open |
-| 2 | T-1002-2 | Persist the action log | T-1002-1 | Open |
-| 3 | T-1002-3 | Timeline UI + remove raw state dump | T-1002-1 | Open |
+| 1 | T-1002-1 | Unify action recording | — | Done |
+| 2 | T-1002-2 | Persist the action log | T-1002-1 | Done |
+| 3 | T-1002-3 | Timeline UI + remove raw state dump | T-1002-1 | Done |
 
 ## Dependency Graph
 

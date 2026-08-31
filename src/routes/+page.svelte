@@ -5,7 +5,6 @@
 	import { activityStore } from '$lib/workspace/activity';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
 	import { connectWebmcp } from '$lib/webmcp/register';
-	import WorkspaceView from '$lib/workspace/WorkspaceView.svelte';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
 	import HistogramPanel from '$lib/workspace/HistogramPanel.svelte';
@@ -61,8 +60,6 @@
 	{#each $workspaceStore.instanceSets as set (set.id)}
 		<HistogramPanel instanceSetId={set.id} {engine} config={apiConfig} />
 	{/each}
-
-	<WorkspaceView state={$workspaceStore} />
 </main>
 
 <style>
