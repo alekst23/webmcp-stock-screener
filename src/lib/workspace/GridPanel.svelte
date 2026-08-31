@@ -7,7 +7,6 @@
 		type InstanceWindowView
 	} from './apiEngine';
 	import { removePanel, selectInstance } from './store';
-	import HistogramPanel from './HistogramPanel.svelte';
 	import type {
 		ApiClientConfig,
 		PanelSummary,
@@ -149,9 +148,6 @@
 				</button>
 			{/each}
 		</div>
-		{#if panel.instanceSetId}
-			<HistogramPanel instanceSetId={panel.instanceSetId} {engine} {config} />
-		{/if}
 	</section>
 {/if}
 
