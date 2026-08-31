@@ -8,3 +8,6 @@ feature spec may be touched by multiple epics as it evolves.
 - [Pattern Research Workbench](pattern-research-workbench/spec.md) — the
   shared human-agent research session: define studies and temporal setups,
   search history for matches, measure and visualize outcomes.
+- [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
+  workspace under a name and recall/switch between saved snapshots,
+  local to one browser.
