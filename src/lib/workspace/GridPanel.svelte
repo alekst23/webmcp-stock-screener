@@ -6,7 +6,8 @@
 		resolveBackendInstanceSet,
 		type InstanceWindowView
 	} from './apiEngine';
-	import { selectInstance } from './store';
+	import { removePanel, selectInstance } from './store';
+	import HistogramPanel from './HistogramPanel.svelte';
 	import type {
 		ApiClientConfig,
 		PanelSummary,
@@ -81,6 +82,12 @@
 		onselect?.(rawViews[index]!);
 	}
 
+	// AC1/AC2: closes just this panel, leaving every other open panel
+	// untouched -- see store.ts's removePanel for the focus-reset rule (AC3).
+	function handleClose(): void {
+		removePanel(store, panel.id);
+	}
+
 	// Line path indexed to the bar array, not real dates -- this is the
 	// "aligned to its own anchor date" behavior AC1 asks for: two instances
 	// with different bar-array lengths (edge clipping) still both render
@@ -111,7 +118,12 @@
 
 {#if !missingData}
 	<section class="grid-panel">
-		<h3>{panel.title ?? 'Grid'} <code>{panel.id}</code> ({windows.length} instances)</h3>
+		<div class="panel-header">
+			<h3>{panel.title ?? 'Grid'} <code>{panel.id}</code> ({windows.length} instances)</h3>
+			<button type="button" class="close" onclick={handleClose} aria-label="Close panel {panel.id}">
+				Close
+			</button>
+		</div>
 		{#if loading}
 			<p class="empty">Loading…</p>
 		{/if}
@@ -137,6 +149,9 @@
 				</button>
 			{/each}
 		</div>
+		{#if panel.instanceSetId}
+			<HistogramPanel instanceSetId={panel.instanceSetId} {engine} {config} />
+		{/if}
 	</section>
 {/if}
 
@@ -144,9 +159,26 @@
 	.grid-panel {
 		margin-bottom: 1.5rem;
 	}
+	.panel-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
 	h3 {
 		font-size: 1rem;
 		margin-bottom: 0.5rem;
+	}
+	.close {
+		border: 1px solid #999;
+		border-radius: 4px;
+		padding: 0.2rem 0.5rem;
+		background: #fff;
+		color: #111;
+		font: inherit;
+		font-size: 0.8rem;
+		cursor: pointer;
+		white-space: nowrap;
 	}
 	.empty {
 		color: #888;

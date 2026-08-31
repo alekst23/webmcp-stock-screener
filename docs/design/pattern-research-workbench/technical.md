@@ -159,6 +159,16 @@ CSV export, not EODHD.
 | `market_cap` | `float \| None` | |
 | `as_of` | `date` | |
 
+### `removePanel` — single-panel removal (T-1003-2)
+
+`src/lib/workspace/store.ts`. Human-driven store mutation, not a
+`ResearchEngine`/WebMCP tool method — same category as `selectInstance`.
+Called directly from `GridPanel.svelte`'s close button.
+
+| Signature | Description |
+|-----------|-------------|
+| `removePanel(store: Writable<WorkspaceState>, panelId: string): void` | removes the matching panel from `ws.panels`; if it was the focused panel (`ws.focus?.panelId === panelId`), resets `ws.focus` to `null` (mirrors `clearPanels()`'s full focus reset, scoped to the single-panel case). Leaves `instanceSets`/`studies`/`setups` untouched. |
+
 ## Data Flow
 
 Partial-match fallback happens inside `findInstances` only — sampling,

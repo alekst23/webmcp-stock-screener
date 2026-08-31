@@ -84,3 +84,18 @@ export function selectInstance(
 		}
 	}));
 }
+
+// The human-driven single-panel counterpart to apiEngine.ts's clearPanels
+// (AC1/AC2): removes just one panel by id, called directly from
+// GridPanel.svelte's close button -- no WebMCP tool call involved, mirroring
+// selectInstance's precedent above. If the closed panel was focused, focus
+// is reset to null (AC3), matching clearPanels()'s full focus reset for the
+// single-panel case; every other workspace field (instanceSets/studies/setups)
+// is left untouched.
+export function removePanel(store: Writable<WorkspaceState>, panelId: string): void {
+	store.update((ws) => ({
+		...ws,
+		panels: ws.panels.filter((panel) => panel.id !== panelId),
+		focus: ws.focus?.panelId === panelId ? null : ws.focus
+	}));
+}
