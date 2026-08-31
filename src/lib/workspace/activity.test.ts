@@ -1,19 +1,46 @@
-import { describe, it } from 'vitest';
+import { get } from 'svelte/store';
+import { describe, expect, it } from 'vitest';
+import { ok } from '../webmcp/tools';
+import { actorLabel, createActivityStore, recordAction } from './activity';
+import { memoryStorage } from './testSupport';
 
 // T-1002-2: activityStore persists to localStorage under its own key,
 // mirroring store.ts's read-on-init/write-on-update pattern for
 // WorkspaceState.
 describe('activity log persistence', () => {
 	it('persists logged actions to localStorage under their own key', () => {
-		throw new Error('not implemented');
+		const storage = memoryStorage();
+		const activity = createActivityStore(storage);
+
+		recordAction(activity, 'human', 'clearPanels', undefined, ok({}));
+
+		const raw = storage.getItem('webmcp-activity-log');
+		expect(raw, 'nothing was written to the activity log key').not.toBeNull();
+		const persisted = JSON.parse(raw!) as unknown[];
+		expect(persisted, `persisted: ${raw}`).toHaveLength(1);
 	});
 
 	it('restores the full log, in the same order, on reload in the same browser', () => {
-		throw new Error('not implemented');
+		const storage = memoryStorage();
+		const first = createActivityStore(storage);
+		recordAction(first, 'human', 'clearPanels', undefined, ok({}));
+		recordAction(first, 'agent', 'defineStudy', undefined, ok({ id: 'study_1' }));
+
+		// A page reload re-runs module init against the same storage -- a
+		// fresh createActivityStore call is the reload's equivalent here.
+		const reloaded = createActivityStore(storage);
+		const events = get(reloaded);
+
+		expect(
+			events.map((e) => `${e.actor}:${e.toolName}`),
+			`events: ${JSON.stringify(events)}`
+		).toEqual(['human:clearPanels', 'agent:defineStudy']);
 	});
 
 	it('starts with an empty log in a fresh browser with no existing key', () => {
-		throw new Error('not implemented');
+		const activity = createActivityStore(memoryStorage());
+
+		expect(get(activity)).toEqual([]);
 	});
 });
 
@@ -24,10 +51,10 @@ describe('activity log persistence', () => {
 // re-tested here).
 describe('actor label', () => {
 	it('labels a human-actor event "Human"', () => {
-		throw new Error('not implemented');
+		expect(actorLabel('human')).toBe('Human');
 	});
 
 	it('labels an agent-actor event "Agent"', () => {
-		throw new Error('not implemented');
+		expect(actorLabel('agent')).toBe('Agent');
 	});
 });

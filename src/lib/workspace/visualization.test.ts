@@ -7,23 +7,7 @@ import { alignInstanceWindows, buildHistogram, computeForwardReturns } from './v
 import { createApiEngine, type BackendPriceBar, type InstanceWindowView } from './apiEngine';
 import { createWorkspaceStore, selectInstance } from './store';
 import type { ModelContext, ModelContextToolDescriptor } from '../webmcp/types';
-
-// In-memory Storage so each test gets an isolated backing store instead of
-// depending on (and leaking state through) jsdom's shared global localStorage
-// -- same fixture store.test.ts uses, for the same reason.
-function memoryStorage(): Storage {
-	const data = new Map<string, string>();
-	return {
-		getItem: (key) => (data.has(key) ? (data.get(key) ?? null) : null),
-		setItem: (key, value) => void data.set(key, String(value)),
-		removeItem: (key) => void data.delete(key),
-		clear: () => data.clear(),
-		key: (index) => [...data.keys()][index] ?? null,
-		get length() {
-			return data.size;
-		}
-	};
-}
+import { memoryStorage } from './testSupport';
 
 function bar(ticker: string, date: string, close: number): BackendPriceBar {
 	return { ticker, date, open: close, high: close, low: close, close, volume: 1000 };

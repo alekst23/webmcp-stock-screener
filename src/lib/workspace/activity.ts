@@ -20,17 +20,62 @@ export interface AgentActivityEvent {
 	summary: string;
 }
 
+const STORAGE_KEY = 'webmcp-activity-log';
+
+function readPersisted(storage: Storage | undefined): AgentActivityEvent[] {
+	if (!storage) {
+		return [];
+	}
+	const raw = storage.getItem(STORAGE_KEY);
+	if (!raw) {
+		return [];
+	}
+	try {
+		return JSON.parse(raw) as AgentActivityEvent[];
+	} catch {
+		// Corrupted or foreign data in the slot must not crash the app on load.
+		return [];
+	}
+}
+
 // Deliberately its own store rather than a field on WorkspaceState: the
 // log is a human-facing trust affordance (AC4), not shared session state
 // an agent needs to read back (unlike focus.selected -- see store.ts's
-// selectInstance) or that any tool contract depends on.
-export function createActivityStore(): Writable<AgentActivityEvent[]> {
-	return writable<AgentActivityEvent[]>([]);
+// selectInstance) or that any tool contract depends on. Persists to its
+// own localStorage key (T-1002-2), mirroring store.ts's
+// createWorkspaceStore read-on-init/write-on-update pattern -- storage is
+// an explicit parameter (default: real browser localStorage) for the same
+// reason store.ts's is: tests need an isolated in-memory Storage.
+export function createActivityStore(storage?: Storage): Writable<AgentActivityEvent[]> {
+	const backing = storage ?? (typeof localStorage !== 'undefined' ? localStorage : undefined);
+	const persisted = readPersisted(backing);
+	// nextActivityId is module-level (shared across the one real
+	// activityStore singleton); restart it past whatever ids the restored
+	// log already used, or a post-reload recordAction call would mint an
+	// id that collides with a persisted entry's, breaking ActivityFeed's
+	// keyed {#each}.
+	nextActivityId = Math.max(nextActivityId, nextIdAfter(persisted));
+	const store = writable<AgentActivityEvent[]>(persisted);
+	store.subscribe((events) => {
+		backing?.setItem(STORAGE_KEY, JSON.stringify(events));
+	});
+	return store;
 }
 
-export const activityStore = createActivityStore();
+function nextIdAfter(events: AgentActivityEvent[]): number {
+	let max = 0;
+	for (const event of events) {
+		const n = Number(event.id.replace('activity_', ''));
+		if (!Number.isNaN(n) && n > max) {
+			max = n;
+		}
+	}
+	return max + 1;
+}
 
 let nextActivityId = 1;
+
+export const activityStore = createActivityStore();
 
 // The shared recording entry point (T-1002-1, AC1): the only place that
 // appends to an activity store. register.ts's tool wrapper and

@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1002 (Unified Action Log)
 **Design**: docs/design/pattern-research-workbench/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1002-1
 **Blocks**: —
 **Issue**: #2
