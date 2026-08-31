@@ -11,6 +11,7 @@
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
 	import ChartToolbar from '$lib/workspace/ChartToolbar.svelte';
+	import SnapshotPicker from '$lib/workspace/SnapshotPicker.svelte';
 
 	const apiConfig = { baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' };
 
@@ -49,6 +50,8 @@
 	</p>
 
 	<ActivityFeed events={$activityStore} />
+
+	<SnapshotPicker store={workspaceStore} onload={() => (focusedView = null)} />
 
 	<ChartToolbar {engine} activity={activityStore} onclear={() => (focusedView = null)} />
 

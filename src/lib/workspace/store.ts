@@ -21,7 +21,9 @@ function uniqueById<T extends { id: string }>(items: T[]): T[] {
 	return [...byId.values()];
 }
 
-function normalizeWorkspace(state: WorkspaceState): WorkspaceState {
+// Exported so snapshots.ts can run a recalled snapshot's state through the
+// same resilience pass a reloaded live workspace gets (T-1005-1 AC6).
+export function normalizeWorkspace(state: WorkspaceState): WorkspaceState {
 	return {
 		studies: uniqueById(state.studies ?? []),
 		setups: uniqueById(state.setups ?? []),
