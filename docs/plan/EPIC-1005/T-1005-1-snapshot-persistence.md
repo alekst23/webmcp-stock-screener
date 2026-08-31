@@ -48,10 +48,46 @@ logic.
 
 ## Solution Approach
 
-Left to ticket design — e.g. a new `snapshots.ts` module alongside
-`store.ts`, exposing `saveSnapshot`, `loadSnapshot`, `deleteSnapshot`,
-`listSnapshots`. Exact `localStorage` key scheme (per-snapshot keys vs. a
-single index) is a ticket-design decision.
+Implements the "Save a named snapshot," "Recall a snapshot," "Delete a
+snapshot," and "Browse snapshots" scenarios from
+`docs/design/workspace-snapshots/spec.md`, as a pure data-layer module —
+no UI (T-1005-2's scope).
+
+- New module `src/lib/workspace/snapshots.ts`, sibling to `store.ts`,
+  following the same explicit-`Storage`-parameter pattern (default: real
+  `localStorage`, tests pass an in-memory `Storage`) so tests don't
+  depend on jsdom's shared global.
+- Single-index key scheme: one `localStorage` key
+  (`webmcp-workspace-snapshots`) holding a JSON object keyed by snapshot
+  `name` → `SnapshotRecord`. Simpler than per-snapshot keys — no need to
+  enumerate `localStorage` keys to list/prune, and overwrite-by-name
+  (AC2) is a single object-key assignment.
+- Four functions: `saveSnapshot`, `loadSnapshot`, `deleteSnapshot`,
+  `listSnapshots`. `loadSnapshot` runs the returned state through
+  `store.ts`'s `normalizeWorkspace` before handing it back (AC6), so a
+  corrupted/foreign snapshot entry can't crash the app any more than a
+  corrupted live-workspace entry can today.
+- `store.ts`'s `normalizeWorkspace` is exported (currently module-private)
+  so `snapshots.ts` can call it — no other change to `store.ts` or to the
+  live workspace's own persistence/reload behavior.
+- Read of the index follows `readPersisted`'s existing resilience
+  pattern: missing key → empty map, parse failure → empty map (never
+  throws).
+
+### Contracts to introduce
+
+- `SnapshotSummary` (`{ name, savedAt }`) — what `listSnapshots` returns;
+  the shape the picker UI (T-1005-2) renders.
+- `SnapshotRecord` (`SnapshotSummary & { state: WorkspaceState }`) — what
+  is actually stored per snapshot.
+
+### References
+
+- `src/lib/workspace/store.ts` — `readPersisted`/`normalizeWorkspace`
+  pattern this follows; `normalizeWorkspace` becomes exported.
+- `src/lib/workspace/store.test.ts` — in-memory `Storage` test pattern
+  (`memoryStorage()`) to reuse in `snapshots.test.ts`.
+- `docs/design/workspace-snapshots/technical.md` — snapshot record shape.
 
 ## Out of Scope
 
