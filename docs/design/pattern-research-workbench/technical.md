@@ -119,18 +119,30 @@ architecture split.
 `src/lib/webmcp/types.ts`. `{ baseUrl: string }` — where the fetch-based
 `ResearchEngine` implementation sends the 5 networked tool calls.
 
-### `AgentActivityEvent` — activity feed contract (T-1001-7)
+### `AgentActivityEvent` — activity feed contract (T-1001-7, extended by EPIC-1002)
 
-`src/lib/workspace/activity.ts`. Populated by extending `register.ts`'s
-`execute()` wrapper — every tool call appends one entry, in order.
+`src/lib/workspace/activity.ts`. Originally populated only by
+`register.ts`'s tool-call wrapper; EPIC-1002 (T-1002-1) adds a shared
+recording entry point so a human-triggered UI control (e.g.
+`ChartToolbar.svelte`) appends events the same way, and persists the
+resulting store (T-1002-2, mirroring `store.ts`'s existing
+localStorage pattern).
 
 | Field | Type | Description |
 |----------------|------|-------------|
 | `id` | `string` | |
+| `actor` | `'human' \| 'agent'` | new (T-1002-1) — set statically per call site, not runtime-detected: the tool-registration path (`register.ts`) is always `'agent'`, a direct UI-control call site is always `'human'` |
 | `toolName` | `string` | |
 | `timestamp` | `string` | ISO |
 | `input` | `unknown` | the call's raw input |
 | `summary` | `string` | one-line human-readable result summary, not raw JSON |
+
+**Shared recording entry point (T-1002-1):** both `register.ts`'s tool
+wrapper and any human-triggered UI control (starting with
+`ChartToolbar.svelte`) must call the same function to append an event —
+no call site writes to `activityStore` any other way. `register.ts`'s
+existing `recordActivity`/`summarizeToolCall` logic is reused, not
+duplicated, for the human path.
 
 ### `TickerMetadata` — universe classification (T-1001-9)
 
