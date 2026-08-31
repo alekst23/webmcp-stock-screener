@@ -122,3 +122,26 @@ export function axisTickIndices(barCount: number, count: number): number[] {
 	return Array.from({ length: count }, (_, i) => Math.round((lastIndex * i) / (count - 1)));
 }
 
+export type ChartRange = '5d' | '1m' | 'max';
+
+const RANGE_TRADING_DAYS: Record<Exclude<ChartRange, 'max'>, number> = {
+	'5d': 5,
+	'1m': 21
+};
+
+// Client-side slice of the already-fetched bars, not a new backend fetch --
+// there's no more historical data available than what's already in `bars`.
+// Takes the most recent N trading days of whatever was fetched, so this is
+// exact for the common case (a trailing window ending at the anchor date,
+// e.g. "Show monthly") and a reasonable approximation for a window that
+// extends past the anchor into forward-return territory (the slice may not
+// include the anchor at all in that case -- see FocusChart.svelte's
+// anchor-index clamping).
+export function sliceBarsForRange(bars: BackendPriceBar[], range: ChartRange): BackendPriceBar[] {
+	if (range === 'max') {
+		return bars;
+	}
+	const days = RANGE_TRADING_DAYS[range];
+	return bars.slice(Math.max(0, bars.length - days));
+}
+

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { alignInstanceWindow } from './visualization';
+	import { alignInstanceWindow, sliceBarsForRange, type ChartRange } from './visualization';
 	import PriceChart from './PriceChart.svelte';
 	import type { InstanceWindowView } from './apiEngine';
 
@@ -14,7 +14,26 @@
 	const CHART_WIDTH = 480;
 	const CHART_HEIGHT = 220;
 
+	const RANGES: { key: ChartRange; label: string }[] = [
+		{ key: '5d', label: '5D' },
+		{ key: '1m', label: '1M' },
+		{ key: 'max', label: 'Max' }
+	];
+
 	const aligned = $derived(alignInstanceWindow(view));
+
+	// A client-side slice of what's already fetched -- see
+	// visualization.ts's sliceBarsForRange for why this is exact for the
+	// common trailing-window case and an approximation otherwise.
+	let range = $state<ChartRange>('max');
+	const rangeBars = $derived(sliceBarsForRange(aligned.bars, range));
+	// The anchor may fall before the slice's start (a window with bars past
+	// the anchor, sliced narrower than the distance from the anchor to the
+	// window's end) -- clamp to the slice's left edge rather than passing a
+	// negative index to PriceChart.
+	const rangeAnchorIndex = $derived(
+		Math.max(0, aligned.anchorIndex - (aligned.bars.length - rangeBars.length))
+	);
 </script>
 
 <section class="focus-chart">
@@ -25,9 +44,22 @@
 	{#if aligned.bars.length === 0}
 		<p class="empty">No price data available for this instance.</p>
 	{:else}
+		<div class="range-tabs" role="tablist" aria-label="Chart range">
+			{#each RANGES as { key, label } (key)}
+				<button
+					type="button"
+					role="tab"
+					aria-selected={range === key}
+					class:active={range === key}
+					onclick={() => (range = key)}
+				>
+					{label}
+				</button>
+			{/each}
+		</div>
 		<PriceChart
-			bars={aligned.bars}
-			anchorIndex={aligned.anchorIndex}
+			bars={rangeBars}
+			anchorIndex={rangeAnchorIndex}
 			width={CHART_WIDTH}
 			height={CHART_HEIGHT}
 			variant="detail"
@@ -56,6 +88,26 @@
 		border-radius: 3px;
 		padding: 0.1rem 0.4rem;
 		margin-left: 0.5rem;
+	}
+	.range-tabs {
+		display: flex;
+		gap: 0.75rem;
+		margin-bottom: 0.5rem;
+		border-bottom: 1px solid #eee;
+	}
+	.range-tabs button {
+		border: none;
+		background: none;
+		font: inherit;
+		font-size: 0.85rem;
+		color: #666;
+		padding: 0.3rem 0.1rem 0.5rem;
+		cursor: pointer;
+	}
+	.range-tabs button.active {
+		color: #06c;
+		font-weight: 600;
+		border-bottom: 2px solid #06c;
 	}
 	.empty {
 		color: #888;

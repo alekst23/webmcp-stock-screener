@@ -8,7 +8,8 @@ import {
 	axisTickIndices,
 	axisTicks,
 	computeChartGeometry,
-	nearestBarIndex
+	nearestBarIndex,
+	sliceBarsForRange
 } from './visualization';
 import { createApiEngine, type BackendPriceBar, type InstanceWindowView } from './apiEngine';
 import { createWorkspaceStore, selectInstance } from './store';
@@ -131,6 +132,23 @@ describe('chart geometry and hover interaction', () => {
 		expect(axisTickIndices(9, 3), 'first, middle, last bar').toEqual([0, 4, 8]);
 		expect(axisTickIndices(1, 3), 'a single bar has only one index to show').toEqual([0]);
 		expect(axisTickIndices(0, 3), 'no bars means no ticks').toEqual([]);
+	});
+
+	it('slices to the most recent N trading days without a new fetch', () => {
+		const bars = Array.from({ length: 30 }, (_, i) =>
+			bar('X', `2024-01-${String(i + 1).padStart(2, '0')}`, 100 + i)
+		);
+
+		expect(sliceBarsForRange(bars, 'max'), "'max' returns every already-fetched bar").toBe(bars);
+		expect(sliceBarsForRange(bars, '5d'), '5D keeps only the last 5 bars').toHaveLength(5);
+		expect(sliceBarsForRange(bars, '5d')[4]!.date).toBe('2024-01-30');
+		expect(sliceBarsForRange(bars, '1m'), '1M keeps the last 21 trading days').toHaveLength(21);
+
+		const short = bars.slice(0, 3);
+		expect(
+			sliceBarsForRange(short, '1m'),
+			'a shorter fetch than the requested range returns everything available, not padded'
+		).toHaveLength(3);
 	});
 });
 
