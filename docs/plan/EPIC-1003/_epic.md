@@ -30,7 +30,7 @@ instead of hunting through a disconnected list of identical buttons.
 |---|--------|-------|------------|--------|
 | 1 | T-1003-1 | Panel-scoped histogram action | — | Done |
 | 2 | T-1003-2 | Individual panel close | — | Done |
-| 3 | T-1003-3 | Add automated test coverage for panel-scoped histogram and removePanel persistence | — | Open |
+| 3 | T-1003-3 | Add removePanel persistence round-trip test | — | Open |
 | 4 | T-1003-4 | Panel action polish — a11y, stuck-panel close, focus-state sync | — | Open |
 
 ## Dependency Graph
