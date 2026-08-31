@@ -5,11 +5,11 @@
 	import { activityStore } from '$lib/workspace/activity';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
 	import { connectWebmcp } from '$lib/webmcp/register';
-	import WorkspaceView from '$lib/workspace/WorkspaceView.svelte';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
 	import HistogramPanel from '$lib/workspace/HistogramPanel.svelte';
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
+	import ChartToolbar from '$lib/workspace/ChartToolbar.svelte';
 
 	const apiConfig = { baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' };
 
@@ -39,7 +39,9 @@
 
 	<ActivityFeed events={$activityStore} />
 
-	{#each $workspaceStore.panels as panel (panel.id)}
+	<ChartToolbar {engine} activity={activityStore} onclear={() => (focusedView = null)} />
+
+	{#each $workspaceStore.panels as panel (panel.id + ':' + panel.instanceSetId)}
 		{#if panel.kind === 'grid'}
 			<GridPanel
 				{panel}
@@ -51,15 +53,13 @@
 		{/if}
 	{/each}
 
-	{#if focusedView}
+	{#if focusedView && $workspaceStore.focus?.selected.length}
 		<FocusChart view={focusedView} />
 	{/if}
 
 	{#each $workspaceStore.instanceSets as set (set.id)}
 		<HistogramPanel instanceSetId={set.id} {engine} config={apiConfig} />
 	{/each}
-
-	<WorkspaceView state={$workspaceStore} />
 </main>
 
 <style>

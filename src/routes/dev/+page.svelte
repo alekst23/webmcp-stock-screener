@@ -2,8 +2,10 @@
 	import { env } from '$env/dynamic/public';
 	import { dev } from '$app/environment';
 	import { workspaceStore } from '$lib/workspace/store';
-	import { createApiEngine } from '$lib/workspace/apiEngine';
+	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
 	import { buildTools } from '$lib/webmcp/tools';
+	import GridPanel from '$lib/workspace/GridPanel.svelte';
+	import FocusChart from '$lib/workspace/FocusChart.svelte';
 	import WorkspaceView from '$lib/workspace/WorkspaceView.svelte';
 	import type { ToolResult } from '$lib/webmcp/types';
 
@@ -19,6 +21,7 @@
 
 	let inputs = $state<Record<string, string>>(Object.fromEntries(tools.map((t) => [t.name, '{}'])));
 	let results = $state<Record<string, { ok: boolean; text: string }>>({});
+	let focusedView = $state<InstanceWindowView | null>(null);
 
 	async function run(name: string): Promise<void> {
 		const tool = tools.find((t) => t.name === name);
@@ -77,6 +80,20 @@
 		</section>
 
 		<h2>Current workspace state</h2>
+		{#each $workspaceStore.panels as panel (panel.id + ':' + panel.instanceSetId)}
+			{#if panel.kind === 'grid'}
+				<GridPanel
+					{panel}
+					{engine}
+					config={{ baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' }}
+					store={workspaceStore}
+					onselect={(view) => (focusedView = view)}
+				/>
+			{/if}
+		{/each}
+		{#if focusedView && $workspaceStore.focus?.selected.length}
+			<FocusChart view={focusedView} />
+		{/if}
 		<WorkspaceView state={$workspaceStore} />
 	</main>
 {/if}

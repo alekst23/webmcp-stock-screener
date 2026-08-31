@@ -53,7 +53,14 @@ function fakeEngine(): ResearchEngine {
 			return [{ ticker: 'ACME', date: '2024-03-08' }];
 		},
 		async measure() {
-			return { metric: 'fwd_return', horizonDays: 10, count: 42, median: 0.02, mean: 0.03, hitRate: 0.6 };
+			return {
+				metric: 'fwd_return',
+				horizonDays: 10,
+				count: 42,
+				median: 0.02,
+				mean: 0.03,
+				hitRate: 0.6
+			};
 		},
 		async splitInstances() {
 			return [];
@@ -62,6 +69,34 @@ function fakeEngine(): ResearchEngine {
 			const panel = { id: id('panel'), kind: 'grid' as const, instanceSetId: input.instanceSetId };
 			ws.panels.push(panel);
 			return panel;
+		},
+		async showTickerCharts(input) {
+			const set = {
+				id: id('set'),
+				setupId: 'manual_ticker_chart',
+				count: input.tickers.length,
+				completeCount: input.tickers.length,
+				partialCount: 0,
+				from: input.date,
+				to: input.date
+			};
+			ws.instanceSets.push(set);
+			const panel = {
+				id: id('panel'),
+				kind: 'grid' as const,
+				instanceSetId: set.id,
+				title: input.title,
+				n: input.tickers.length,
+				strategy: 'recent' as const,
+				window: input.window
+			};
+			ws.panels.push(panel);
+			return panel;
+		},
+		async clearPanels() {
+			ws.panels = [];
+			ws.focus = null;
+			return ws;
 		},
 		async focusInstance() {},
 		async getWorkspace() {
@@ -84,6 +119,8 @@ describe('tool availability', () => {
 			'defineStudy',
 			'defineSetup',
 			'findInstances',
+			'showTickerCharts',
+			'clearPanels',
 			'getWorkspace'
 		]);
 	});
@@ -131,5 +168,27 @@ describe('tool execution', () => {
 		const payload = JSON.parse(result.content[0]!.text);
 		expect(payload.id).toBe('study_1');
 		expect(payload.name).toBe('rel_volume_20');
+	});
+
+	it('can create and clear explicit ticker chart panels through tools', async () => {
+		const engine = fakeEngine();
+		const tools = buildTools(engine);
+		const showTickerCharts = tools.find((t) => t.name === 'showTickerCharts');
+		const clearPanels = tools.find((t) => t.name === 'clearPanels');
+		expect(showTickerCharts).toBeDefined();
+		expect(clearPanels).toBeDefined();
+
+		const panelResult = await showTickerCharts!.execute({
+			tickers: ['MOCK02', 'MOCK03'],
+			date: '2025-12-31',
+			window: [-20, 0],
+			title: 'Monthly charts'
+		});
+		expect(panelResult.isError).toBeUndefined();
+		expect((await engine.getWorkspace()).panels).toHaveLength(1);
+
+		const clearResult = await clearPanels!.execute({});
+		expect(clearResult.isError).toBeUndefined();
+		expect((await engine.getWorkspace()).panels).toHaveLength(0);
 	});
 });

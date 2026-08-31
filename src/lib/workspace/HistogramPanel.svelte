@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { buildHistogram, computeForwardReturns, type HistogramBucket } from './visualization';
-	import { fetchInstanceWindows, getBackendInstanceSet } from './apiEngine';
+	import { fetchInstanceWindows, resolveBackendInstanceSet } from './apiEngine';
 	import type { ApiClientConfig, ResearchEngine } from '../webmcp/types';
 
 	// AC3: distribution of a measured outcome across a result set. measure()
@@ -26,6 +26,7 @@
 	let buckets = $state<HistogramBucket[]>([]);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
+	let missingData = $state(false);
 	let loaded = $state(false);
 
 	async function toggle(): Promise<void> {
@@ -33,13 +34,14 @@
 		if (!expanded || loaded) {
 			return;
 		}
-		const instanceSet = getBackendInstanceSet(engine, instanceSetId);
+		const instanceSet = await resolveBackendInstanceSet(engine, instanceSetId);
 		if (!instanceSet) {
-			error = `No cached instance set for "${instanceSetId}"`;
+			missingData = true;
 			return;
 		}
 		loading = true;
 		error = null;
+		missingData = false;
 		try {
 			// n=50: wide enough for a real distribution shape without pulling
 			// the whole set for large instance sets. window=[0, horizonDays]:
@@ -68,7 +70,10 @@
 		{#if error}
 			<p class="error">{error}</p>
 		{/if}
-		{#if !loading && !error && buckets.length === 0}
+		{#if missingData}
+			<p class="empty">Outcome data unavailable after reload.</p>
+		{/if}
+		{#if !loading && !error && !missingData && buckets.length === 0}
 			<p class="empty">No resolved outcomes yet for this set.</p>
 		{/if}
 		{#if buckets.length > 0}

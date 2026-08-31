@@ -1,28 +1,13 @@
 import { get, writable } from 'svelte/store';
 import { afterEach, describe, expect, it } from 'vitest';
 import { connectWebmcp } from '../webmcp/register';
-import type { AgentActivityEvent } from './activity';
+import { ok, fail } from '../webmcp/tools';
+import { recordAction, type AgentActivityEvent } from './activity';
 import { alignInstanceWindows, buildHistogram, computeForwardReturns } from './visualization';
 import { createApiEngine, type BackendPriceBar, type InstanceWindowView } from './apiEngine';
 import { createWorkspaceStore, selectInstance } from './store';
 import type { ModelContext, ModelContextToolDescriptor } from '../webmcp/types';
-
-// In-memory Storage so each test gets an isolated backing store instead of
-// depending on (and leaking state through) jsdom's shared global localStorage
-// -- same fixture store.test.ts uses, for the same reason.
-function memoryStorage(): Storage {
-	const data = new Map<string, string>();
-	return {
-		getItem: (key) => (data.has(key) ? (data.get(key) ?? null) : null),
-		setItem: (key, value) => void data.set(key, String(value)),
-		removeItem: (key) => void data.delete(key),
-		clear: () => data.clear(),
-		key: (index) => [...data.keys()][index] ?? null,
-		get length() {
-			return data.size;
-		}
-	};
-}
+import { memoryStorage } from './testSupport';
 
 function bar(ticker: string, date: string, close: number): BackendPriceBar {
 	return { ticker, date, open: close, high: close, low: close, close, volume: 1000 };
@@ -186,5 +171,113 @@ describe('cross-actor visibility', () => {
 			{ ticker: 'ACME', date: '2024-03-08', completeness: 1 }
 		]);
 		expect(ws.focus?.panelId).toBe('panel_1');
+	});
+});
+
+// T-1002-1: unify action recording so a human UI control (starting with
+// ChartToolbar) and an agent tool call append to the same log through one
+// shared entry point, distinguished only by a static `actor` field.
+describe('unified action log', () => {
+	it('labels an agent tool call event with actor "agent"', async () => {
+		const store = createWorkspaceStore(memoryStorage());
+		const engine = createApiEngine(store, { baseUrl: 'http://localhost:8000' });
+		const activity = writable<AgentActivityEvent[]>([]);
+		const registeredTools = new Map<string, ModelContextToolDescriptor>();
+		document.modelContext = {
+			registerTool: async (tool) => {
+				registeredTools.set(tool.name, tool);
+			},
+			unregisterTool: async (name) => {
+				registeredTools.delete(name);
+			}
+		};
+
+		await connectWebmcp(engine, activity);
+		await registeredTools.get('defineStudy')!.execute({
+			name: 'rel_vol_5',
+			expression: 'volume / sma(volume, 5)'
+		});
+
+		const events = get(activity);
+		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
+		expect(events[0]!.actor).toBe('agent');
+	});
+
+	it('appends an entry when a human triggers a chart-toolbar action, labeled actor "human"', () => {
+		const activity = writable<AgentActivityEvent[]>([]);
+
+		recordAction(activity, 'human', 'clearPanels', undefined, ok({ panels: [] }));
+
+		const events = get(activity);
+		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
+		expect(events[0]!.actor).toBe('human');
+		expect(events[0]!.toolName).toBe('clearPanels');
+		expect(events[0]!.summary, 'summary must be human-readable, not raw JSON').not.toMatch(/[{}]/);
+	});
+
+	it('records human and agent actions in true chronological order in the same log', async () => {
+		const store = createWorkspaceStore(memoryStorage());
+		const engine = createApiEngine(store, { baseUrl: 'http://localhost:8000' });
+		const activity = writable<AgentActivityEvent[]>([]);
+		const registeredTools = new Map<string, ModelContextToolDescriptor>();
+		document.modelContext = {
+			registerTool: async (tool) => {
+				registeredTools.set(tool.name, tool);
+			},
+			unregisterTool: async (name) => {
+				registeredTools.delete(name);
+			}
+		};
+
+		await connectWebmcp(engine, activity);
+		recordAction(activity, 'human', 'clearPanels', undefined, ok({ panels: [] }));
+		await registeredTools.get('defineStudy')!.execute({
+			name: 'rel_vol_5',
+			expression: 'volume / sma(volume, 5)'
+		});
+		recordAction(activity, 'human', 'showTickerCharts', undefined, ok({}));
+
+		const events = get(activity);
+		expect(
+			events.map((e) => `${e.actor}:${e.toolName}`),
+			`events: ${JSON.stringify(events)}`
+		).toEqual(['human:clearPanels', 'agent:defineStudy', 'human:showTickerCharts']);
+	});
+
+	it('shows a readable failure reason when an agent tool call fails', async () => {
+		const store = createWorkspaceStore(memoryStorage());
+		const engine = createApiEngine(store, { baseUrl: 'http://localhost:8000' });
+		const activity = writable<AgentActivityEvent[]>([]);
+		const registeredTools = new Map<string, ModelContextToolDescriptor>();
+		document.modelContext = {
+			registerTool: async (tool) => {
+				registeredTools.set(tool.name, tool);
+			},
+			unregisterTool: async (name) => {
+				registeredTools.delete(name);
+			}
+		};
+
+		await connectWebmcp(engine, activity);
+		await registeredTools.get('defineStudy')!.execute({
+			name: 'bad',
+			expression: 'not_a_real_function(close)'
+		});
+
+		const events = get(activity);
+		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
+		expect(events[0]!.actor).toBe('agent');
+		expect(events[0]!.summary, `summary: ${events[0]!.summary}`).toMatch(/failed/i);
+	});
+
+	it('shows a readable failure reason when a human chart-toolbar action fails', () => {
+		const activity = writable<AgentActivityEvent[]>([]);
+
+		recordAction(activity, 'human', 'showTickerCharts', undefined, fail('backend unreachable'));
+
+		const events = get(activity);
+		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
+		expect(events[0]!.actor).toBe('human');
+		expect(events[0]!.summary, `summary: ${events[0]!.summary}`).toMatch(/backend unreachable/);
 	});
 });

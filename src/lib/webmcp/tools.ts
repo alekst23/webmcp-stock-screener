@@ -8,17 +8,21 @@ import {
 	type ResearchEngine,
 	type SampleInstancesInput,
 	type ShowGridInput,
+	type ShowTickerChartsInput,
 	type SplitInstancesInput,
 	type ToolResult,
 	type ToolSpec,
 	type WorkspaceState
 } from './types';
 
-function ok(payload: unknown): ToolResult {
+// Exported so non-tool call sites (ChartToolbar.svelte's human-triggered
+// actions, T-1002-1) can build the same ToolResult shape recordAction's
+// summarizeToolCall expects, instead of re-implementing this JSON-shaping.
+export function ok(payload: unknown): ToolResult {
 	return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
 }
 
-function fail(message: string, extra?: Record<string, unknown>): ToolResult {
+export function fail(message: string, extra?: Record<string, unknown>): ToolResult {
 	return {
 		content: [{ type: 'text', text: JSON.stringify({ error: message, ...extra }, null, 2) }],
 		isError: true
@@ -193,7 +197,7 @@ export function buildTools(engine: ResearchEngine): ToolSpec[] {
 				'Split an instance set into labeled child sets. mode="outcome" splits winners from ' +
 				'losers by forward return over horizonDays (optional threshold, default 0) — put the ' +
 				'losers in a grid to see why the setup fails. mode="condition" splits by a boolean ' +
-				'expression evaluated at each instance\'s t=0.',
+				"expression evaluated at each instance's t=0.",
 			inputSchema: {
 				type: 'object',
 				properties: {
@@ -237,9 +241,51 @@ export function buildTools(engine: ResearchEngine): ToolSpec[] {
 			execute: (input) => run(() => engine.showGrid(input as ShowGridInput))
 		},
 		{
+			name: 'showTickerCharts',
+			description:
+				'Render explicit ticker charts on the main page without first defining a setup. Use this ' +
+				'when the user asks to see a named ticker such as MOCK02, with a date anchor and display ' +
+				'window. For a roughly monthly chart, use window [-20, 0]. Returns a panelId.',
+			inputSchema: {
+				type: 'object',
+				properties: {
+					tickers: {
+						type: 'array',
+						items: { type: 'string' },
+						minItems: 1,
+						description: 'Ticker symbols to chart, e.g. ["MOCK02", "MOCK03"]'
+					},
+					date: {
+						type: 'string',
+						description: 'ISO anchor/end date for the chart window, e.g. "2025-12-31"'
+					},
+					window: {
+						type: 'array',
+						items: { type: 'integer' },
+						minItems: 2,
+						maxItems: 2,
+						description: 'Trading days around the anchor date. Use [-20, 0] for monthly.'
+					},
+					title: { type: 'string' }
+				},
+				required: ['tickers', 'date']
+			},
+			available: always,
+			execute: (input) => run(() => engine.showTickerCharts(input as ShowTickerChartsInput))
+		},
+		{
+			name: 'clearPanels',
+			description:
+				'Clear every open chart/grid panel and reset current focus on the main page while keeping ' +
+				'studies and result-set history available in the workspace.',
+			inputSchema: { type: 'object', properties: {} },
+			available: always,
+			execute: () => run(() => engine.clearPanels())
+		},
+		{
 			name: 'focusInstance',
 			description:
-				'Zoom the user\'s view to a single (ticker, date) instance for close inspection, e.g. ' +
+				"Zoom the user's view to a single (ticker, date) instance for close inspection, e.g. " +
 				'one the user asked about or an outlier worth discussing.',
 			inputSchema: {
 				type: 'object',

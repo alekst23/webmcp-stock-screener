@@ -1,7 +1,7 @@
 # T-1001-3: Query engine core
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1001-1
 **Blocks**: T-1001-4
 **Issue**: #1

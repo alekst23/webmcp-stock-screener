@@ -1,6 +1,6 @@
 import type { Writable } from 'svelte/store';
 import { buildTools } from './tools';
-import { summarizeToolCall, type AgentActivityEvent } from '../workspace/activity';
+import { recordAction, type AgentActivityEvent } from '../workspace/activity';
 import type { ModelContext, ResearchEngine, ToolResult, ToolSpec } from './types';
 
 export interface WebmcpConnection {
@@ -33,19 +33,9 @@ async function connect(
 ): Promise<WebmcpConnection> {
 	const specs = buildTools(engine);
 	const registered = new Set<string>();
-	let nextActivityId = 1;
 
 	function recordActivity(spec: ToolSpec, input: unknown, result: ToolResult): void {
-		activity?.update((events) => [
-			...events,
-			{
-				id: `activity_${nextActivityId++}`,
-				toolName: spec.name,
-				timestamp: new Date().toISOString(),
-				input,
-				summary: summarizeToolCall(spec.name, result)
-			}
-		]);
+		recordAction(activity, 'agent', spec.name, input, result);
 	}
 
 	async function refresh(): Promise<void> {

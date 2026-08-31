@@ -63,7 +63,7 @@
 		<p class="empty">No panels open yet.</p>
 	{:else}
 		<ul>
-			{#each state.panels as panel (panel.id)}
+			{#each state.panels as panel (panel.id + ':' + panel.instanceSetId)}
 				<li>
 					<code>{panel.id}</code> — {panel.kind}{#if panel.instanceSetId}
 						over <code>{panel.instanceSetId}</code>{/if}

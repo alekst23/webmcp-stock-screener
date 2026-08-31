@@ -29,14 +29,14 @@ than either of us could alone.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1001-1 | Mock data layer | — | Open |
-| 2 | T-1001-2 | Platform spike | T-1001-1 | Open |
-| 3 | T-1001-3 | Query engine core | T-1001-1 | Open |
-| 4 | T-1001-4 | Query engine stats | T-1001-3 | Open |
-| 5 | T-1001-5 | WebMCP integration | T-1001-2, T-1001-4 | Open |
-| 6 | T-1001-6 | Frontend shell | — | Open |
-| 7 | T-1001-7 | Frontend visualization | T-1001-6, T-1001-5 | Open |
-| 8 | T-1001-8 | Deploy & ops (mock) | T-1001-4 | Open |
+| 1 | T-1001-1 | Mock data layer | — | Done |
+| 2 | T-1001-2 | Platform spike | T-1001-1 | Blocked — awaiting live human verification |
+| 3 | T-1001-3 | Query engine core | T-1001-1 | Done |
+| 4 | T-1001-4 | Query engine stats | T-1001-3 | Done |
+| 5 | T-1001-5 | WebMCP integration | T-1001-2, T-1001-4 | Done |
+| 6 | T-1001-6 | Frontend shell | — | Done |
+| 7 | T-1001-7 | Frontend visualization | T-1001-6, T-1001-5 | Done |
+| 8 | T-1001-8 | Deploy & ops (mock) | T-1001-4 | Blocked — awaiting live deployment |
 | 9 | T-1001-9 | Real data pipeline (paid, deferred) | T-1001-1, T-1001-8 | Open |
 | 10 | T-1001-10 | Submission package | T-1001-9 | Open |
 

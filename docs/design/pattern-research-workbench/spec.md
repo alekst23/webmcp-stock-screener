@@ -52,9 +52,13 @@ at every step.
 8. **Instance focus**: zoom a panel to a single instance for close
    inspection, independent of what the human has selected by hand.
 9. **Shared workspace & collaboration**: a single visible research session
-   — defined studies/patterns/results/panels, and what's currently
-   selected/focused — that both the human (via direct interaction) and the
-   agent (via tool calls) read from and write to, persisted per browser.
+   — defined studies/patterns/results/panels, what's currently
+   selected/focused, and a complete ordered log of every action taken —
+   that both the human (via direct interaction) and the agent (via tool
+   calls) read from and write to, persisted per browser. Every action
+   either party takes appears in one timeline, labeled by who did it, so a
+   person watching the session can trust it as a full transactional
+   record rather than inferring history from a state snapshot.
 10. **Progressive tool availability**: the set of tools an agent can call
     expands as the research workflow advances (e.g. measurement tools only
     appear once a search has produced results), rather than exposing the
@@ -125,6 +129,10 @@ at every step.
 | Happy path | any combination of defined studies/patterns/results/panels and current selection/focus | the workspace is read | the full current state is returned, including what the human has selected by hand, so the agent can act on references like "these ones" |
 | Persistence | a session with existing workspace state | the page is reloaded in the same browser | the workspace state is restored as it was |
 | Cross-actor visibility | the human changes something directly in the UI (e.g. selects an instance) | the agent subsequently reads the workspace | the agent sees the human's change |
+| Unified action log | any action that changes the session — a human interacting with a UI control, or an agent invoking a tool | the action completes (success or failure) | one entry is appended to a single ordered log, showing who did it ("Human" or "Agent"), what action, a human-readable summary of the result, and when |
+| Human actions are visible | a human triggers an action through a UI control (not the `/dev` testing harness) | the action completes | it appears in the same log as agent actions, in true chronological order relative to them |
+| Failed actions are visible | an action (human or agent) fails | the failure occurs | the log shows the failure with a readable reason, not silently dropped |
+| Log persists across reloads | a session with existing logged actions | the page is reloaded in the same browser | the full log is restored, matching how the rest of workspace state already persists |
 
 ### Progressive tool availability
 
@@ -148,6 +156,14 @@ at every step.
   sources are ingestion-time only.
 - Chart interactivity beyond selection and zoom (e.g. manual drawing
   tools).
+- The `/dev` control surface (developer testing harness, no agent or
+  WebMCP browser involved) does not write to the action log — it is a
+  separate, disconnected tool.
+- The raw current-state snapshot view is removed; the log is the sole
+  visible record of session activity going forward (current panel/chart
+  rendering is unaffected — only the redundant text snapshot goes away).
+- Editing, deleting, or reordering log entries — the log is append-only,
+  matching the workspace's existing append-only model.
 
 ## Open Questions
 
@@ -155,4 +171,4 @@ None outstanding.
 
 ---
 
-*Implemented by: EPIC-1001*
+*Implemented by: EPIC-1001, EPIC-1002*

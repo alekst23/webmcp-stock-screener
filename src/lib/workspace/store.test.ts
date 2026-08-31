@@ -1,24 +1,9 @@
 import { get } from 'svelte/store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildTools } from '../webmcp/tools';
-import { createApiEngine } from './apiEngine';
+import { createApiEngine, getBackendInstanceSet, resolveBackendInstanceSet } from './apiEngine';
 import { createWorkspaceStore } from './store';
-
-// In-memory Storage so each test gets an isolated backing store instead of
-// depending on (and leaking state through) jsdom's shared global localStorage.
-function memoryStorage(): Storage {
-	const data = new Map<string, string>();
-	return {
-		getItem: (key) => (data.has(key) ? (data.get(key) ?? null) : null),
-		setItem: (key, value) => void data.set(key, String(value)),
-		removeItem: (key) => void data.delete(key),
-		clear: () => data.clear(),
-		key: (index) => [...data.keys()][index] ?? null,
-		get length() {
-			return data.size;
-		}
-	};
-}
+import { memoryStorage } from './testSupport';
 
 // These tests exercise the workspace store's contract against the real
 // ResearchEngine implementation (createApiEngine) rather than a
@@ -100,6 +85,27 @@ describe('workspace state visibility', () => {
 });
 
 describe('workspace persistence', () => {
+	it('normalizes duplicate persisted ids instead of crashing keyed chart lists', () => {
+		const storage = memoryStorage();
+		storage.setItem(
+			'webmcp-workspace-state',
+			JSON.stringify({
+				studies: [],
+				setups: [],
+				instanceSets: [],
+				panels: [
+					{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_1' },
+					{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_2' }
+				],
+				focus: null
+			})
+		);
+
+		const store = createWorkspaceStore(storage);
+
+		expect(get(store).panels).toEqual([{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_2' }]);
+	});
+
 	it('restores workspace state after a simulated page reload in the same browser', async () => {
 		stubResearchFetch();
 		const storage = memoryStorage();
@@ -120,6 +126,83 @@ describe('workspace persistence', () => {
 			`restored setups: ${JSON.stringify(restored.setups)}`
 		).toContain(setup.id);
 		expect(restored.instanceSets, `restored instanceSets`).toHaveLength(1);
+	});
+
+	it('restores full instance set data after reload so charts can render on the main page', async () => {
+		stubResearchFetch();
+		const workspaceStorage = memoryStorage();
+		const instanceSetStorage = memoryStorage();
+		const storeBeforeReload = createWorkspaceStore(workspaceStorage);
+		const engineBeforeReload = createApiEngine(storeBeforeReload, {
+			baseUrl: 'http://localhost:8000',
+			instanceSetStorage
+		});
+
+		const setup = await engineBeforeReload.defineSetup({ steps: [{ condition: 'gap_pct > 4' }] });
+		const set = await engineBeforeReload.findInstances({ setupId: setup.id });
+
+		const storeAfterReload = createWorkspaceStore(workspaceStorage);
+		const engineAfterReload = createApiEngine(storeAfterReload, {
+			baseUrl: 'http://localhost:8000',
+			instanceSetStorage
+		});
+		const restoredSet = getBackendInstanceSet(engineAfterReload, set.id);
+
+		expect(restoredSet?.instances, `restoredSet: ${JSON.stringify(restoredSet)}`).toEqual([
+			{ ticker: 'ACME', date: '2024-03-08', completeness: 1 }
+		]);
+	});
+
+	it('rehydrates old workspace summaries that predate the full instance set cache', async () => {
+		stubResearchFetch();
+		const workspaceStorage = memoryStorage();
+		const storeBeforeReload = createWorkspaceStore(workspaceStorage);
+		const engineBeforeReload = createApiEngine(storeBeforeReload, {
+			baseUrl: 'http://localhost:8000',
+			instanceSetStorage: memoryStorage()
+		});
+
+		const setup = await engineBeforeReload.defineSetup({ steps: [{ condition: 'gap_pct > 4' }] });
+		const set = await engineBeforeReload.findInstances({ setupId: setup.id });
+
+		const storeAfterReload = createWorkspaceStore(workspaceStorage);
+		const engineAfterReload = createApiEngine(storeAfterReload, {
+			baseUrl: 'http://localhost:8000',
+			instanceSetStorage: memoryStorage()
+		});
+		const restoredSet = await resolveBackendInstanceSet(engineAfterReload, set.id);
+
+		expect(restoredSet?.id).toBe(set.id);
+		expect(restoredSet?.instances, `rehydratedSet: ${JSON.stringify(restoredSet)}`).toEqual([
+			{ ticker: 'ACME', date: '2024-03-08', completeness: 1 }
+		]);
+	});
+
+	it('keeps client handles unique when a restarted backend reuses an old set id', async () => {
+		stubResearchFetch();
+		const workspaceStorage = memoryStorage();
+		const instanceSetStorage = memoryStorage();
+		const storeBeforeRestart = createWorkspaceStore(workspaceStorage);
+		const engineBeforeRestart = createApiEngine(storeBeforeRestart, {
+			baseUrl: 'http://localhost:8000',
+			instanceSetStorage
+		});
+
+		const setup = await engineBeforeRestart.defineSetup({ steps: [{ condition: 'gap_pct > 4' }] });
+		const firstSet = await engineBeforeRestart.findInstances({ setupId: setup.id });
+		vi.unstubAllGlobals();
+		stubResearchFetch();
+
+		const storeAfterRestart = createWorkspaceStore(workspaceStorage);
+		const engineAfterRestart = createApiEngine(storeAfterRestart, {
+			baseUrl: 'http://localhost:8000',
+			instanceSetStorage
+		});
+		const secondSet = await engineAfterRestart.findInstances({ setupId: setup.id });
+		const ids = get(storeAfterRestart).instanceSets.map((set) => set.id);
+
+		expect(secondSet.id).not.toBe(firstSet.id);
+		expect(new Set(ids).size, `instance set ids: ${JSON.stringify(ids)}`).toBe(ids.length);
 	});
 });
 

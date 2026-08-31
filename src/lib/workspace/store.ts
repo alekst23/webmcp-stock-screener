@@ -13,6 +13,24 @@ function emptyWorkspace(): WorkspaceState {
 	return { studies: [], setups: [], instanceSets: [], panels: [], focus: null };
 }
 
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+	const byId = new Map<string, T>();
+	for (const item of items) {
+		byId.set(item.id, item);
+	}
+	return [...byId.values()];
+}
+
+function normalizeWorkspace(state: WorkspaceState): WorkspaceState {
+	return {
+		studies: uniqueById(state.studies ?? []),
+		setups: uniqueById(state.setups ?? []),
+		instanceSets: uniqueById(state.instanceSets ?? []),
+		panels: uniqueById(state.panels ?? []),
+		focus: state.focus ?? null
+	};
+}
+
 function readPersisted(storage: Storage | undefined): WorkspaceState {
 	if (!storage) {
 		return emptyWorkspace();
@@ -22,7 +40,7 @@ function readPersisted(storage: Storage | undefined): WorkspaceState {
 		return emptyWorkspace();
 	}
 	try {
-		return JSON.parse(raw) as WorkspaceState;
+		return normalizeWorkspace(JSON.parse(raw) as WorkspaceState);
 	} catch {
 		// Corrupted or foreign data in the slot must not crash the app on load.
 		return emptyWorkspace();
