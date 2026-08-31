@@ -46,9 +46,46 @@ successfully without opening dev tools.
 
 ## Solution Approach
 
-Left to ticket design — likely reads `connectWebmcp()`'s resolved value
-(non-null vs. null) and `buildTools(engine).length` in `+page.svelte`'s
-`onMount`, rendering the result inline in the header.
+Implements the "WebMCP status visible" and "Not WebMCP-capable" scenarios
+from `spec.md`'s Shared workspace & collaboration feature (#9).
+
+- **Layer**: frontend only (`src/lib/webmcp/`, `src/routes/+page.svelte`).
+- New pure function `formatWebmcpStatus(status: WebmcpStatus): string` in
+  `src/lib/webmcp/status.ts` — takes `{ connected: boolean; toolCount:
+  number }` and returns the header text ("WebMCP connected · N tools
+  available" or "WebMCP isn't available in this browser"). Pure and
+  synchronous so it's unit-testable without a Svelte component-testing
+  library (none is in `package.json`; existing WebMCP tests only exercise
+  plain TS, e.g. `tools.test.ts`).
+- `+page.svelte`'s `onMount` computes `toolCount` from
+  `buildTools(engine).length` (static full surface — AC3, feature #10 out
+  of scope) and awaits `connectWebmcp()`; `connected` is `connectWebmcp()`'s
+  result being non-null (it returns `null` exactly when
+  `document.modelContext` is absent — see `register.ts`). Both feed a
+  `$state` `WebmcpStatus` object rendered via `formatWebmcpStatus` inline
+  in the header markup.
+- No backend, domain, or infra changes — this ticket is presentation over
+  data `register.ts`/`tools.ts` already expose.
+
+### Contracts to introduce
+
+- `WebmcpStatus` (type) → `src/lib/webmcp/status.ts` — `{ connected:
+  boolean; toolCount: number }`, the input to `formatWebmcpStatus`.
+- `formatWebmcpStatus(status: WebmcpStatus): string` → same file — pure
+  formatter, stubbed in this phase (throws), implemented in
+  `/at-ticket-start`.
+
+### Config vars introduced
+
+None.
+
+### References
+
+- `src/routes/+page.svelte` — renders the header, owns `onMount`
+- `src/lib/webmcp/register.ts` — `connectWebmcp()` return value contract
+- `src/lib/webmcp/tools.ts` — `buildTools()`
+- `docs/design/pattern-research-workbench/technical.md` — contract entry
+  added by this phase
 
 ## Out of Scope
 
