@@ -1,0 +1,19 @@
+// T-1001-8: Cloudflare Workers static-assets config for the frontend.
+//
+// Cloudflare's current Git-connected deploy flow (Workers & Pages, unified)
+// runs `npx wrangler deploy` and expects this file -- discovered live during
+// T-1001-8 deployment; the classic "Pages: build output directory" field the
+// runbook originally assumed no longer exists in that flow. `directory`
+// matches vite.config.ts's `adapter({ pages: 'build', assets: 'build' })`
+// output. `not_found_handling: "single-page-application"` replaces
+// static/_redirects' SPA-fallback rule for this deploy path (the app is
+// pure client-side SPA, no route declares `prerender = true` -- see
+// vite.config.ts).
+{
+	"name": "webmcp-stock-screener",
+	"compatibility_date": "2026-08-31",
+	"assets": {
+		"directory": "build",
+		"not_found_handling": "single-page-application"
+	}
+}

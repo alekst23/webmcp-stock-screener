@@ -15,12 +15,15 @@ or later, once T-1001-8's work merges into it).
 
 - **Backend**: FastAPI (`backend/`), serving the T-1001-1 synthetic mock
   panel, on **Render**, via the blueprint at [`render.yaml`](../../../render.yaml).
-- **Frontend**: SvelteKit static build (`src/`), on **Cloudflare Pages**,
-  via `@sveltejs/adapter-static` (configured in [`vite.config.ts`](../../../vite.config.ts))
-  + the SPA-fallback rule in [`static/_redirects`](../../../static/_redirects).
+- **Frontend**: SvelteKit static build (`src/`), on **Cloudflare Workers**
+  (static assets), via `@sveltejs/adapter-static` (configured in
+  [`vite.config.ts`](../../../vite.config.ts)) + [`wrangler.jsonc`](../../../wrangler.jsonc)'s
+  `assets` config (its `not_found_handling: "single-page-application"`
+  covers the SPA-fallback role [`static/_redirects`](../../../static/_redirects)
+  was written for under the classic Pages flow).
 
 Both come up on the platforms' own HTTPS domains by default (AC3) --
-`*.onrender.com` and `*.pages.dev` respectively -- no separate TLS setup
+`*.onrender.com` and `*.workers.dev` respectively -- no separate TLS setup
 needed for the mock-data stage.
 
 ---
@@ -42,7 +45,7 @@ needed for the mock-data stage.
      actually calls EODHD yet (that's T-1001-9); set it anyway so the var
      exists for when that ticket lands and reuses this same service.
    - `CORS_ALLOWED_ORIGINS` -- **do not set this yet**. You don't have the
-     frontend's real `*.pages.dev` URL until step 2 is done. Set it to
+     frontend's real `*.workers.dev` URL until step 2 is done. Set it to
      `http://localhost:5173` for now (matches the code's own local-dev
      default) and come back to this in step 2.5 once the frontend URL
      exists.
@@ -69,39 +72,46 @@ from the committed blueprint -- prefer editing `render.yaml`).
 
 ---
 
-## 2. Frontend: deploy to Cloudflare Pages
+## 2. Frontend: deploy to Cloudflare Workers (static assets)
+
+Cloudflare's current Git-connected onboarding routes new projects through
+its unified Workers flow, not the classic separate "Pages" product this
+section originally assumed -- discovered live during T-1001-8 deployment.
+That flow runs `npx wrangler deploy` and needs a `wrangler.jsonc` in the
+repo (added -- see its header comment); there's no "build output
+directory" field to fill in by hand anymore.
 
 1. Create a Cloudflare account (or sign in) at <https://dash.cloudflare.com>.
-2. **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
-   Select this repo and the branch you're deploying.
-3. Build configuration:
-   - **Framework preset**: SvelteKit (if offered) or **None** -- either
-     way, the settings below are what actually matter, and
-     `@sveltejs/adapter-static` doesn't need Cloudflare's SvelteKit-adapter
-     special-casing (that's for `adapter-cloudflare`, not what this repo
-     uses -- see `vite.config.ts` for why `adapter-static` was chosen: the
-     app is a pure client-side SPA with no server routes).
+2. **Workers & Pages** → **Create**. Connect this GitHub repo, select the
+   branch you're deploying.
+3. Fields on the "Set up your application" screen:
    - **Build command**: `npm run build`
-   - **Build output directory**: `build`
-   - **Root directory**: `/` (repo root -- the frontend isn't under a
-     subdirectory the way the backend is).
-4. **Environment variables** (build-time, not runtime -- SvelteKit's
-   `PUBLIC_*` convention bakes these into the static bundle at build time,
-   so they must be set here, not left for later):
-   - `PUBLIC_API_BASE_URL` = the Render backend URL from step 1.6, e.g.
+   - **Deploy command**: `npx wrangler deploy` (leave the default --
+     reads `wrangler.jsonc`)
+   - **Path**: `/` (repo root)
+   - **API token**: leave "Create new token" -- Cloudflare provisions its
+     own deploy credential, nothing to enter
+   - **Variable name / Variable value** (build-time, not runtime --
+     SvelteKit's `PUBLIC_*` convention bakes these into the static bundle
+     at build time, so this is the only place to set it): `PUBLIC_API_BASE_URL`
+     = the Render backend URL from step 1.6, e.g.
      `https://webmcp-pattern-research-api.onrender.com`. See
      [`.env.example`](../../../.env.example) for this var's local-dev
-     default.
-5. Deploy. Cloudflare Pages builds and serves from `*.pages.dev` over
-   HTTPS automatically (AC3) -- no certificate setup needed.
-6. Note the deployed URL, e.g. `https://webmcp-stock-screener.pages.dev`.
+     default. If the backend URL isn't known yet, deploy without it and
+     come back to set it + redeploy once it exists -- don't leave the
+     frontend calling the wrong origin.
+4. Deploy. Cloudflare serves the Worker's static assets over HTTPS
+   automatically (AC3) -- no certificate setup needed.
+5. Note the deployed URL -- with this flow it's `*.workers.dev`
+   (e.g. `https://webmcp-stock-screener.<subdomain>.workers.dev`), not
+   `*.pages.dev`.
 
 ### 2.5 Close the CORS loop
 
 Go back to the Render dashboard (or `render.yaml`) and set
-`CORS_ALLOWED_ORIGINS` to the real Cloudflare Pages URL from step 2.6
-(comma-separate multiple origins if you keep a preview deployment URL
-too, e.g. `https://webmcp-stock-screener.pages.dev,https://<preview-hash>.webmcp-stock-screener.pages.dev`).
+`CORS_ALLOWED_ORIGINS` to the real Cloudflare `*.workers.dev` URL from
+step 2.5 (comma-separate multiple origins if you keep a preview
+deployment URL too).
 Redeploy the backend so the new value takes effect (`main.py` reads
 `CORS_ALLOWED_ORIGINS` once at process startup -- see `_allowed_origins`).
 
@@ -113,7 +123,7 @@ Redeploy the backend so the new value takes effect (`main.py` reads
 
 ```bash
 curl -I https://webmcp-pattern-research-api.onrender.com/api/spike/ping
-curl -I https://webmcp-stock-screener.pages.dev
+curl -I https://webmcp-stock-screener.<subdomain>.workers.dev
 ```
 
 Both should connect over TLS (curl fails outright on a bad cert) and
@@ -136,7 +146,7 @@ was always going to be superseded by.
 
 ### Frontend reachable and talking to the backend (AC2)
 
-Open `https://webmcp-stock-screener.pages.dev` in a browser, open dev
+Open your `*.workers.dev` frontend URL in a browser, open dev
 tools' Network tab, and trigger the spike tool (via `/spike` or `/dev` --
 check `src/routes/` for what's live) or a real product tool once T-1001-5
 lands. Confirm the request goes to the `PUBLIC_API_BASE_URL` origin (not
@@ -181,8 +191,13 @@ or judge would.
   truth for the Render service's build/start commands and env vars; no
   disk -- see its header comment).
 - [`vite.config.ts`](../../../vite.config.ts) -- frontend adapter config.
-- [`static/_redirects`](../../../static/_redirects) -- Cloudflare Pages
-  SPA fallback rule.
+- [`wrangler.jsonc`](../../../wrangler.jsonc) -- Cloudflare Workers static-assets
+  config (source of truth for the deploy's assets directory and SPA
+  fallback; see its header comment).
+- [`static/_redirects`](../../../static/_redirects) -- SPA fallback rule
+  from the classic Pages flow; superseded by `wrangler.jsonc`'s
+  `not_found_handling` for the current deploy path, kept in case a future
+  deploy reverts to classic Pages.
 - [`backend/.env.example`](../../../backend/.env.example),
   [`.env.example`](../../../.env.example) -- what every config var means
   and its local-dev default; this runbook only says where each one gets
