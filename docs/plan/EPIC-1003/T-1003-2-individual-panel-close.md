@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1003 (Panel Action Set)
 **Design**: docs/design/pattern-research-workbench/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: —
 **Issue**: #3

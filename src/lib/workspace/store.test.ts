@@ -263,14 +263,11 @@ describe('individual panel removal (T-1003-2)', () => {
 	});
 
 	it('clears focus when the closed panel was the focused panel', () => {
-		const store = storeWithPanels(
-			[{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_1' }],
-			{
-				panelId: 'panel_1',
-				selected: [{ ticker: 'ACME', date: '2024-03-08' }],
-				focusedInstance: null
-			}
-		);
+		const store = storeWithPanels([{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_1' }], {
+			panelId: 'panel_1',
+			selected: [{ ticker: 'ACME', date: '2024-03-08' }],
+			focusedInstance: null
+		});
 
 		removePanel(store, 'panel_1');
 
