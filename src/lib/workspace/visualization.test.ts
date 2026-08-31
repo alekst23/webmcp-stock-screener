@@ -188,3 +188,28 @@ describe('cross-actor visibility', () => {
 		expect(ws.focus?.panelId).toBe('panel_1');
 	});
 });
+
+// T-1002-1: unify action recording so a human UI control (starting with
+// ChartToolbar) and an agent tool call append to the same log through one
+// shared entry point, distinguished only by a static `actor` field.
+describe('unified action log', () => {
+	it('labels an agent tool call event with actor "agent"', () => {
+		throw new Error('not implemented');
+	});
+
+	it('appends an entry when a human triggers a chart-toolbar action, labeled actor "human"', () => {
+		throw new Error('not implemented');
+	});
+
+	it('records human and agent actions in true chronological order in the same log', () => {
+		throw new Error('not implemented');
+	});
+
+	it('shows a readable failure reason when an agent tool call fails', () => {
+		throw new Error('not implemented');
+	});
+
+	it('shows a readable failure reason when a human chart-toolbar action fails', () => {
+		throw new Error('not implemented');
+	});
+});
