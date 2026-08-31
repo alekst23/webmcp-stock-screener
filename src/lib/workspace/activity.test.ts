@@ -16,3 +16,18 @@ describe('activity log persistence', () => {
 		throw new Error('not implemented');
 	});
 });
+
+// T-1002-3: the timeline UI shows each entry's actor as "Human" or
+// "Agent" -- extracted as a pure helper so the label mapping is testable
+// without mounting ActivityFeed.svelte (raw-dump removal and rendered
+// ordering are structural/covered by T-1002-1's ordering test, not
+// re-tested here).
+describe('actor label', () => {
+	it('labels a human-actor event "Human"', () => {
+		throw new Error('not implemented');
+	});
+
+	it('labels an agent-actor event "Agent"', () => {
+		throw new Error('not implemented');
+	});
+});
