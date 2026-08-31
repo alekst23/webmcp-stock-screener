@@ -33,6 +33,8 @@ instead of inferring history from a static end-state snapshot.
 | 1 | T-1002-1 | Unify action recording | — | Done |
 | 2 | T-1002-2 | Persist the action log | T-1002-1 | Done |
 | 3 | T-1002-3 | Timeline UI + remove raw state dump | T-1002-1 | Done |
+| 4 | T-1002-4 | Validate persisted activity log shape on load | — | Open |
+| 5 | T-1002-5 | Structurally enforce failure logging instead of relying on convention | — | Open |
 
 ## Dependency Graph
 
