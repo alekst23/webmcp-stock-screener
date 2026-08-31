@@ -44,9 +44,10 @@ before the paid data pipeline is in the critical path.
 ## Solution Approach
 
 Pure infra/config, no new domain contracts. Render Web Service running
-the FastAPI app (uvicorn) with the mock panel from T-1001-1 on its
-persistent disk; frontend static build deployed to Cloudflare Pages or
-Vercel (either is fine per `docs/plan.md` — only the backend needs
+the FastAPI app (uvicorn); the mock panel from T-1001-1 regenerates at
+build time on every deploy (no persistent disk — see "Implementation
+notes" below for why). Frontend static build deployed to Cloudflare Pages
+or Vercel (either is fine per `docs/plan.md` — only the backend needs
 Render). CORS restricted to the deployed frontend origin. Rate limiting
 via a small FastAPI middleware (e.g. `slowapi`), sufficient at this scale
 per `docs/plan.md`'s risk mitigation — no custom implementation needed.
@@ -87,13 +88,18 @@ per `docs/plan.md`'s risk mitigation — no custom implementation needed.
   landed yet. The runbook and rate-limit curl example both target that
   endpoint; re-check `backend/main.py` once T-1001-5 lands and prefer one
   of its endpoints instead.
-- `render.yaml`'s persistent disk is mounted directly over the path
-  `backend/api/routes/spike.py` already reads
-  (`backend/data/mock/panel.parquet`), so no application code changed to
-  make the deploy config work — the build command generates the panel
-  once (skipped on later deploys once the disk already has it), rehearsing
-  the "generate once, persist across deploys" shape T-1001-9's real
-  backfill + nightly delta job will need.
+- **Dropped the persistent disk originally planned for the mock panel**
+  (discovered live during deployment): Render's free tier doesn't support
+  disks at all, and a paid tier just to persist a deterministic,
+  seconds-to-regenerate mock panel isn't worth it. The build command
+  regenerates `backend/data/mock/panel.parquet` on every deploy instead —
+  no functional difference, since the mock data is a fixed seeded output.
+  This does **not** carry over to T-1001-9: real backfilled data is
+  expensive to re-fetch (API quota) and the nightly delta job needs
+  something to append to, so it needs real persistence — planned as object
+  storage (R2/S3) rather than a Render disk, since object storage is far
+  cheaper than Render's paid-disk tier for this data volume. See
+  `T-1001-9-real-data-pipeline.md`.
 - The frontend adapter is configured in `vite.config.ts` (inline in the
   `sveltekit()` plugin's `adapter` option), not a separate
   `svelte.config.js` — no such file exists in this repo; that's just how

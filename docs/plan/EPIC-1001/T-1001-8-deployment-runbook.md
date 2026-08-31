@@ -47,11 +47,10 @@ needed for the mock-data stage.
      default) and come back to this in step 2.5 once the frontend URL
      exists.
 5. Deploy. Watch the build log: `pip install uv`, then `uv sync --frozen`,
-   then either a skip (`test -f data/mock/panel.parquet`) or a fresh
-   `uv run python scripts/generate_mock_panel.py` on the very first deploy
-   (subsequent deploys reuse the panel already sitting on the persistent
-   disk mounted at `backend/data` -- see `render.yaml`'s `disk` block for
-   why that path was chosen).
+   then `uv run python scripts/generate_mock_panel.py` (regenerates the
+   mock panel fresh on every deploy -- there's no persistent disk; see
+   `render.yaml`'s header comment for why, and `T-1001-9-real-data-pipeline.md`
+   for how real data will persist instead).
 6. Once live, note the service's public URL, e.g.
    `https://webmcp-pattern-research-api.onrender.com`. `render.yaml`
    configures `healthCheckPath: /api/spike/ping`, so Render's own health
@@ -179,7 +178,8 @@ or judge would.
 ## Reference
 
 - [`render.yaml`](../../../render.yaml) -- backend blueprint (source of
-  truth for the Render service's build/start commands, env vars, disk).
+  truth for the Render service's build/start commands and env vars; no
+  disk -- see its header comment).
 - [`vite.config.ts`](../../../vite.config.ts) -- frontend adapter config.
 - [`static/_redirects`](../../../static/_redirects) -- Cloudflare Pages
   SPA fallback rule.

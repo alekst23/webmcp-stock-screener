@@ -8,6 +8,12 @@
 # Serves the mock dataset only (T-1001-1's synthetic panel) -- the real
 # EODHD-backed panel and its nightly refresh belong to T-1001-9 and will
 # extend this service's build/cron config, not replace it.
+#
+# No persistent disk: Render's free tier doesn't support disks at all, and
+# a paid tier just to persist a mock panel that regenerates deterministically
+# in seconds isn't worth it (discovered live during T-1001-8 deployment).
+# T-1001-9's real, non-regenerable backfilled data will persist in object
+# storage (R2/S3) instead of a Render disk -- see that ticket for why.
 
 services:
   - type: "web"
@@ -34,10 +40,10 @@ services:
       uv sync --frozen &&
       (test -f data/mock/panel.parquet || uv run python scripts/generate_mock_panel.py)
     startCommand: "uv run uvicorn main:app --host 0.0.0.0 --port $PORT"
-    # Exercises the same panel file the persistent disk is for -- if the
-    # mock panel failed to generate or the disk didn't mount, this fails
-    # closed instead of serving a broken deploy. Swap for a T-1001-5
-    # endpoint once one exists that doesn't depend on route-specific state.
+    # Exercises the panel file the build step generates -- if generation
+    # failed, this fails closed instead of serving a broken deploy. Swap
+    # for a T-1001-5 endpoint once one exists that doesn't depend on
+    # route-specific state.
     healthCheckPath: "/api/spike/ping"
     envVars:
       # Secrets/deployment-specific values -- `sync: false` means Render
@@ -52,12 +58,3 @@ services:
       # `_rate_limit_default` for the "<count>/<period>" syntax (AC4).
       - key: "RATE_LIMIT_DEFAULT"
         value: "60/minute"
-    disk:
-      name: "panel-data"
-      # Mounted over the exact path backend/api/routes/spike.py already
-      # reads (`backend/data/mock/panel.parquet`, i.e. `data/mock/...`
-      # relative to `rootDir: backend`) -- Render persists whatever's at
-      # this path across deploys, so no PANEL_PATH env var/code change is
-      # needed to make the build-time generation above actually durable.
-      mountPath: "/opt/render/project/src/backend/data"
-      sizeGB: 1

@@ -54,22 +54,35 @@ way — same `PriceBar` schema (T-1001-1/T-1001-3), so nothing downstream
 changes. Backfill uses EODHD's per-ticker range endpoint (1 API call per
 ticker, any date length — confirmed in `data-provider.md`, not the
 bulk-by-day endpoint, which is for the nightly delta only). Nightly delta
-via the bulk-by-exchange endpoint as a Render Cron Job, appending to the
-same disk T-1001-8's Web Service reads. Sector/market-cap metadata comes
-from a free Nasdaq screener CSV export, not EODHD (outside its plan).
-As-of date surfaces through a small addition to `getWorkspace`'s response
-(or an adjacent endpoint) so the UI can display it per spec.md's
-Preconditions.
+via the bulk-by-exchange endpoint as a Render Cron Job.
+
+**Storage: object storage (R2 or S3), not a Render disk.** Discovered
+during T-1001-8's deployment that Render's persistent disk requires a
+paid instance tier (~$25/mo) just to attach it — far more than storing
+~60-90MB of Parquet in Cloudflare R2 (free tier covers this size, zero
+egress fees) or S3 (~$0.02/GB/mo). The backend fetches the panel from
+object storage into memory/`/tmp` on startup instead of reading a mounted
+disk path; the nightly cron job downloads, appends the day's delta, and
+re-uploads. Keeps the Render Web Service on its existing free/cheap
+compute tier — only the storage layer changes from what T-1001-8
+originally sketched.
+
+Sector/market-cap metadata comes from a free Nasdaq screener CSV export,
+not EODHD (outside its plan). As-of date surfaces through a small addition
+to `getWorkspace`'s response (or an adjacent endpoint) so the UI can
+display it per spec.md's Preconditions.
 
 **Contracts introduced:** `TickerMetadata` →
 `backend/domain/models/universe.py` — `ticker`, `sector`, `market_cap`,
 `as_of`.
 
-**Config vars introduced:** none new — reuses `EODHD_API_KEY` from
-T-1001-1, but the underlying EODHD account must be upgraded to the paid
-EOD Historical Data plan ($19.99/mo) for this ticket; the free tier used
-in T-1001-1 is insufficient for full-universe/full-history backfill. This
-is an account-tier change, not a different key.
+**Config vars introduced:** reuses `EODHD_API_KEY` from T-1001-1, but the
+underlying EODHD account must be upgraded to the paid EOD Historical Data
+plan ($19.99/mo) for this ticket; the free tier used in T-1001-1 is
+insufficient for full-universe/full-history backfill. This is an
+account-tier change, not a different key. New: R2/S3 credentials + bucket
+name for the panel object store (`sync: false`, set in Render dashboard,
+never committed).
 
 ## Technical Considerations
 

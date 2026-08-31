@@ -77,6 +77,16 @@ receives small, per-query slices (e.g. a 12-instance × 40-day grid ≈
 | Sector / market cap | Nasdaq screener export (free CSV) | Static enough not to need a live feed; one-time/occasional pull |
 | Earnings dates | Not yet finalized | Nice-to-have for `days_since_earnings`; not a blocker. Evaluate a free earnings-calendar source separately if time allows — do not let this hold up the OHLCV pipeline |
 
+## Storage: object storage, not a Render disk
+
+The backfilled panel and its nightly delta persist in Cloudflare R2 (free
+tier covers this size, zero egress) or S3 (~$0.02/GB/mo), not a Render
+persistent disk. Decided during T-1001-8's deployment: Render requires a
+paid instance tier (~$25/mo) just to attach a disk, which costs far more
+than the object storage this data volume actually needs. The backend
+fetches the panel into memory/`/tmp` on startup; the nightly cron job
+downloads, appends, re-uploads.
+
 ## Open items
 
 - Confirm the bulk-by-exchange endpoint's exact per-call payload shape and
@@ -84,3 +94,5 @@ receives small, per-query slices (e.g. a 12-instance × 40-day grid ≈
   cron.
 - Store the EODHD API key as a Render environment secret — never commit
   it. See `.gitignore` (`.env*` is excluded).
+- Same for R2/S3 credentials once chosen — Render environment secret,
+  never committed.
