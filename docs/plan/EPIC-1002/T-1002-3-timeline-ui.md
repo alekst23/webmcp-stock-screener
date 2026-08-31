@@ -44,9 +44,33 @@ raw state dump.
 
 ## Solution Approach
 
-Left to ticket design. Exact visual treatment (spacing, actor styling) is
-open — this ticket is scoped to structure and correctness (actor label,
-ordering, removal of the raw dump), not a full visual design pass.
+Structural change only, no new contracts — `ActivityFeed.svelte` and
+`+page.svelte` are edited; `WorkspaceView.svelte` is deleted outright
+(the Dead Code Policy doesn't allow leaving it unrendered in the tree
+once nothing imports it).
+
+- `ActivityFeed.svelte`: each `<li>` gains an actor badge —
+  `event.actor === 'human' ? 'Human' : 'Agent'` — rendered before the
+  action/summary text (AC1). Heading changes from "Agent activity (N)" to
+  "Activity log (N)" and the empty-state copy from "No tool calls yet."
+  to "No activity yet." — both were agent-only phrasing that's now
+  inaccurate (this feed already receives both actors once T-1002-1
+  lands). Ordering needs no new logic: both the agent path
+  (`register.ts`) and human path (`ChartToolbar.svelte`) append through
+  `recordAction`'s `activity.update((events) => [...events, event])`, so
+  array order already equals call order (AC2) — the component renders
+  `events` as given, no client-side sort.
+- `WorkspaceView.svelte` is deleted; its
+  `<WorkspaceView state={$workspaceStore} />` usage and import are
+  removed from `src/routes/+page.svelte` (AC3). `workspaceStore`'s own
+  import/usage in `+page.svelte` is untouched — `$workspaceStore.panels`,
+  `.instanceSets`, and `.focus` still drive `GridPanel`/`HistogramPanel`/
+  `FocusChart` rendering there, unaffected by removing the raw dump.
+- No change to `store.ts`, `activity.ts`, `register.ts`, or
+  `ChartToolbar.svelte` — those are T-1002-1/T-1002-2's surface.
+
+**References:** `src/lib/workspace/ActivityFeed.svelte`,
+`src/lib/workspace/WorkspaceView.svelte` (deleted), `src/routes/+page.svelte`.
 
 ## Out of Scope
 
