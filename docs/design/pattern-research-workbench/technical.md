@@ -137,12 +137,15 @@ localStorage pattern).
 | `input` | `unknown` | the call's raw input |
 | `summary` | `string` | one-line human-readable result summary, not raw JSON |
 
-**Shared recording entry point (T-1002-1):** both `register.ts`'s tool
-wrapper and any human-triggered UI control (starting with
-`ChartToolbar.svelte`) must call the same function to append an event —
-no call site writes to `activityStore` any other way. `register.ts`'s
-existing `recordActivity`/`summarizeToolCall` logic is reused, not
-duplicated, for the human path.
+**Shared recording entry point (T-1002-1):** `activity.ts` exports
+`recordAction(activity, actor, actionName, input, result: ToolResult)`.
+Both `register.ts`'s tool wrapper (`actor: 'agent'`) and any
+human-triggered UI control (starting with `ChartToolbar.svelte`, `actor:
+'human'`) call this one function to append an event — no call site
+writes to `activityStore` any other way. It reuses the existing
+`summarizeToolCall` logic (not duplicated) for both paths; `tools.ts`'s
+`ok`/`fail` `ToolResult` builders are exported so `ChartToolbar.svelte`
+can build the same result shape without re-implementing it.
 
 ### `TickerMetadata` — universe classification (T-1001-9)
 

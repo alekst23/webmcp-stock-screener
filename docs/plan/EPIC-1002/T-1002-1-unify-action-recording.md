@@ -50,12 +50,49 @@ so that the activity log is a complete record, not just an agent-only one.
 
 ## Solution Approach
 
-Left to ticket design — the entry point could live in `activity.ts`
-itself (a function both `register.ts` and `ChartToolbar.svelte` import)
-or as a thin wrapper `ChartToolbar.svelte` calls before/after each
-`engine.*()` call. Either way, `register.ts`'s existing
-`recordActivity`/`summarizeToolCall` logic should be reused, not
-duplicated.
+The shared entry point lives in `src/lib/workspace/activity.ts` (the
+module that already owns `activityStore` and `summarizeToolCall`), not as
+a `ChartToolbar`-local wrapper — so both call sites depend on the same
+module instead of one depending on the other.
+
+- Add `export function recordAction(activity, actor, actionName, input,
+  result: ToolResult): void` to `activity.ts`. It builds the
+  `AgentActivityEvent` (id, actor, toolName, timestamp,
+  `summarizeToolCall(actionName, result)`) and appends via
+  `activity?.update(...)` — this replaces `register.ts`'s inline
+  `recordActivity` closure and its local `nextActivityId` counter, which
+  move into `activity.ts` as module state.
+- `register.ts`'s `toDescriptor` calls `recordAction(activity, 'agent',
+  spec.name, input, result)` directly in place of the old closure.
+- Export `ok`/`fail` from `webmcp/tools.ts` (currently private) so
+  `ChartToolbar.svelte` can build the same `ToolResult` shape
+  `summarizeToolCall` expects, instead of duplicating that JSON-shaping
+  logic.
+- `ChartToolbar.svelte` gains an `activity: Writable<AgentActivityEvent[]>`
+  prop (passed from `+page.svelte` as `activityStore`, mirroring how
+  `store`/`engine` are already passed as props to sibling components, not
+  imported as singletons). Each handler (`clearPanels`, `showMonthly`)
+  wraps its existing try/catch: on success, `recordAction(activity,
+  'human', 'clearPanels' | 'showTickerCharts', input, ok(returnValue))`;
+  on failure, `recordAction(activity, 'human', ..., fail(message))` before
+  the existing `error = ...` UI handling. Action names match the
+  corresponding tool spec names in `tools.ts` (AC3's "same log... in true
+  chronological order" implies the same action identity, not just the
+  same list).
+- `/dev/+page.svelte` is untouched — it already talks to
+  `workspaceStore`/`engine` directly with no `activityStore` or
+  `recordAction` reference (verified by inspection), so AC5 holds by
+  construction, not by an explicit guard.
+
+No domain contracts introduced — this is a TypeScript-only frontend
+change to the existing `AgentActivityEvent` interface (see
+`technical.md`, already documents the `actor` field and shared
+entry-point requirement from epic design). No backend/Python layers are
+touched.
+
+**References:** `src/lib/workspace/activity.ts`, `src/lib/webmcp/register.ts`,
+`src/lib/webmcp/tools.ts`, `src/lib/workspace/ChartToolbar.svelte`,
+`src/routes/+page.svelte`.
 
 ## Out of Scope
 
