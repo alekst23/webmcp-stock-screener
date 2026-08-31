@@ -4,7 +4,9 @@ export interface WebmcpStatus {
 }
 
 // Renders WebmcpStatus into the header string an AC1/AC2 relies on.
-// Stub: implemented in /at-ticket-start.
 export function formatWebmcpStatus(status: WebmcpStatus): string {
-	throw new Error('not implemented');
+	if (!status.connected) {
+		return "WebMCP isn't available in this browser";
+	}
+	return `WebMCP connected · ${status.toolCount} tools available`;
 }
