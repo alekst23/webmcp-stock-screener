@@ -29,6 +29,9 @@ did.
 |---|--------|-------|------------|--------|
 | 1 | T-1005-1 | Snapshot persistence layer | — | Done |
 | 2 | T-1005-2 | Snapshot picker UI | T-1005-1 | Done |
+| 3 | T-1005-3 | Handle localStorage write failures and reserved-name collisions | — | Open |
+| 4 | T-1005-4 | Add SnapshotPicker test coverage and fix remount-fragile baseline | — | Open |
+| 5 | T-1005-5 | Minor cleanup — dedupe empty-workspace literal, shared test fake, unused export | — | Open |
 
 ## Dependency Graph
 
