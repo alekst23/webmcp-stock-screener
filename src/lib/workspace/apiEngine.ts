@@ -10,9 +10,10 @@
 // record of a setup or instance set by id. Every networked call therefore
 // sends the full setup/instance-set data by value, sourced either from the
 // workspace store (studies/setups, which already have the right shape) or
-// from a private cache of full backend InstanceSets this engine keeps
+// from a browser-side cache of full backend InstanceSets this engine keeps
 // alongside the store (WorkspaceState.instanceSets only carries summaries,
-// for UI purposes -- see types.ts).
+// for UI purposes -- see types.ts). The cache is persisted so charts can
+// render again after reloads.
 import { get, type Writable } from 'svelte/store';
 import {
 	ExpressionError,
@@ -32,6 +33,7 @@ import {
 	type SetupStep,
 	type SetupSummary,
 	type ShowGridInput,
+	type ShowTickerChartsInput,
 	type SplitInstancesInput,
 	type StudySummary,
 	type WorkspaceState
@@ -109,6 +111,8 @@ interface BackendStudy {
 	expression: string;
 }
 
+const INSTANCE_SET_CACHE_KEY = 'webmcp-backend-instance-sets';
+
 // Every function call in `expression` must name a FUNCTION_CATALOG entry.
 // Deliberately shallow (name-only, not real parsing) per this ticket's
 // resolved design in the ticket doc -- the backend's infra/expression.py
@@ -164,13 +168,17 @@ function toMeasureResult(result: BackendMeasureResult): MeasureResult {
 }
 
 // Keyed by the exact ResearchEngine object createApiEngine returns, so
-// getBackendInstanceSet (below) can reach a given engine's private
-// instanceSetCache without adding a method to the ResearchEngine interface
-// itself -- that interface is the WebMCP tool contract and T-1001-7 must
-// leave it unchanged (see this module's header comment and the ticket's
-// "data-fetching gap" note). A WeakMap rather than a field on the returned
-// object keeps ResearchEngine's own shape exactly as T-1001-5 shipped it.
+// chart components can reach a given engine's browser-side instanceSetCache
+// without adding methods to the ResearchEngine interface itself -- that
+// interface is the WebMCP tool contract and T-1001-7 must leave it
+// unchanged (see this module's header comment and the ticket's
+// "data-fetching gap" note). WeakMaps rather than fields on the returned
+// object keep ResearchEngine's own shape exactly as T-1001-5 shipped it.
 const instanceSetCacheByEngine = new WeakMap<ResearchEngine, Map<string, BackendInstanceSet>>();
+const instanceSetResolverByEngine = new WeakMap<
+	ResearchEngine,
+	(instanceSetId: string) => Promise<BackendInstanceSet | undefined>
+>();
 
 // UI-only escape hatch for T-1001-7's grid/chart/histogram components: they
 // only have a PanelSummary/InstanceSetSummary (from WorkspaceState) to work
@@ -181,6 +189,40 @@ export function getBackendInstanceSet(
 	instanceSetId: string
 ): BackendInstanceSet | undefined {
 	return instanceSetCacheByEngine.get(engine)?.get(instanceSetId);
+}
+
+export async function resolveBackendInstanceSet(
+	engine: ResearchEngine,
+	instanceSetId: string
+): Promise<BackendInstanceSet | undefined> {
+	const cached = getBackendInstanceSet(engine, instanceSetId);
+	if (cached) {
+		return cached;
+	}
+	return instanceSetResolverByEngine.get(engine)?.(instanceSetId);
+}
+
+function readInstanceSetCache(storage: Storage | undefined): Map<string, BackendInstanceSet> {
+	if (!storage) {
+		return new Map();
+	}
+	const raw = storage.getItem(INSTANCE_SET_CACHE_KEY);
+	if (!raw) {
+		return new Map();
+	}
+	try {
+		const sets = JSON.parse(raw) as BackendInstanceSet[];
+		return new Map(sets.filter((set) => typeof set?.id === 'string').map((set) => [set.id, set]));
+	} catch {
+		return new Map();
+	}
+}
+
+function writeInstanceSetCache(
+	storage: Storage | undefined,
+	cache: Map<string, BackendInstanceSet>
+): void {
+	storage?.setItem(INSTANCE_SET_CACHE_KEY, JSON.stringify([...cache.values()]));
 }
 
 // InstanceWindow (see BackendInstanceWindow above) carries only `ticker` --
@@ -245,12 +287,45 @@ export function createApiEngine(
 	store: Writable<WorkspaceState>,
 	config: ApiClientConfig
 ): ResearchEngine {
-	let nextId = 1;
+	const cacheStorage =
+		config.instanceSetStorage ?? (typeof localStorage !== 'undefined' ? localStorage : undefined);
+	const existingIds = workspaceIds(get(store));
+	let nextId =
+		Math.max(0, ...existingIds.map((existingId) => Number(existingId.match(/_(\d+)$/)?.[1] ?? 0))) +
+		1;
 	const id = (prefix: string) => `${prefix}_${nextId++}`;
 	// Full backend InstanceSets (with the concrete instance list), keyed by
 	// id -- see the module header comment for why this can't just be read
 	// back out of WorkspaceState.
-	const instanceSetCache = new Map<string, BackendInstanceSet>();
+	const instanceSetCache = readInstanceSetCache(cacheStorage);
+
+	function uniqueId(prefix: string, preferred: string): string {
+		const used = new Set([...workspaceIds(get(store)), ...instanceSetCache.keys()]);
+		if (!used.has(preferred)) {
+			return preferred;
+		}
+		let candidate = id(prefix);
+		while (used.has(candidate)) {
+			candidate = id(prefix);
+		}
+		return candidate;
+	}
+
+	function rememberInstanceSet(set: BackendInstanceSet): void {
+		instanceSetCache.set(set.id, set);
+		writeInstanceSetCache(cacheStorage, instanceSetCache);
+	}
+
+	function appendInstanceSetSummary(summary: InstanceSetSummary): void {
+		mutate((ws) => {
+			const existingIndex = ws.instanceSets.findIndex((set) => set.id === summary.id);
+			if (existingIndex >= 0) {
+				ws.instanceSets[existingIndex] = summary;
+			} else {
+				ws.instanceSets.push(summary);
+			}
+		});
+	}
 
 	function mutate(fn: (ws: WorkspaceState) => void): void {
 		store.update((ws) => {
@@ -326,9 +401,10 @@ export function createApiEngine(
 				min_market_cap: input.universe?.minMarketCap,
 				sectors: input.universe?.sectors
 			});
-			instanceSetCache.set(result.id, result);
+			result.id = uniqueId('set', result.id);
+			rememberInstanceSet(result);
 			const summary = toSummary(result);
-			mutate((ws) => ws.instanceSets.push(summary));
+			appendInstanceSetSummary(summary);
 			return summary;
 		},
 		async sampleInstances(input: SampleInstancesInput): Promise<InstanceEvent[]> {
@@ -362,10 +438,13 @@ export function createApiEngine(
 				threshold: input.threshold
 			});
 			for (const set of results) {
-				instanceSetCache.set(set.id, set);
+				set.id = uniqueId('set', set.id);
+				rememberInstanceSet(set);
 			}
 			const summaries = results.map(toSummary);
-			mutate((ws) => ws.instanceSets.push(...summaries));
+			for (const summary of summaries) {
+				appendInstanceSetSummary(summary);
+			}
 			return summaries;
 		},
 		async showGrid(input: ShowGridInput): Promise<PanelSummary> {
@@ -382,10 +461,52 @@ export function createApiEngine(
 			const panel: PanelSummary = {
 				id: id('panel'),
 				kind: 'grid',
-				instanceSetId: input.instanceSetId
+				instanceSetId: input.instanceSetId,
+				n: input.n,
+				strategy: input.strategy,
+				window: input.window
 			};
 			mutate((ws) => ws.panels.push(panel));
 			return panel;
+		},
+		async showTickerCharts(input: ShowTickerChartsInput): Promise<PanelSummary> {
+			const tickers = input.tickers.map((ticker) => ticker.trim().toUpperCase()).filter(Boolean);
+			if (tickers.length === 0) {
+				throw new Error('At least one ticker is required');
+			}
+			const set: BackendInstanceSet = {
+				id: uniqueId('set', id('set')),
+				setup_id: 'manual_ticker_chart',
+				instances: tickers.map((ticker) => ({
+					ticker,
+					date: input.date,
+					completeness: 1
+				})),
+				complete_count: tickers.length,
+				partial_count: 0,
+				from_date: input.date,
+				to_date: input.date
+			};
+			rememberInstanceSet(set);
+			appendInstanceSetSummary(toSummary(set));
+			const panel: PanelSummary = {
+				id: id('panel'),
+				kind: 'grid',
+				instanceSetId: set.id,
+				title: input.title ?? `${tickers.join(', ')} monthly chart`,
+				n: tickers.length,
+				strategy: 'recent',
+				window: input.window ?? [-20, 0]
+			};
+			mutate((ws) => ws.panels.push(panel));
+			return panel;
+		},
+		async clearPanels(): Promise<WorkspaceState> {
+			mutate((ws) => {
+				ws.panels = [];
+				ws.focus = null;
+			});
+			return get(store);
 		},
 		async focusInstance(input: FocusInstanceInput): Promise<void> {
 			mutate((ws) => {
@@ -405,5 +526,36 @@ export function createApiEngine(
 		}
 	};
 	instanceSetCacheByEngine.set(engine, instanceSetCache);
+	instanceSetResolverByEngine.set(engine, async (instanceSetId: string) => {
+		const cached = instanceSetCache.get(instanceSetId);
+		if (cached) {
+			return cached;
+		}
+		const ws = get(store);
+		const summary = ws.instanceSets.find((set) => set.id === instanceSetId);
+		const setup = ws.setups.find((item) => item.id === summary?.setupId);
+		if (!summary || !setup || summary.parentId) {
+			return undefined;
+		}
+		const result = await post<BackendInstanceSet>('/api/research/find-instances', {
+			setup: { id: setup.id, name: setup.name, steps: setup.steps },
+			studies: knownStudies(),
+			from_date: summary.from,
+			to_date: summary.to
+		});
+		result.id = summary.id;
+		result.setup_id = summary.setupId;
+		rememberInstanceSet(result);
+		return result;
+	});
 	return engine;
+}
+
+function workspaceIds(ws: WorkspaceState): string[] {
+	return [
+		...ws.studies.map((item) => item.id),
+		...ws.setups.map((item) => item.id),
+		...ws.instanceSets.map((item) => item.id),
+		...ws.panels.map((item) => item.id)
+	];
 }

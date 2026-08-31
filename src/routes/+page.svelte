@@ -10,6 +10,7 @@
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
 	import HistogramPanel from '$lib/workspace/HistogramPanel.svelte';
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
+	import ChartToolbar from '$lib/workspace/ChartToolbar.svelte';
 
 	const apiConfig = { baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' };
 
@@ -39,7 +40,9 @@
 
 	<ActivityFeed events={$activityStore} />
 
-	{#each $workspaceStore.panels as panel (panel.id)}
+	<ChartToolbar {engine} onclear={() => (focusedView = null)} />
+
+	{#each $workspaceStore.panels as panel (panel.id + ':' + panel.instanceSetId)}
 		{#if panel.kind === 'grid'}
 			<GridPanel
 				{panel}
@@ -51,7 +54,7 @@
 		{/if}
 	{/each}
 
-	{#if focusedView}
+	{#if focusedView && $workspaceStore.focus?.selected.length}
 		<FocusChart view={focusedView} />
 	{/if}
 

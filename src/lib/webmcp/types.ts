@@ -47,6 +47,10 @@ export interface PanelSummary {
 	id: string;
 	kind: 'grid' | 'histogram' | 'chart';
 	instanceSetId?: string;
+	title?: string;
+	n?: number;
+	strategy?: 'random' | 'recent' | 'best' | 'worst';
+	window?: [number, number];
 }
 
 export interface FocusState {
@@ -131,6 +135,14 @@ export interface ShowGridInput {
 	normalize?: boolean;
 }
 
+export interface ShowTickerChartsInput {
+	tickers: string[];
+	date: string;
+	// Trading days around the anchor date. [-20, 0] is roughly one market month.
+	window?: [number, number];
+	title?: string;
+}
+
 export interface FocusInstanceInput {
 	ticker: string;
 	date: string;
@@ -148,6 +160,8 @@ export const FUNCTION_CATALOG = ['sma', 'ema', 'atr', 'highest', 'lowest', 'days
 export interface ApiClientConfig {
 	// Base URL of the FastAPI backend for the 5 networked tools.
 	baseUrl: string;
+	// Optional test hook for the browser-side full instance-set cache.
+	instanceSetStorage?: Storage;
 }
 
 // Thrown by the engine when an expression fails to parse; the catalog is
@@ -170,6 +184,8 @@ export interface ResearchEngine {
 	measure(input: MeasureInput): Promise<MeasureResult>;
 	splitInstances(input: SplitInstancesInput): Promise<InstanceSetSummary[]>;
 	showGrid(input: ShowGridInput): Promise<PanelSummary>;
+	showTickerCharts(input: ShowTickerChartsInput): Promise<PanelSummary>;
+	clearPanels(): Promise<WorkspaceState>;
 	focusInstance(input: FocusInstanceInput): Promise<void>;
 	getWorkspace(): Promise<WorkspaceState>;
 }

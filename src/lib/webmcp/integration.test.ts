@@ -100,6 +100,8 @@ describe('real engine tool availability', () => {
 			'defineStudy',
 			'defineSetup',
 			'findInstances',
+			'showTickerCharts',
+			'clearPanels',
 			'getWorkspace'
 		]);
 
@@ -162,6 +164,12 @@ describe('end-to-end research session', () => {
 			horizonDays: 10
 		});
 		const panel = await call('showGrid', { instanceSetId: instanceSet.id });
+		const tickerPanel = await call('showTickerCharts', {
+			tickers: ['MOCK02', 'MOCK03'],
+			date: '2025-12-31',
+			window: [-20, 0],
+			title: 'Monthly charts'
+		});
 
 		expect(study.id).toMatch(/^study_/);
 		expect(setup.id).toMatch(/^setup_/);
@@ -169,6 +177,7 @@ describe('end-to-end research session', () => {
 		expect(Array.isArray(sample)).toBe(true);
 		expect(measurement.horizonDays).toBe(10);
 		expect(panel.kind).toBe('grid');
+		expect(tickerPanel.window).toEqual([-20, 0]);
 
 		// Every step's handle is visible in the same shared workspace state the
 		// human UI reads, not just in the tool result the agent saw.
@@ -177,5 +186,6 @@ describe('end-to-end research session', () => {
 		expect(ws.setups.map((s) => s.id)).toContain(setup.id);
 		expect(ws.instanceSets.map((s) => s.id)).toContain(instanceSet.id);
 		expect(ws.panels.map((p) => p.id)).toContain(panel.id);
+		expect(ws.panels.map((p) => p.id)).toContain(tickerPanel.id);
 	});
 });

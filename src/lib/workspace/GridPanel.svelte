@@ -3,7 +3,7 @@
 	import { alignInstanceWindows, type AlignedWindow } from './visualization';
 	import {
 		fetchInstanceWindows,
-		getBackendInstanceSet,
+		resolveBackendInstanceSet,
 		type InstanceWindowView
 	} from './apiEngine';
 	import { selectInstance } from './store';
@@ -40,20 +40,26 @@
 	let windows = $state<AlignedWindow[]>([]);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
+	let missingData = $state(false);
 
 	$effect(() => {
 		const instanceSetId = panel.instanceSetId;
 		if (!instanceSetId) {
 			return;
 		}
-		const instanceSet = getBackendInstanceSet(engine, instanceSetId);
-		if (!instanceSet) {
-			error = `No cached instance set for "${instanceSetId}"`;
-			return;
-		}
 		loading = true;
 		error = null;
-		fetchInstanceWindows(config, instanceSet)
+		missingData = false;
+		resolveBackendInstanceSet(engine, instanceSetId)
+			.then((instanceSet) => {
+				if (!instanceSet) {
+					rawViews = [];
+					windows = [];
+					missingData = true;
+					return [];
+				}
+				return fetchInstanceWindows(config, instanceSet, panel.n, panel.strategy, panel.window);
+			})
 			.then((views) => {
 				rawViews = views;
 				windows = alignInstanceWindows(views);
@@ -103,34 +109,36 @@
 	}
 </script>
 
-<section class="grid-panel">
-	<h3>Grid <code>{panel.id}</code> ({windows.length} instances)</h3>
-	{#if loading}
-		<p class="empty">Loading…</p>
-	{/if}
-	{#if error}
-		<p class="error">{error}</p>
-	{/if}
-	<div class="cells">
-		{#each windows as win, i (win.ticker + win.date)}
-			<button
-				type="button"
-				class="cell"
-				class:partial={win.isPartial}
-				onclick={() => handleSelect(win, i)}
-			>
-				<svg viewBox="0 0 {CHART_WIDTH} {CHART_HEIGHT}" preserveAspectRatio="none">
-					<line x1={anchorX(win)} y1="0" x2={anchorX(win)} y2={CHART_HEIGHT} class="anchor" />
-					<path d={linePath(win)} class="line" />
-				</svg>
-				<span class="label"
-					>{win.ticker} — {win.date}{#if win.isPartial}
-						(partial){/if}</span
+{#if !missingData}
+	<section class="grid-panel">
+		<h3>{panel.title ?? 'Grid'} <code>{panel.id}</code> ({windows.length} instances)</h3>
+		{#if loading}
+			<p class="empty">Loading…</p>
+		{/if}
+		{#if error}
+			<p class="error">{error}</p>
+		{/if}
+		<div class="cells">
+			{#each windows as win, i (win.ticker + win.date)}
+				<button
+					type="button"
+					class="cell"
+					class:partial={win.isPartial}
+					onclick={() => handleSelect(win, i)}
 				>
-			</button>
-		{/each}
-	</div>
-</section>
+					<svg viewBox="0 0 {CHART_WIDTH} {CHART_HEIGHT}" preserveAspectRatio="none">
+						<line x1={anchorX(win)} y1="0" x2={anchorX(win)} y2={CHART_HEIGHT} class="anchor" />
+						<path d={linePath(win)} class="line" />
+					</svg>
+					<span class="label"
+						>{win.ticker} — {win.date}{#if win.isPartial}
+							(partial){/if}</span
+					>
+				</button>
+			{/each}
+		</div>
+	</section>
+{/if}
 
 <style>
 	.grid-panel {
