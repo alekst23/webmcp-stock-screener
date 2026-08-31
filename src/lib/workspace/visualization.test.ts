@@ -212,9 +212,7 @@ describe('unified action log', () => {
 		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
 		expect(events[0]!.actor).toBe('human');
 		expect(events[0]!.toolName).toBe('clearPanels');
-		expect(events[0]!.summary, 'summary must be human-readable, not raw JSON').not.toMatch(
-			/[{}]/
-		);
+		expect(events[0]!.summary, 'summary must be human-readable, not raw JSON').not.toMatch(/[{}]/);
 	});
 
 	it('records human and agent actions in true chronological order in the same log', async () => {
