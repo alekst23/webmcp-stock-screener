@@ -7,11 +7,20 @@
 // Svelte wiring (ChartToolbar.svelte, ActivityFeed.svelte have no tests).
 import type { WorkspaceState } from '../webmcp/types';
 
-// STUB: contract only, filled in during the ticket's implementation phase.
-// baseline is null before any save/load has happened this session.
+const EMPTY_WORKSPACE: WorkspaceState = {
+	studies: [],
+	setups: [],
+	instanceSets: [],
+	panels: [],
+	focus: null
+};
+
+// baseline is null before any save/load has happened this session, treated
+// as an empty workspace -- WorkspaceState has no non-serializable fields,
+// so structural (JSON) equality is a safe/complete comparison.
 export function hasUnsavedChanges(
-	_current: WorkspaceState,
-	_baseline: WorkspaceState | null
+	current: WorkspaceState,
+	baseline: WorkspaceState | null
 ): boolean {
-	throw new Error('not implemented');
+	return JSON.stringify(current) !== JSON.stringify(baseline ?? EMPTY_WORKSPACE);
 }

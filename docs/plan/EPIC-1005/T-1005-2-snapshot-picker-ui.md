@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1005 (Workspace Snapshots)
 **Design**: docs/design/workspace-snapshots/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1005-1
 **Blocks**: —
 **Issue**: #5

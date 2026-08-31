@@ -27,8 +27,8 @@ did.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1005-1 | Snapshot persistence layer | — | Open |
-| 2 | T-1005-2 | Snapshot picker UI | T-1005-1 | Open |
+| 1 | T-1005-1 | Snapshot persistence layer | — | Done |
+| 2 | T-1005-2 | Snapshot picker UI | T-1005-1 | Done |
 
 ## Dependency Graph
 
