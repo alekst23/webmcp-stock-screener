@@ -1,11 +1,16 @@
 <script lang="ts">
+	import type { Writable } from 'svelte/store';
 	import type { ResearchEngine } from '../webmcp/types';
+	import { ok, fail } from '../webmcp/tools';
+	import { recordAction, type AgentActivityEvent } from './activity';
 
 	let {
 		engine,
+		activity,
 		onclear
 	}: {
 		engine: ResearchEngine;
+		activity: Writable<AgentActivityEvent[]>;
 		onclear?: () => void;
 	} = $props();
 
@@ -25,10 +30,13 @@
 		busy = true;
 		error = null;
 		try {
-			await engine.clearPanels();
+			const result = await engine.clearPanels();
+			recordAction(activity, 'human', 'clearPanels', undefined, ok(result));
 			onclear?.();
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			const message = e instanceof Error ? e.message : String(e);
+			recordAction(activity, 'human', 'clearPanels', undefined, fail(message));
+			error = message;
 		} finally {
 			busy = false;
 		}
@@ -37,15 +45,19 @@
 	async function showMonthly(): Promise<void> {
 		busy = true;
 		error = null;
+		const input = {
+			tickers: parseTickers(),
+			date,
+			window: [-20, 0] as [number, number],
+			title: 'Monthly charts'
+		};
 		try {
-			await engine.showTickerCharts({
-				tickers: parseTickers(),
-				date,
-				window: [-20, 0],
-				title: 'Monthly charts'
-			});
+			const result = await engine.showTickerCharts(input);
+			recordAction(activity, 'human', 'showTickerCharts', input, ok(result));
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			const message = e instanceof Error ? e.message : String(e);
+			recordAction(activity, 'human', 'showTickerCharts', input, fail(message));
+			error = message;
 		} finally {
 			busy = false;
 		}

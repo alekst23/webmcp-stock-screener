@@ -40,7 +40,7 @@
 
 	<ActivityFeed events={$activityStore} />
 
-	<ChartToolbar {engine} onclear={() => (focusedView = null)} />
+	<ChartToolbar {engine} activity={activityStore} onclear={() => (focusedView = null)} />
 
 	{#each $workspaceStore.panels as panel (panel.id + ':' + panel.instanceSetId)}
 		{#if panel.kind === 'grid'}

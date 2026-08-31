@@ -15,11 +15,14 @@ import {
 	type WorkspaceState
 } from './types';
 
-function ok(payload: unknown): ToolResult {
+// Exported so non-tool call sites (ChartToolbar.svelte's human-triggered
+// actions, T-1002-1) can build the same ToolResult shape recordAction's
+// summarizeToolCall expects, instead of re-implementing this JSON-shaping.
+export function ok(payload: unknown): ToolResult {
 	return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
 }
 
-function fail(message: string, extra?: Record<string, unknown>): ToolResult {
+export function fail(message: string, extra?: Record<string, unknown>): ToolResult {
 	return {
 		content: [{ type: 'text', text: JSON.stringify({ error: message, ...extra }, null, 2) }],
 		isError: true

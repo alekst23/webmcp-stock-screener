@@ -1,7 +1,8 @@
 import { get, writable } from 'svelte/store';
 import { afterEach, describe, expect, it } from 'vitest';
 import { connectWebmcp } from '../webmcp/register';
-import type { AgentActivityEvent } from './activity';
+import { ok, fail } from '../webmcp/tools';
+import { recordAction, type AgentActivityEvent } from './activity';
 import { alignInstanceWindows, buildHistogram, computeForwardReturns } from './visualization';
 import { createApiEngine, type BackendPriceBar, type InstanceWindowView } from './apiEngine';
 import { createWorkspaceStore, selectInstance } from './store';
@@ -193,23 +194,108 @@ describe('cross-actor visibility', () => {
 // ChartToolbar) and an agent tool call append to the same log through one
 // shared entry point, distinguished only by a static `actor` field.
 describe('unified action log', () => {
-	it('labels an agent tool call event with actor "agent"', () => {
-		throw new Error('not implemented');
+	it('labels an agent tool call event with actor "agent"', async () => {
+		const store = createWorkspaceStore(memoryStorage());
+		const engine = createApiEngine(store, { baseUrl: 'http://localhost:8000' });
+		const activity = writable<AgentActivityEvent[]>([]);
+		const registeredTools = new Map<string, ModelContextToolDescriptor>();
+		document.modelContext = {
+			registerTool: async (tool) => {
+				registeredTools.set(tool.name, tool);
+			},
+			unregisterTool: async (name) => {
+				registeredTools.delete(name);
+			}
+		};
+
+		await connectWebmcp(engine, activity);
+		await registeredTools.get('defineStudy')!.execute({
+			name: 'rel_vol_5',
+			expression: 'volume / sma(volume, 5)'
+		});
+
+		const events = get(activity);
+		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
+		expect(events[0]!.actor).toBe('agent');
 	});
 
 	it('appends an entry when a human triggers a chart-toolbar action, labeled actor "human"', () => {
-		throw new Error('not implemented');
+		const activity = writable<AgentActivityEvent[]>([]);
+
+		recordAction(activity, 'human', 'clearPanels', undefined, ok({ panels: [] }));
+
+		const events = get(activity);
+		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
+		expect(events[0]!.actor).toBe('human');
+		expect(events[0]!.toolName).toBe('clearPanels');
+		expect(events[0]!.summary, 'summary must be human-readable, not raw JSON').not.toMatch(
+			/[{}]/
+		);
 	});
 
-	it('records human and agent actions in true chronological order in the same log', () => {
-		throw new Error('not implemented');
+	it('records human and agent actions in true chronological order in the same log', async () => {
+		const store = createWorkspaceStore(memoryStorage());
+		const engine = createApiEngine(store, { baseUrl: 'http://localhost:8000' });
+		const activity = writable<AgentActivityEvent[]>([]);
+		const registeredTools = new Map<string, ModelContextToolDescriptor>();
+		document.modelContext = {
+			registerTool: async (tool) => {
+				registeredTools.set(tool.name, tool);
+			},
+			unregisterTool: async (name) => {
+				registeredTools.delete(name);
+			}
+		};
+
+		await connectWebmcp(engine, activity);
+		recordAction(activity, 'human', 'clearPanels', undefined, ok({ panels: [] }));
+		await registeredTools.get('defineStudy')!.execute({
+			name: 'rel_vol_5',
+			expression: 'volume / sma(volume, 5)'
+		});
+		recordAction(activity, 'human', 'showTickerCharts', undefined, ok({}));
+
+		const events = get(activity);
+		expect(
+			events.map((e) => `${e.actor}:${e.toolName}`),
+			`events: ${JSON.stringify(events)}`
+		).toEqual(['human:clearPanels', 'agent:defineStudy', 'human:showTickerCharts']);
 	});
 
-	it('shows a readable failure reason when an agent tool call fails', () => {
-		throw new Error('not implemented');
+	it('shows a readable failure reason when an agent tool call fails', async () => {
+		const store = createWorkspaceStore(memoryStorage());
+		const engine = createApiEngine(store, { baseUrl: 'http://localhost:8000' });
+		const activity = writable<AgentActivityEvent[]>([]);
+		const registeredTools = new Map<string, ModelContextToolDescriptor>();
+		document.modelContext = {
+			registerTool: async (tool) => {
+				registeredTools.set(tool.name, tool);
+			},
+			unregisterTool: async (name) => {
+				registeredTools.delete(name);
+			}
+		};
+
+		await connectWebmcp(engine, activity);
+		await registeredTools.get('defineStudy')!.execute({
+			name: 'bad',
+			expression: 'not_a_real_function(close)'
+		});
+
+		const events = get(activity);
+		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
+		expect(events[0]!.actor).toBe('agent');
+		expect(events[0]!.summary, `summary: ${events[0]!.summary}`).toMatch(/failed/i);
 	});
 
 	it('shows a readable failure reason when a human chart-toolbar action fails', () => {
-		throw new Error('not implemented');
+		const activity = writable<AgentActivityEvent[]>([]);
+
+		recordAction(activity, 'human', 'showTickerCharts', undefined, fail('backend unreachable'));
+
+		const events = get(activity);
+		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
+		expect(events[0]!.actor).toBe('human');
+		expect(events[0]!.summary, `summary: ${events[0]!.summary}`).toMatch(/backend unreachable/);
 	});
 });
