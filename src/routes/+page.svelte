@@ -7,7 +7,6 @@
 	import { connectWebmcp } from '$lib/webmcp/register';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
-	import HistogramPanel from '$lib/workspace/HistogramPanel.svelte';
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
 	import ChartToolbar from '$lib/workspace/ChartToolbar.svelte';
 
@@ -56,10 +55,6 @@
 	{#if focusedView && $workspaceStore.focus?.selected.length}
 		<FocusChart view={focusedView} />
 	{/if}
-
-	{#each $workspaceStore.instanceSets as set (set.id)}
-		<HistogramPanel instanceSetId={set.id} {engine} config={apiConfig} />
-	{/each}
 </main>
 
 <style>
