@@ -5,10 +5,13 @@
 // T-1001-8 deployment; the classic "Pages: build output directory" field the
 // runbook originally assumed no longer exists in that flow. `directory`
 // matches vite.config.ts's `adapter({ pages: 'build', assets: 'build' })`
-// output. `not_found_handling: "single-page-application"` replaces
-// static/_redirects' SPA-fallback rule for this deploy path (the app is
-// pure client-side SPA, no route declares `prerender = true` -- see
-// vite.config.ts).
+// output. `not_found_handling: "single-page-application"` is the SPA
+// fallback for this deploy path (the app is pure client-side SPA, no route
+// declares `prerender = true` -- see vite.config.ts). A static/_redirects
+// file with the equivalent classic-Pages rule was tried first and deleted:
+// it conflicts with this option (Cloudflare's asset router detects an
+// infinite loop between the two mechanisms) -- use this option only, not
+// both.
 {
 	"name": "webmcp-stock-screener",
 	"compatibility_date": "2026-08-31",

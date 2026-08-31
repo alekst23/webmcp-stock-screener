@@ -11,12 +11,13 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			// T-1001-8: static output for Cloudflare Pages. Every route already
-			// disables SSR (see src/routes/+layout.ts -- there's no backend
-			// session to render against), so this is a pure client-side SPA: no
-			// route declares `prerender = true`, so `fallback` builds one shell
-			// (build/index.html) that Cloudflare Pages serves for any path not
-			// matching a static asset -- see the routing rule in static/_redirects.
+			// T-1001-8: static output for Cloudflare Workers (static assets).
+			// Every route already disables SSR (see src/routes/+layout.ts --
+			// there's no backend session to render against), so this is a pure
+			// client-side SPA: no route declares `prerender = true`, so
+			// `fallback` builds one shell (build/index.html) that Cloudflare
+			// serves for any path not matching a static asset -- see
+			// wrangler.jsonc's `not_found_handling`.
 			adapter: adapter({
 				pages: 'build',
 				assets: 'build',

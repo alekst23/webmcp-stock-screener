@@ -19,8 +19,7 @@ or later, once T-1001-8's work merges into it).
   (static assets), via `@sveltejs/adapter-static` (configured in
   [`vite.config.ts`](../../../vite.config.ts)) + [`wrangler.jsonc`](../../../wrangler.jsonc)'s
   `assets` config (its `not_found_handling: "single-page-application"`
-  covers the SPA-fallback role [`static/_redirects`](../../../static/_redirects)
-  was written for under the classic Pages flow).
+  is the SPA-fallback mechanism for this deploy path).
 
 Both come up on the platforms' own HTTPS domains by default (AC3) --
 `*.onrender.com` and `*.workers.dev` respectively -- no separate TLS setup
@@ -193,11 +192,8 @@ or judge would.
 - [`vite.config.ts`](../../../vite.config.ts) -- frontend adapter config.
 - [`wrangler.jsonc`](../../../wrangler.jsonc) -- Cloudflare Workers static-assets
   config (source of truth for the deploy's assets directory and SPA
-  fallback; see its header comment).
-- [`static/_redirects`](../../../static/_redirects) -- SPA fallback rule
-  from the classic Pages flow; superseded by `wrangler.jsonc`'s
-  `not_found_handling` for the current deploy path, kept in case a future
-  deploy reverts to classic Pages.
+  fallback; see its header comment for why there's no `static/_redirects`
+  file alongside it).
 - [`backend/.env.example`](../../../backend/.env.example),
   [`.env.example`](../../../.env.example) -- what every config var means
   and its local-dev default; this runbook only says where each one gets
