@@ -84,3 +84,10 @@ export function selectInstance(
 		}
 	}));
 }
+
+// T-1003-2 contract stub -- see docs/plan/EPIC-1003/T-1003-2-individual-panel-close.md's
+// Solution Approach. Not yet implemented; ticket-tests stubs in store.test.ts
+// assert against this signature.
+export function removePanel(_store: Writable<WorkspaceState>, _panelId: string): void {
+	throw new Error('removePanel: not implemented');
+}

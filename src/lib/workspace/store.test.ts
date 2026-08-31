@@ -2,8 +2,9 @@ import { get } from 'svelte/store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildTools } from '../webmcp/tools';
 import { createApiEngine, getBackendInstanceSet, resolveBackendInstanceSet } from './apiEngine';
-import { createWorkspaceStore } from './store';
+import { createWorkspaceStore, removePanel } from './store';
 import { memoryStorage } from './testSupport';
+import type { WorkspaceState } from '../webmcp/types';
 
 // These tests exercise the workspace store's contract against the real
 // ResearchEngine implementation (createApiEngine) rather than a
@@ -227,5 +228,91 @@ describe('dev control surface', () => {
 		expect(get(store).studies, `via raw store: ${JSON.stringify(get(store).studies)}`).toHaveLength(
 			1
 		);
+	});
+});
+
+// T-1003-2: failing stubs written against removePanel's contract stub in
+// store.ts (currently throws "not implemented") -- see
+// docs/plan/EPIC-1003/T-1003-2-individual-panel-close.md's Solution Approach.
+describe('individual panel removal (T-1003-2)', () => {
+	function storeWithPanels(
+		panels: WorkspaceState['panels'],
+		focus: WorkspaceState['focus']
+	): ReturnType<typeof createWorkspaceStore> {
+		const storage = memoryStorage();
+		storage.setItem(
+			'webmcp-workspace-state',
+			JSON.stringify({ studies: [], setups: [], instanceSets: [], panels, focus })
+		);
+		return createWorkspaceStore(storage);
+	}
+
+	it('removes only the targeted panel, leaving other open panels unaffected', () => {
+		const store = storeWithPanels(
+			[
+				{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_1' },
+				{ id: 'panel_2', kind: 'grid', instanceSetId: 'set_2' }
+			],
+			null
+		);
+
+		removePanel(store, 'panel_1');
+
+		const ids = get(store).panels.map((p) => p.id);
+		expect(ids, `panels after removePanel: ${JSON.stringify(ids)}`).toEqual(['panel_2']);
+	});
+
+	it('clears focus when the closed panel was the focused panel', () => {
+		const store = storeWithPanels(
+			[{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_1' }],
+			{
+				panelId: 'panel_1',
+				selected: [{ ticker: 'ACME', date: '2024-03-08' }],
+				focusedInstance: null
+			}
+		);
+
+		removePanel(store, 'panel_1');
+
+		expect(
+			get(store).focus,
+			`focus after removing the focused panel: ${JSON.stringify(get(store).focus)}`
+		).toBeNull();
+	});
+
+	it('leaves focus unchanged when the closed panel was not the focused panel', () => {
+		const focus = {
+			panelId: 'panel_2',
+			selected: [{ ticker: 'ACME', date: '2024-03-08' }],
+			focusedInstance: null
+		};
+		const store = storeWithPanels(
+			[
+				{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_1' },
+				{ id: 'panel_2', kind: 'grid', instanceSetId: 'set_2' }
+			],
+			focus
+		);
+
+		removePanel(store, 'panel_1');
+
+		expect(
+			get(store).focus,
+			`focus after removing an unfocused panel: ${JSON.stringify(get(store).focus)}`
+		).toEqual(focus);
+	});
+
+	it('is a no-op when the given panel id does not exist', () => {
+		const panels: WorkspaceState['panels'] = [
+			{ id: 'panel_1', kind: 'grid', instanceSetId: 'set_1' }
+		];
+		const store = storeWithPanels(panels, null);
+
+		removePanel(store, 'panel_does_not_exist');
+
+		expect(
+			get(store).panels,
+			`panels after removing an unknown id: ${JSON.stringify(get(store).panels)}`
+		).toEqual(panels);
 	});
 });

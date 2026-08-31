@@ -65,6 +65,22 @@ Purely a composition change — no new store, engine, or backend contract.
 **Contracts:** none — no new types, store functions, or engine methods.
 Existing `HistogramPanel` props are reused as-is.
 
+## Test Plan
+
+No new pure logic is introduced (see Solution Approach — pure template
+composition), and this repo has no Svelte component-render test harness
+(no `@testing-library/svelte`; `store.test.ts`/`visualization.test.ts`
+only exercise store/engine logic, never mounted components) — that is
+the established convention here, not a gap introduced by this ticket.
+
+| Scenario | Tier | How verified |
+|----------|------|--------------|
+| AC1/AC2: histogram toggle visibly attached to its own panel | UI (browser) | `/at-browser-check T-1003-1` at ticket close |
+| AC3: standalone per-instance-set list removed from `+page.svelte` | UI (browser) | `/at-browser-check T-1003-1` — confirms no disconnected histogram list remains |
+| AC4: `resolveBackendInstanceSet`/`fetchInstanceWindows`/10d forward-return computation unchanged | regression | existing `src/lib/workspace/visualization.test.ts` and `src/lib/workspace/store.test.ts` suites, which already cover these functions, must remain green |
+
+No new test stubs for this ticket.
+
 ## Out of Scope
 
 Individual panel close (T-1003-2). New panel kinds.

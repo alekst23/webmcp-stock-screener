@@ -68,6 +68,21 @@ Implements the "Individual panel removal" scenario (spec.md, feature #7).
   a `ResearchEngine`/WebMCP tool method), following `selectInstance`'s
   existing precedent for direct store mutations from UI interaction.
 
+## Test Plan
+
+| Scenario | Tier | Test | What it asserts |
+|----------|------|------|------------------|
+| Happy path: closing one of several panels | unit | `src/lib/workspace/store.test.ts` — "removes only the targeted panel, leaving other open panels unaffected" | closed panel's id is gone from `ws.panels`; the other panel's id remains (AC1, AC2) |
+| Closed panel was focused | unit | `store.test.ts` — "clears focus when the closed panel was the focused panel" | `ws.focus` becomes `null` (AC3) |
+| Closed panel was not focused | unit | `store.test.ts` — "leaves focus unchanged when the closed panel was not the focused panel" | `ws.focus` is unchanged, still pointing at the other panel (AC2, AC3) |
+| Unknown panel id | unit | `store.test.ts` — "is a no-op when the given panel id does not exist" | `ws.panels` unchanged, no throw |
+| AC4: `clearPanels` unchanged | regression | existing `src/lib/webmcp/tools.test.ts`/`integration.test.ts` `clearPanels` coverage | must remain green — this ticket does not touch `clearPanels` |
+
+**Stubs written:** `removePanel` added to `store.ts` as a throwing
+contract stub (`throw new Error('removePanel: not implemented')`); the 4
+unit tests above import and call it, so they currently fail on that throw
+— a clear "not implemented" signal, collectible under `vitest run`.
+
 ## Out of Scope
 
 Panel-scoped histogram action (T-1003-1). Reordering or resizing panels.
