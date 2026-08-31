@@ -49,9 +49,15 @@ Structural change only, no new contracts — `ActivityFeed.svelte` and
 (the Dead Code Policy doesn't allow leaving it unrendered in the tree
 once nothing imports it).
 
-- `ActivityFeed.svelte`: each `<li>` gains an actor badge —
-  `event.actor === 'human' ? 'Human' : 'Agent'` — rendered before the
-  action/summary text (AC1). Heading changes from "Agent activity (N)" to
+- `ActivityFeed.svelte`: each `<li>` gains an actor badge, sourced from a
+  small exported pure helper `actorLabel(actor: 'human' | 'agent'):
+  'Human' | 'Agent'` in `activity.ts` (kept there alongside
+  `summarizeToolCall` rather than inlined in the template, so the
+  actor→label mapping is unit-testable without mounting the component —
+  this codebase's established pattern, per `visualization.test.ts`
+  testing `alignInstanceWindows`/`buildHistogram` rather than rendered
+  markup) — rendered before the action/summary text (AC1). Heading
+  changes from "Agent activity (N)" to
   "Activity log (N)" and the empty-state copy from "No tool calls yet."
   to "No activity yet." — both were agent-only phrasing that's now
   inaccurate (this feed already receives both actors once T-1002-1
