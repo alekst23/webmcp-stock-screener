@@ -20,23 +20,59 @@ export interface SnapshotRecord extends SnapshotSummary {
 
 type SnapshotIndex = Record<string, SnapshotRecord>;
 
-// STUB: contract only, filled in during the ticket's implementation phase.
-export function saveSnapshot(_name: string, _state: WorkspaceState, _storage?: Storage): void {
-	throw new Error('not implemented');
+// Storage is an explicit parameter (default: real localStorage), matching
+// store.ts's createWorkspaceStore pattern, so tests use an isolated
+// in-memory Storage instead of a shared DOM global.
+function backingStorage(storage?: Storage): Storage | undefined {
+	return storage ?? (typeof localStorage !== 'undefined' ? localStorage : undefined);
 }
 
-// STUB: contract only, filled in during the ticket's implementation phase.
-// Returns null when no snapshot exists under that name.
-export function loadSnapshot(_name: string, _storage?: Storage): WorkspaceState | null {
-	throw new Error('not implemented');
+function readIndex(storage: Storage | undefined): SnapshotIndex {
+	if (!storage) {
+		return {};
+	}
+	const raw = storage.getItem(SNAPSHOTS_KEY);
+	if (!raw) {
+		return {};
+	}
+	try {
+		return JSON.parse(raw) as SnapshotIndex;
+	} catch {
+		// Corrupted or foreign data in the slot must not crash the app, same
+		// resilience guarantee store.ts's readPersisted gives the live workspace.
+		return {};
+	}
 }
 
-// STUB: contract only, filled in during the ticket's implementation phase.
-export function deleteSnapshot(_name: string, _storage?: Storage): void {
-	throw new Error('not implemented');
+function writeIndex(storage: Storage | undefined, index: SnapshotIndex): void {
+	storage?.setItem(SNAPSHOTS_KEY, JSON.stringify(index));
 }
 
-// STUB: contract only, filled in during the ticket's implementation phase.
-export function listSnapshots(_storage?: Storage): SnapshotSummary[] {
-	throw new Error('not implemented');
+export function saveSnapshot(name: string, state: WorkspaceState, storage?: Storage): void {
+	const backing = backingStorage(storage);
+	const index = readIndex(backing);
+	index[name] = { name, savedAt: new Date().toISOString(), state };
+	writeIndex(backing, index);
+}
+
+// Runs the recalled state through store.ts's normalizeWorkspace so a
+// corrupted/foreign snapshot entry can't crash the app (AC6) -- the same
+// resilience the live workspace already gets on reload.
+export function loadSnapshot(name: string, storage?: Storage): WorkspaceState | null {
+	const record = readIndex(backingStorage(storage))[name];
+	return record ? normalizeWorkspace(record.state) : null;
+}
+
+export function deleteSnapshot(name: string, storage?: Storage): void {
+	const backing = backingStorage(storage);
+	const index = readIndex(backing);
+	delete index[name];
+	writeIndex(backing, index);
+}
+
+export function listSnapshots(storage?: Storage): SnapshotSummary[] {
+	return Object.values(readIndex(backingStorage(storage))).map(({ name, savedAt }) => ({
+		name,
+		savedAt
+	}));
 }
