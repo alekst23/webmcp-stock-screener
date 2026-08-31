@@ -45,10 +45,25 @@ to which result set.
 
 ## Solution Approach
 
-Left to ticket design — e.g. `GridPanel.svelte` could render a
-`HistogramPanel` scoped to its own `panel.instanceSetId` internally,
-behind a toggle, rather than `+page.svelte` looping over instance sets
-separately.
+Implements the "Panel-scoped histogram" scenario (spec.md, feature #7).
+Purely a composition change — no new store, engine, or backend contract.
+
+- `GridPanel.svelte` renders a `HistogramPanel` inside its own
+  `<section class="grid-panel">`, passing `instanceSetId={panel.instanceSetId}`
+  along with the `engine`/`config` props `GridPanel` already receives.
+  `HistogramPanel`'s existing toggle button becomes that panel's own
+  histogram control (AC1, AC2) — no changes to `HistogramPanel.svelte`
+  itself; its props (`instanceSetId`, `engine`, `config`, `horizonDays`)
+  already match what `GridPanel` has in scope.
+- `+page.svelte` deletes the standalone
+  `{#each $workspaceStore.instanceSets as set}<HistogramPanel .../>{/each}`
+  loop and its `HistogramPanel` import (AC3).
+- `resolveBackendInstanceSet`/`fetchInstanceWindows` and the 10d forward
+  return computation are untouched (AC4) — only where the toggle renders
+  changes.
+
+**Contracts:** none — no new types, store functions, or engine methods.
+Existing `HistogramPanel` props are reused as-is.
 
 ## Out of Scope
 
