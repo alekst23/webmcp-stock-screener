@@ -23,7 +23,7 @@ class MeasureResult(BaseModel):
 
 class InstanceWindow(BaseModel):
     """A window of price bars around one instance's anchor date, for
-    small-multiples rendering (the actual chart is T-1001-7's job)."""
+    small-multiples rendering (the actual chart is T-0001-7's job)."""
 
     ticker: str
     bars: list[PriceBar]

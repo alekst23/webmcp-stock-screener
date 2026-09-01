@@ -387,7 +387,7 @@ Agent-facing tool names and their snake_case inputs:
 | Tool | Inputs |
 |------|--------|
 | `get_app_context` | — |
-| `get_workspace` | `workspace_id?` |
+| `get_canvas_state` | `workspace_id?` |
 | `create_workspace` | `name`, `template_id?`, `idempotency_key?` |
 | `save_workspace` | `workspace_id?`, `name`, `expected_revision?`, `idempotency_key?` |
 | `undo_change` | `undo_token` |

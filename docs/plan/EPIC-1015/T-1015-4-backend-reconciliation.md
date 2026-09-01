@@ -73,7 +73,7 @@ The likely split, from reading the backend during epic authoring:
   computed-field and custom-study needs, which the target spec
   deliberately specifies as a typed expression model rather than
   arbitrary code.
-- The spike route and schema, and their functional test, are T-1001-2
+- The spike route and schema, and their functional test, are T-0001-2
   scaffolding. Retire them — but repoint the deployment health check
   first, in the same change, or the deploy fails on the next push.
 - Mock-panel generation and the data-fetch scripts are deployment

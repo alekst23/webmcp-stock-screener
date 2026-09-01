@@ -1,4 +1,4 @@
-"""Nightly delta job (T-1001-9 AC2) -- the Render Cron Job's entry point.
+"""Nightly delta job (T-0001-9 AC2) -- the Render Cron Job's entry point.
 
     uv run python scripts/nightly_delta.py
 

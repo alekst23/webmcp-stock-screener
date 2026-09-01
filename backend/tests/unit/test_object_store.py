@@ -1,4 +1,4 @@
-"""T-1001-9: the R2/S3 panel-store adapter, without a live bucket."""
+"""T-0001-9: the R2/S3 panel-store adapter, without a live bucket."""
 
 from __future__ import annotations
 

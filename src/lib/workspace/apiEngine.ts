@@ -1,8 +1,8 @@
-// Real ResearchEngine (T-1001-5): defineStudy/defineSetup/getWorkspace/
+// Real ResearchEngine (T-0001-5): defineStudy/defineSetup/getWorkspace/
 // focusInstance run purely in-memory client-side (per docs/plan.md's
 // client/server split); findInstances/sampleInstances/measure/
 // splitInstances/showGrid call the FastAPI backend built in
-// backend/api/routes/research.py. Supersedes devEngine.ts (T-1001-6's
+// backend/api/routes/research.py. Supersedes devEngine.ts (T-0001-6's
 // explicit stand-in for this ticket).
 //
 // The backend is stateless per request (docs/plan.md's "Sessions" section):
@@ -41,7 +41,7 @@ import {
 
 // Backend JSON shapes (snake_case, matching the Pydantic domain models in
 // backend/domain/models/ directly -- see api/schemas/research.py). Exported
-// (not just used internally) because T-1001-7's grid/chart components need
+// (not just used internally) because T-0001-7's grid/chart components need
 // the full instance set -- not just the InstanceSetSummary in
 // WorkspaceState -- to call fetchInstanceWindows below; see this module's
 // header comment and getBackendInstanceSet.
@@ -170,17 +170,17 @@ function toMeasureResult(result: BackendMeasureResult): MeasureResult {
 // Keyed by the exact ResearchEngine object createApiEngine returns, so
 // chart components can reach a given engine's browser-side instanceSetCache
 // without adding methods to the ResearchEngine interface itself -- that
-// interface is the WebMCP tool contract and T-1001-7 must leave it
+// interface is the WebMCP tool contract and T-0001-7 must leave it
 // unchanged (see this module's header comment and the ticket's
 // "data-fetching gap" note). WeakMaps rather than fields on the returned
-// object keep ResearchEngine's own shape exactly as T-1001-5 shipped it.
+// object keep ResearchEngine's own shape exactly as T-0001-5 shipped it.
 const instanceSetCacheByEngine = new WeakMap<ResearchEngine, Map<string, BackendInstanceSet>>();
 const instanceSetResolverByEngine = new WeakMap<
 	ResearchEngine,
 	(instanceSetId: string) => Promise<BackendInstanceSet | undefined>
 >();
 
-// UI-only escape hatch for T-1001-7's grid/chart/histogram components: they
+// UI-only escape hatch for T-0001-7's grid/chart/histogram components: they
 // only have a PanelSummary/InstanceSetSummary (from WorkspaceState) to work
 // from, but fetchInstanceWindows below needs the full BackendInstanceSet
 // (concrete instance list) the same way showGrid/measure/etc. do internally.
@@ -256,7 +256,7 @@ function pairWithInstances(
 	});
 }
 
-// The UI-only fetch T-1001-7 needs to actually render a panel: showGrid
+// The UI-only fetch T-0001-7 needs to actually render a panel: showGrid
 // (above) only returns a bare PanelSummary handle to the agent -- correct
 // for the WebMCP tool contract, but it means grid/chart/histogram
 // components must fetch the bar data themselves, independent of whichever
@@ -450,7 +450,7 @@ export function createApiEngine(
 		async showGrid(input: ShowGridInput): Promise<PanelSummary> {
 			const instanceSet = requireInstanceSet(input.instanceSetId);
 			// Validates the set resolves and materializes windows server-side;
-			// rendering the returned bars is T-1001-7's job, not this tool's --
+			// rendering the returned bars is T-0001-7's job, not this tool's --
 			// showGrid's contract only promises a PanelSummary back to the agent.
 			await post('/api/research/instance-windows', {
 				instance_set: instanceSet,

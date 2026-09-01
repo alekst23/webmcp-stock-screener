@@ -47,7 +47,7 @@ focused, what the surface is permitted to do, how delayed the data is,
 what timezone the app is presenting, and the workspace's current revision.
 It now has everything it needs to make a correctly-guarded first mutation.
 
-**Ask what the workspace contains.** The agent calls `get_workspace` and
+**Ask what the workspace contains.** The agent calls `get_canvas_state` and
 receives the panels, the layout, the links between panels, the active
 symbol, the screener configuration, and whether there are changes not yet
 saved under a name. Every item carries its stable ID.

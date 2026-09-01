@@ -1,8 +1,8 @@
-// T-1001-8: Cloudflare Workers static-assets config for the frontend.
+// T-0001-8: Cloudflare Workers static-assets config for the frontend.
 //
 // Cloudflare's current Git-connected deploy flow (Workers & Pages, unified)
 // runs `npx wrangler deploy` and expects this file -- discovered live during
-// T-1001-8 deployment; the classic "Pages: build output directory" field the
+// T-0001-8 deployment; the classic "Pages: build output directory" field the
 // runbook originally assumed no longer exists in that flow. `directory`
 // matches vite.config.ts's `adapter({ pages: 'build', assets: 'build' })`
 // output. `not_found_handling: "single-page-application"` is the SPA

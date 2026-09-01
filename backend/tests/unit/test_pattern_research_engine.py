@@ -13,8 +13,8 @@ from scripts.known_pattern_instances import KNOWN_PATTERN_INSTANCES
 # These tests target the real pandas-based PatternResearchEngine
 # implementation (built in this ticket), not MockPatternResearchEngine —
 # the whole point is verifying real temporal-matching correctness against
-# T-1001-1's known fixture instances. The mock is for other tickets'
-# callers (e.g. T-1001-5) that just need a stand-in dependency.
+# T-0001-1's known fixture instances. The mock is for other tickets'
+# callers (e.g. T-0001-5) that just need a stand-in dependency.
 
 # The setup config that must reproduce every known "gap up -> range
 # contraction -> breakout" fixture from known_pattern_instances.py exactly:

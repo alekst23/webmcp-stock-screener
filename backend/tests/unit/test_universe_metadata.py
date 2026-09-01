@@ -1,4 +1,4 @@
-"""T-1001-9 AC3: sector and market cap for universe filtering, parsed from a
+"""T-0001-9 AC3: sector and market cap for universe filtering, parsed from a
 free Nasdaq screener CSV export (docs/reference/data-provider.md)."""
 
 from datetime import date, timedelta

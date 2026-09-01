@@ -1,4 +1,4 @@
-"""One-time real-data backfill (T-1001-9 AC1).
+"""One-time real-data backfill (T-0001-9 AC1).
 
 Costs one paid EODHD call per ticker. Run it deliberately:
 

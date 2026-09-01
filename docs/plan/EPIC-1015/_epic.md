@@ -107,7 +107,7 @@ The currently-deployed hackathon submission runs on the legacy surface
 authoring:
 
 - `render.yaml` sets `healthCheckPath: "/api/spike/ping"`. That endpoint is
-  served by `backend/api/routes/spike.py`, a T-1001-2 throwaway spike that
+  served by `backend/api/routes/spike.py`, a T-0001-2 throwaway spike that
   is otherwise a retirement candidate. Deleting it without first repointing
   the health check will fail the Render deploy.
 - `docs/reference/deployment.md` records the live verification evidence
@@ -160,13 +160,13 @@ run. Each carries a stated assumption so the epic can proceed.
    measurement and winner/loser splitting are a **deliberate capability
    drop** that must be surfaced to the user for sign-off in T-1015-2,
    not silently deleted.
-3. **Snapshots vs. workspace revisions.** EPIC-1005 shipped named
+3. **Snapshots vs. workspace revisions.** EPIC-0005 shipped named
    `localStorage` snapshots; `tool-spec.md` specifies `save_workspace`,
    `undo_change`, `get_change_history`, and `restore_workspace_revision`.
    *Assumption*: the new revision model supersedes snapshots and the
    snapshot module is absorbed, not kept in parallel.
 4. **The `/spike` route and `/api/spike/ping` endpoint.** Throwaway
-   T-1001-2 scaffolding, but load-bearing for the Render health check.
+   T-0001-2 scaffolding, but load-bearing for the Render health check.
    *Assumption*: retire both, after repointing `healthCheckPath` at a
    real health endpoint on the new surface (T-1015-4).
 5. **Ownership of each new tool by epic is unknown at authoring time**,

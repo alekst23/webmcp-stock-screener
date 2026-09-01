@@ -1,4 +1,4 @@
-"""Request schemas for T-1001-5's 5 networked WebMCP tool endpoints.
+"""Request schemas for T-0001-5's 5 networked WebMCP tool endpoints.
 
 Stateless per request (docs/plan.md's "Sessions" section): defineStudy and
 defineSetup run entirely client-side (no network call), so the server never

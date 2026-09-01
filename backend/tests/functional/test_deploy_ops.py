@@ -1,4 +1,4 @@
-"""T-1001-8: rate limiting and CORS lockdown for the deployed backend.
+"""T-0001-8: rate limiting and CORS lockdown for the deployed backend.
 
 Both tests reload the `main` module after patching the relevant env var,
 since `main.py` reads `RATE_LIMIT_DEFAULT`/`CORS_ALLOWED_ORIGINS` once at

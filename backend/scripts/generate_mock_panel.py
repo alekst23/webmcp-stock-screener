@@ -1,11 +1,11 @@
 """Generate a synthetic daily-OHLCV panel for local development and tests.
 
 Produces a small (~25-ticker) universe spanning several years, in the same
-row shape (`PriceBar`) the real EODHD backfill (T-1001-9) will later
+row shape (`PriceBar`) the real EODHD backfill (T-0001-9) will later
 produce, so downstream components (query engine, WebMCP tools, frontend)
 can be built against it at zero cost. A handful of tickers additionally
 carry hand-authored occurrences of a known multi-step temporal pattern (see
-`known_pattern_instances.py`) so T-1001-3's temporal matcher has a
+`known_pattern_instances.py`) so T-0001-3's temporal matcher has a
 hand-computable expected result to test against.
 
 Run directly to (re)write the panel to disk:
@@ -54,7 +54,7 @@ _BREAKOUT_BREAK_PCT = 0.03
 
 def trading_calendar(start: date = START_DATE, end: date = END_DATE) -> list[date]:
     """Weekday calendar used by the mock panel. Not a real market-holiday
-    calendar — that distinction belongs to the real pipeline (T-1001-9); a
+    calendar — that distinction belongs to the real pipeline (T-0001-9); a
     plain business-day range is enough for a synthetic dev/test fixture."""
     return [ts.date() for ts in pd.bdate_range(start, end)]
 
@@ -180,7 +180,7 @@ def generate_panel(seed: int = DEFAULT_SEED) -> list[PriceBar]:
 
 def write_panel(bars: list[PriceBar], output_path: Path = OUTPUT_PATH) -> Path:
     """Persist the panel as Parquet, matching the format the real pipeline
-    (T-1001-9) will also write to."""
+    (T-0001-9) will also write to."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame([bar.model_dump() for bar in bars])
     frame.to_parquet(output_path, index=False)

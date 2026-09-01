@@ -1,4 +1,4 @@
-// Pure rendering-data logic for T-1001-7's grid/focus/histogram views --
+// Pure rendering-data logic for T-0001-7's grid/focus/histogram views --
 // kept separate from the Svelte components so it's unit-testable without a
 // DOM (matching this codebase's existing test style: store/engine logic is
 // tested directly, not through component rendering).

@@ -208,4 +208,4 @@ at every step.
 
 ---
 
-_Implemented by: EPIC-1001, EPIC-1002, EPIC-1003, EPIC-1004, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status_
+_Implemented by: EPIC-0001, EPIC-0002, EPIC-0003, EPIC-0004, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status_

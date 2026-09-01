@@ -11,7 +11,7 @@ SUPPORTED_FUNCTIONS = ["sma", "ema", "atr", "highest", "lowest", "days_since"]
 
 class MockPatternResearchEngine(PatternResearchEngine):
     """Real in-memory behavior over a tiny hand-built fixture, for tests of
-    callers (e.g. T-1001-5's WebMCP integration) that don't need the actual
+    callers (e.g. T-0001-5's WebMCP integration) that don't need the actual
     pandas-backed engine."""
 
     def __init__(self) -> None:

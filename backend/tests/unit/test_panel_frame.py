@@ -1,4 +1,4 @@
-"""T-1001-9: the compact panel representation and its positional lookups.
+"""T-0001-9: the compact panel representation and its positional lookups.
 
 The mock panel's 25 tickers never exposed the real universe's memory
 profile. These tests pin the per-row cost and the lookup behavior that

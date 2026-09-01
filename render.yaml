@@ -1,19 +1,19 @@
-# T-1001-8: Render Blueprint for the backend Web Service.
+# T-0001-8: Render Blueprint for the backend Web Service.
 #
 # This is config only -- it is NOT applied to a live Render account by this
 # repo. A human deploys it by following
-# docs/plan/EPIC-1001/T-1001-8-deployment-runbook.md (connect the repo in
+# docs/plan/EPIC-0001/T-0001-8-deployment-runbook.md (connect the repo in
 # the Render dashboard, "New +" -> "Blueprint", point it at this file).
 #
 # Serves the real EODHD-backed panel from Cloudflare R2 when the R2_*
-# variables are set, and falls back to the mock dataset (T-1001-1's synthetic
+# variables are set, and falls back to the mock dataset (T-0001-1's synthetic
 # panel, regenerated at build time) when they are not -- see
 # backend/application/load_panel.py.
 #
 # No persistent disk: Render's free tier doesn't support disks at all, and a
 # paid tier just to attach one costs far more than storing ~60-90MB of
-# Parquet in object storage (discovered live during T-1001-8 deployment).
-# T-1001-9's real, non-regenerable backfilled data lives in R2 instead --
+# Parquet in object storage (discovered live during T-0001-8 deployment).
+# T-0001-9's real, non-regenerable backfilled data lives in R2 instead --
 # see docs/reference/data-provider.md.
 #
 # MEMORY: the free plan caps the web service at 512 MB, and the panel is held
@@ -39,7 +39,7 @@ services:
     # seeded build artifact (see scripts/generate_mock_panel.py); generating
     # it once and leaving it on the persistent disk (skipped on redeploys
     # once present) rehearses the same "generate once, persist across
-    # deploys" shape T-1001-9's real backfill + nightly delta will use,
+    # deploys" shape T-0001-9's real backfill + nightly delta will use,
     # which is this ticket's whole point -- validating the architecture
     # ahead of the real pipeline.
     buildCommand: >-
@@ -49,7 +49,7 @@ services:
     startCommand: "uv run uvicorn main:app --host 0.0.0.0 --port $PORT"
     # Exercises the panel file the build step generates -- if generation
     # failed, this fails closed instead of serving a broken deploy. Swap
-    # for a T-1001-5 endpoint once one exists that doesn't depend on
+    # for a T-0001-5 endpoint once one exists that doesn't depend on
     # route-specific state.
     healthCheckPath: "/api/spike/ping"
     envVars:
@@ -65,7 +65,7 @@ services:
       # `_rate_limit_default` for the "<count>/<period>" syntax (AC4).
       - key: "RATE_LIMIT_DEFAULT"
         value: "60/minute"
-      # T-1001-9: the R2 bucket holding the real panel. With any of these
+      # T-0001-9: the R2 bucket holding the real panel. With any of these
       # unset the service still boots, serving the mock panel instead of
       # failing -- so a half-configured deploy degrades visibly (the UI
       # labels synthetic data) rather than 500ing.
@@ -78,7 +78,7 @@ services:
       - key: "R2_SECRET_ACCESS_KEY"
         sync: false
 
-  # T-1001-9 AC2: appends the latest trading day to the stored panel, so the
+  # T-0001-9 AC2: appends the latest trading day to the stored panel, so the
   # dataset stays current with no manual step. One bulk-by-exchange EODHD
   # call per run (~100 quota units against a 100,000/day cap), NOT one call
   # per ticker -- the backfill's endpoint choice inverted, see

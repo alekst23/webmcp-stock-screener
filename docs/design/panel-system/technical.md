@@ -6,10 +6,11 @@ links) and `src/lib/webmcp/v2/` (tool surface). Nothing in
 system is built alongside the existing 11-tool surface, which EPIC-1015
 retires separately.
 
-Layering: `panels/domain` (pure, no I/O) ← `panels/registry` ←
-`panels/application` (use cases producing mutation envelopes) ←
-`webmcp/v2` (tool specs) ← Svelte components. Domain never imports from
-the registry's concrete kind definitions or from any component.
+Layering: `panels/domain` (pure, no I/O) ← `panels/registry` (panel-kind
+registry and source/renderer registry) ← `panels/application` (use cases
+producing mutation envelopes) ← `webmcp/v2` (tool specs) ← Svelte
+components. Domain never imports from either registry's concrete
+definitions or from any component.
 
 ## Consumed from EPIC-1006 (not defined here)
 
@@ -45,21 +46,48 @@ load; the panel container never imports the sibling's module directly.
 |-------|------|-------------|
 | `kind` | `string` | unique key, e.g. `'chart'` |
 | `defaultTitle` | `string` | title given to a new panel of this kind |
-| `defaultSize` | `GridSize` | logical cells, used when `add_panel` omits a size |
-| `minSize` | `GridSize` | rejected below this by `set_panel_layout` |
+| `defaultSize` | `GridSize` | logical cells, used when `create_panel` omits a size |
+| `minSize` | `GridSize` | rejected below this by `set_panel_layout` and `split_panel` |
 | `defaultConfig` | `() => TConfig` | configuration for a freshly added panel |
-| `validateConfig` | `(input: unknown) => ConfigValidation<TConfig>` | `{ ok: true, value }` or `{ ok: false, errors }` — errors carry field paths and reasons |
-| `configSchema` | `object` | JSON Schema fragment merged into `add_panel`/`update_panel` tool schemas and returned by catalog discovery |
+| `validateConfig` | `(input: unknown) => ConfigValidation<TConfig>` | `{ ok: true, value }` or `{ ok: false, errors }` — errors carry field paths and reasons; for a data-bearing kind this delegates to the active renderer's own `validateConfig` from the source/renderer registry below |
+| `configSchema` | `object` | JSON Schema fragment merged into `create_panel`'s per-kind schema and returned by catalog discovery |
 | `linkChannels` | `PanelLinkChannel[]` | channels this kind may join |
-| `bindingTypes` | `string[]` | resource types `update_panel`'s rebind accepts (empty = not bindable) |
+| `bindingTypes` | `string[]` | source type names (registered in the source/renderer registry below) that `bind_panel_source` accepts for this kind (empty = not bindable) |
 | `component` | `() => Promise<Component>` | lazy loader for the panel body |
 
 Sibling epics call `registerPanelKind` from their own module; EPIC-1007
 ships all eight kinds as placeholder definitions (real `defaultSize`,
-`linkChannels`, and `configSchema`; a stub body and a permissive
-`validateConfig`) so the five tools work end-to-end from day one. A
-sibling replaces its kind's definition by owning the registration —
-no edit to the container.
+`linkChannels`, `bindingTypes`, and `configSchema`; a stub body and a
+permissive `validateConfig`) so the fourteen tools work end-to-end from
+day one. A sibling replaces its kind's definition by owning the
+registration — no edit to the container.
+
+### Source/renderer registry (`src/lib/panels/sourceRendererRegistry.ts`)
+
+The second plug-point (T-1007-7), independent of the panel-kind registry
+above: a panel's kind rarely changes after creation, but its source and
+renderer change routinely, so they are looked up and revalidated on every
+relevant mutation rather than fixed at creation time like a kind is.
+
+| Symbol | Signature | Description |
+|--------|-----------|-------------|
+| `SourceTypeDefinition` | interface | `name`; the shape a valid source reference of that type must have (e.g. `screener_results` references a `run_id`, `panel_reference` references another panel's stable ID); a compatibility predicate deciding whether a given panel kind/renderer pair accepts it |
+| `RendererTypeDefinition<TConfig>` | interface | `name`; `configSchema`; `validateConfig`; `defaultConfig`; the source types it accepts |
+| `registerSourceType` | `(def: SourceTypeDefinition) => void` | throws on duplicate `name` rather than overwriting |
+| `registerRendererType` | `(def: RendererTypeDefinition) => void` | throws on duplicate `name` rather than overwriting |
+| `getSourceType` / `getRendererType` | `(name: string) => Definition \| undefined` | lookup for validation |
+| `listSourceTypes` / `listRendererTypes` | `() => Definition[]` | powers the "unsupported source/renderer" error and catalog discovery |
+| `createSourceRendererRegistry` | `() => SourceRendererRegistry` | isolated registry instance so tests never touch module-global state |
+
+`bind_panel_source`, `set_panel_renderer`, `configure_panel_view`, and
+`configure_chart_grid` all resolve through this registry rather than
+switching on source or renderer type themselves. EPIC-1007 ships the four
+source types (`screener_results`, `watchlist`, `symbol_list`,
+`panel_reference`) and four renderer types (`table`, `chart_grid`,
+`heatmap`, `scatter_plot`) named in the tool spec as placeholders — real
+compatibility rules and schemas, provisional validators — so the tools
+work end-to-end before EPIC-1009/1010/1011/1012 replace each validator by
+re-registering its type, no edit to the container.
 
 ### Grid layout (`src/lib/panels/layout.ts`)
 
@@ -73,7 +101,7 @@ Pure geometry over a fixed 12-column, unbounded-row logical grid.
 | `GRID_COLUMNS` | `12` | see spec Open Question 1 |
 | `rectsOverlap` | `(a: GridRect, b: GridRect) => boolean` | half-open interval intersection |
 | `validatePlacement` | `(rect, kind, occupied) => PlacementResult` | bounds, min-size, and overlap checks in one pass; error names the offending panel or bound |
-| `findFreeRect` | `(size: GridSize, occupied: OccupiedRect[]) => GridRect` | deterministic top-left-first auto-placement for `add_panel` |
+| `findFreeRect` | `(size: GridSize, occupied: OccupiedRect[]) => GridRect` | deterministic top-left-first auto-placement for `create_panel` |
 | `applyLayout` | `(panels, placements) => LayoutResult` | all-or-nothing batch move/resize |
 
 `occupied` excludes hidden panels (spec Open Question 5).
@@ -102,21 +130,33 @@ Undirected groups, one set per channel (spec Open Question 2).
 | `rect` | `GridRect` | |
 | `hidden` | `boolean` | |
 | `collapsed` | `boolean` | |
-| `binding` | `{ type: string; id: string } \| null` | spec Open Question 3 |
+| `source` | `{ type: string; ref: unknown } \| null` | resolved and validated via the source/renderer registry; spec Open Question 3 |
+| `renderer` | `string \| null` | active renderer name, resolved via the source/renderer registry; `null` until a source is bound |
 
 ### Use cases (`src/lib/panels/application/`)
 
 One function per tool, each `(workspace, request) => MutationEnvelope`,
 each registering an inverse operation with EPIC-1006's undo store:
-`addPanel`, `updatePanel`, `setPanelLayout`, `linkPanels`, `removePanel`.
+`createPanel`, `duplicatePanel`, `removePanel`, `setPanelLayout`,
+`applyLayoutTemplate`, `splitPanel`, `bindPanelSource`,
+`setPanelRenderer`, `configureChartGrid`, `configurePanelView`,
+`linkPanels`, `unlinkPanels`, `setPanelSelection`. `maximizePanel` is the
+one exception — it does not mutate the workspace or consume a revision;
+it is rendering-only client state layered over the saved layout (T-1007-4
+AC10).
 
 ### Tool surface (`src/lib/webmcp/v2/panelTools.ts`)
 
-Five `ToolSpec`s (`add_panel`, `update_panel`, `set_panel_layout`,
-`link_panels`, `remove_panel`) built from the use cases, following the
-existing `buildTools(engine)` factory shape and `ok`/`fail` result
-shaping in `src/lib/webmcp/tools.ts` — reimplemented in `v2`, not
-imported across the old/new boundary.
+Fourteen `ToolSpec`s (`create_panel`, `duplicate_panel`, `remove_panel`,
+`set_panel_layout`, `apply_layout_template`, `split_panel`,
+`maximize_panel`, `bind_panel_source`, `set_panel_renderer`,
+`configure_chart_grid`, `configure_panel_view`, `link_panels`,
+`unlink_panels`, `set_panel_selection`) built from the use cases and the
+source/renderer registry, following the existing `buildTools(engine)`
+factory shape and `ok`/`fail` result shaping in `src/lib/webmcp/tools.ts`
+— reimplemented in `v2`, not imported across the old/new boundary.
+`create_panel`'s schema is generated from the panel-kind and
+source/renderer registries at build time, not written out by hand.
 
 ## Default kind → link channel matrix
 
@@ -135,9 +175,22 @@ Shipped by EPIC-1007; a sibling epic may widen its own kind's row.
 
 ## Data Flow
 
-`add_panel` → validate kind in registry → validate config via the kind →
-resolve a `GridRect` (explicit, else `findFreeRect`) → `validatePlacement`
-→ mint ID → append to workspace panels → bump revision → envelope.
+`create_panel` → validate kind in the panel-kind registry → validate
+source and renderer in the source/renderer registry → validate config via
+the active renderer's contract → resolve a `GridRect` (explicit, else
+`findFreeRect`) → `validatePlacement` → mint ID → append to workspace
+panels → bump revision → envelope.
+
+`bind_panel_source` → look up the panel by ID → validate the new source
+reference against the panel's kind and active renderer via the
+source/renderer registry → replace `source` → bump revision → envelope.
+Rejected without changing the panel if the source type is not accepted.
+
+`set_panel_renderer` → look up the panel by ID → validate the requested
+renderer against the panel's current source via the source/renderer
+registry → for each existing configuration field, keep it if the new
+renderer's schema recognizes it, else drop it and add a warning → replace
+`renderer` and `config` → bump revision → envelope.
 
 A linked change (e.g. the chart's symbol) reaches
 `propagationTargets(graph, 'symbol', sourcePanelId)` and is applied to

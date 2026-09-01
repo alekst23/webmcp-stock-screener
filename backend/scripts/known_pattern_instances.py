@@ -3,7 +3,7 @@ temporal pattern, hand-placed by generate_mock_panel.py at these exact
 ticker/date locations.
 
 This is a plain fixture list, not a domain model: it exists purely so
-T-1001-3's temporal-matcher tests have a hand-computed expected result to
+T-0001-3's temporal-matcher tests have a hand-computed expected result to
 assert against (`find_instances` on the matching setup must return exactly
 these anchor dates, no more, no less). It is not consumed by application code.
 

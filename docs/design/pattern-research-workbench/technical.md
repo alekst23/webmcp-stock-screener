@@ -4,7 +4,7 @@
 
 The design interview surfaced three gaps against the currently implemented
 types in `src/lib/webmcp/types.ts` that the query-engine tickets
-(T-1001-3, T-1001-4) and integration ticket (T-1001-5) need to close:
+(T-0001-3, T-0001-4) and integration ticket (T-0001-5) need to close:
 
 ### `InstanceEvent` — needs a completeness field
 
@@ -45,10 +45,10 @@ Needed shape — `focusInstance` (agent-driven) must not mutate `selected`
 | ---------------------- | --------------------- | -------------------------------------------------------------------------------------------------- |
 | `excludedPartialCount` | `number \| undefined` | new — present when the input set contained partial instances that were excluded from the statistic |
 
-### `PriceBar` — backend panel row schema (T-1001-1)
+### `PriceBar` — backend panel row schema (T-0001-1)
 
 `backend/domain/models/price.py`. One adjusted daily OHLCV row — the
-shared schema the mock generator and the real EODHD pipeline (T-1001-9)
+shared schema the mock generator and the real EODHD pipeline (T-0001-9)
 both must produce, so swapping one panel for the other requires no
 downstream code changes.
 
@@ -62,18 +62,18 @@ downstream code changes.
 | `close`  | `float` | adjusted    |
 | `volume` | `int`   |             |
 
-### `SpikePingResponse` — throwaway spike DTO (T-1001-2)
+### `SpikePingResponse` — throwaway spike DTO (T-0001-2)
 
 `backend/api/schemas/spike.py`. Proves a WebMCP tool's `execute()` can
 reach a live deployed backend. Superseded by the real tool endpoints wired
-in T-1001-5 — not part of the permanent API surface.
+in T-0001-5 — not part of the permanent API surface.
 
 | Field     | Type       | Description                      |
 | --------- | ---------- | -------------------------------- |
 | `message` | `str`      |                                  |
 | `sample`  | `PriceBar` | one row read from the mock panel |
 
-### `PatternResearchEngine` — query engine contract (T-1001-3, extended by T-1001-4)
+### `PatternResearchEngine` — query engine contract (T-0001-3, extended by T-0001-4)
 
 `backend/domain/contracts/engine.py`. Implemented by a pandas/numpy infra
 adapter; a `MockPatternResearchEngine` fake lives in
@@ -84,62 +84,62 @@ adapter; a `MockPatternResearchEngine` fake lives in
 | `define_study`         | `(name, expression) -> Study`                                                    | raises `ExpressionError` (with catalog) on an unsupported function |
 | `define_setup`         | `(name, steps) -> Setup`                                                         |                                                                    |
 | `find_instances`       | `(setup, from_date, to_date, min_market_cap, sectors) -> InstanceSet`            | applies the partial-match fallback and dedup rules from `spec.md`  |
-| `sample_instances`     | `(instance_set, n, strategy, horizon_days) -> list[Instance]`                    | T-1001-4                                                           |
-| `measure`              | `(instance_set, horizon_days, metric, compare_to_base_rate) -> MeasureResult`    | T-1001-4 — excludes partial instances                              |
-| `split_instances`      | `(instance_set, mode, expression, horizon_days, threshold) -> list[InstanceSet]` | T-1001-4                                                           |
-| `get_instance_windows` | `(instance_set, n, strategy, window) -> list[InstanceWindow]`                    | T-1001-4 — backs `showGrid`'s data needs                           |
+| `sample_instances`     | `(instance_set, n, strategy, horizon_days) -> list[Instance]`                    | T-0001-4                                                           |
+| `measure`              | `(instance_set, horizon_days, metric, compare_to_base_rate) -> MeasureResult`    | T-0001-4 — excludes partial instances                              |
+| `split_instances`      | `(instance_set, mode, expression, horizon_days, threshold) -> list[InstanceSet]` | T-0001-4                                                           |
+| `get_instance_windows` | `(instance_set, n, strategy, window) -> list[InstanceWindow]`                    | T-0001-4 — backs `showGrid`'s data needs                           |
 
-### `MeasureResult`, `BaseRateResult`, `InstanceWindow` — stats models (T-1001-4)
+### `MeasureResult`, `BaseRateResult`, `InstanceWindow` — stats models (T-0001-4)
 
 `backend/domain/models/measurement.py`. `MeasureResult.excluded_partial_count`
 mirrors the frontend `MeasureResult` field of the same name documented
 above.
 
-### `Study`, `SetupStep`, `Setup` — pattern domain models (T-1001-3)
+### `Study`, `SetupStep`, `Setup` — pattern domain models (T-0001-3)
 
 `backend/domain/models/pattern.py`. Backend-side mirror of the frontend's
 `StudySummary`/`SetupStep`/`SetupSummary` types.
 
-### `Instance`, `InstanceSet` — result domain models (T-1001-3)
+### `Instance`, `InstanceSet` — result domain models (T-0001-3)
 
 `backend/domain/models/instance.py`. `InstanceSet.complete_count` /
 `partial_count` are stored fields (not derived), matching the
 `InstanceSetSummary` breakdown documented above.
 
-### `FUNCTION_CATALOG` / `SUPPORTED_FUNCTIONS` — deliberately duplicated (T-1001-5)
+### `FUNCTION_CATALOG` / `SUPPORTED_FUNCTIONS` — deliberately duplicated (T-0001-5)
 
 `src/lib/webmcp/types.ts`'s `FUNCTION_CATALOG` mirrors
 `backend/tests/mocks/mock_pattern_research_engine.py`'s
-`SUPPORTED_FUNCTIONS` (and, once T-1001-3's real engine exists, whatever
+`SUPPORTED_FUNCTIONS` (and, once T-0001-3's real engine exists, whatever
 canonical list it uses). Kept in sync by hand — a list of ~6-12 function
 names, not parsing logic, so this is cheap duplication in exchange for
 `defineStudy`/`defineSetup` staying client-side per `docs/plan.md`'s
 architecture split.
 
-### `ApiClientConfig` — frontend backend-URL contract (T-1001-5)
+### `ApiClientConfig` — frontend backend-URL contract (T-0001-5)
 
 `src/lib/webmcp/types.ts`. `{ baseUrl: string }` — where the fetch-based
 `ResearchEngine` implementation sends the 5 networked tool calls.
 
-### `AgentActivityEvent` — activity feed contract (T-1001-7, extended by EPIC-1002)
+### `AgentActivityEvent` — activity feed contract (T-0001-7, extended by EPIC-0002)
 
 `src/lib/workspace/activity.ts`. Originally populated only by
-`register.ts`'s tool-call wrapper; EPIC-1002 (T-1002-1) adds a shared
+`register.ts`'s tool-call wrapper; EPIC-0002 (T-0002-1) adds a shared
 recording entry point so a human-triggered UI control (e.g.
 `ChartToolbar.svelte`) appends events the same way, and persists the
-resulting store (T-1002-2, mirroring `store.ts`'s existing
+resulting store (T-0002-2, mirroring `store.ts`'s existing
 localStorage pattern).
 
 | Field       | Type                 | Description                                                                                                                                                                            |
 | ----------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`        | `string`             |                                                                                                                                                                                        |
-| `actor`     | `'human' \| 'agent'` | new (T-1002-1) — set statically per call site, not runtime-detected: the tool-registration path (`register.ts`) is always `'agent'`, a direct UI-control call site is always `'human'` |
+| `actor`     | `'human' \| 'agent'` | new (T-0002-1) — set statically per call site, not runtime-detected: the tool-registration path (`register.ts`) is always `'agent'`, a direct UI-control call site is always `'human'` |
 | `toolName`  | `string`             |                                                                                                                                                                                        |
 | `timestamp` | `string`             | ISO                                                                                                                                                                                    |
 | `input`     | `unknown`            | the call's raw input                                                                                                                                                                   |
 | `summary`   | `string`             | one-line human-readable result summary, not raw JSON                                                                                                                                   |
 
-**Shared recording entry point (T-1002-1):** `activity.ts` exports
+**Shared recording entry point (T-0002-1):** `activity.ts` exports
 `recordAction(activity, actor, actionName, input, result: ToolResult)`.
 Both `register.ts`'s tool wrapper (`actor: 'agent'`) and any
 human-triggered UI control (starting with `ChartToolbar.svelte`, `actor:
@@ -149,12 +149,12 @@ writes to `activityStore` any other way. It reuses the existing
 `ok`/`fail` `ToolResult` builders are exported so `ChartToolbar.svelte`
 can build the same result shape without re-implementing it.
 
-### `WebmcpStatus` / `WebmcpBridgeState` / header status contract (T-1004-1, T-1004-2, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status)
+### `WebmcpStatus` / `WebmcpBridgeState` / header status contract (T-0004-1, T-0004-2, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status)
 
 `src/lib/webmcp/status.ts`. Pure formatters backing the header's two
 counts and its bridge-state line.
 
-**Why this changed (hotfix/webmcp-bridge-status).** T-1004-1 originally
+**Why this changed (hotfix/webmcp-bridge-status).** T-0004-1 originally
 rendered `"WebMCP connected · N tools available"` with an explicit
 `"WebMCP isn't available in this browser"` branch.
 hotfix/webmcp-tools-always-visible deleted that branching so the count
@@ -186,7 +186,7 @@ pair loses information the agent feedback showed is load-bearing:
 | `connecting`  | `connectWebmcp()` in flight; `onMount` is sync, resolution is not      |
 | `connected`   | resolved to a `WebmcpConnection`                                       |
 | `unavailable` | resolved to `null` — `document.modelContext` absent (the agent's case) |
-| `failed`      | rejected — `getWorkspace()` or `registerTool()` threw (T-1004-2 AC1)   |
+| `failed`      | rejected — `getWorkspace()` or `registerTool()` threw (T-0004-2 AC1)   |
 
 `unavailable` and `failed` both show 0 available and must stay distinct:
 one is "this browser can't", the other is "this browser could and
@@ -331,9 +331,9 @@ The HTML comment is retained unchanged in its role. It is the channel
 that demonstrably reached a real agent in production, and it remains the
 only one that works for a reader that never renders or clicks anything.
 
-### `WebmcpConnection` lifecycle — live registration and remount (T-1004-2)
+### `WebmcpConnection` lifecycle — live registration and remount (T-0004-2)
 
-`src/lib/webmcp/register.ts`. Two additions, both driven by T-1004-2.
+`src/lib/webmcp/register.ts`. Two additions, both driven by T-0004-2.
 
 `connectWebmcp(engine, activity?, onToolsChanged?)` takes a third
 optional callback, invoked by `refresh()` with the current registered
@@ -352,7 +352,7 @@ churn the header.
 
 `WebmcpConnection` gains `dispose(): Promise<void>`, which unregisters
 every tool this connection **still owns**, best-effort — see the two
-qualifications below. T-1004-2 AC2 asked whether remount needs cleanup;
+qualifications below. T-0004-2 AC2 asked whether remount needs cleanup;
 it does, and the answer is not "document why it's unreachable".
 `connect()` closes over a fresh `registered: Set<string>` per call, while
 `document.modelContext` retains the previous mount's registrations — so a
@@ -462,7 +462,7 @@ intro-adjacent block.
 prop, or behavioral change, so `workspace-snapshots/spec.md` and
 `technical.md` are unaffected.
 
-### `TickerMetadata` — universe classification (T-1001-9)
+### `TickerMetadata` — universe classification (T-0001-9)
 
 `backend/domain/models/universe.py`. Sourced from a free Nasdaq screener
 CSV export, not EODHD.
@@ -474,7 +474,7 @@ CSV export, not EODHD.
 | `market_cap` | `float \| None` |             |
 | `as_of`      | `date`          |             |
 
-### `removePanel` — single-panel removal (T-1003-2)
+### `removePanel` — single-panel removal (T-0003-2)
 
 `src/lib/workspace/store.ts`. Human-driven store mutation, not a
 `ResearchEngine`/WebMCP tool method — same category as `selectInstance`.

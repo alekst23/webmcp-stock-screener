@@ -1,4 +1,4 @@
-"""T-1001-9: the real EODHD-backed pipeline, end to end without a network.
+"""T-0001-9: the real EODHD-backed pipeline, end to end without a network.
 
 Every test here drives the production code path -- the real `EodhdClient`
 over a stub transport carrying recorded EODHD response shapes, the real

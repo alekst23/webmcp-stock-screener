@@ -39,7 +39,7 @@ def config_from_env(env: dict[str, str] | None = None) -> ObjectStoreConfig | No
 
     None rather than an error: a local checkout with no R2 credentials must
     still boot against the mock panel (main.py's fallback), which is how
-    every test and every pre-T-1001-9 workflow runs.
+    every test and every pre-T-0001-9 workflow runs.
     """
     source = env if env is not None else dict(os.environ)
     values = {

@@ -1,7 +1,7 @@
-"""T-1001-5's 5 real networked WebMCP tool endpoints: findInstances,
+"""T-0001-5's 5 real networked WebMCP tool endpoints: findInstances,
 sampleInstances, measure, splitInstances, and showGrid (which wraps
 get_instance_windows -- see
-docs/plan/EPIC-1001/T-1001-5-webmcp-integration.md's endpoint-to-tool
+docs/plan/EPIC-0001/T-0001-5-webmcp-integration.md's endpoint-to-tool
 mapping). defineStudy/defineSetup/getWorkspace/focusInstance are NOT here --
 those 4 tools run purely client-side (docs/plan.md's "Sessions" section).
 
@@ -52,7 +52,7 @@ def get_engine(request: Request) -> PandasPatternResearchEngine:
 
 @router.get("/panel", response_model=PanelStatus)
 def panel(request: Request) -> PanelStatus:
-    """The loaded panel's provenance (T-1001-9 AC4).
+    """The loaded panel's provenance (T-0001-9 AC4).
 
     A GET rather than a field on getWorkspace: getWorkspace runs purely
     client-side and never touches the network (docs/plan.md's "Sessions"

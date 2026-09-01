@@ -1,10 +1,10 @@
 """Pull a handful of real tickers from EODHD's free tier and check their
 field shape against the `PriceBar` schema the mock generator already
-produces (T-1001-1, AC3).
+produces (T-0001-1, AC3).
 
 This is a one-off sanity script, not a pipeline — the real paid backfill
 and nightly delta live in `infra/eodhd_client.py` plus
-`scripts/backfill_panel.py` / `scripts/nightly_delta.py` (T-1001-9). It
+`scripts/backfill_panel.py` / `scripts/nightly_delta.py` (T-0001-9). It
 exists to catch schema drift *before* the real pipeline becomes
 load-bearing: field names, date handling, and — the one that actually
 differs — split/dividend adjustment convention.

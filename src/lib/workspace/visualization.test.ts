@@ -208,7 +208,7 @@ describe('cross-actor visibility', () => {
 	});
 });
 
-// T-1002-1: unify action recording so a human UI control (starting with
+// T-0002-1: unify action recording so a human UI control (starting with
 // ChartToolbar) and an agent tool call append to the same log through one
 // shared entry point, distinguished only by a static `actor` field.
 describe('unified action log', () => {

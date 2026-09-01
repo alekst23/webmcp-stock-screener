@@ -1,8 +1,8 @@
-"""T-1001-2 platform spike endpoint.
+"""T-0001-2 platform spike endpoint.
 
 Deliberately reads the mock Parquet panel with pandas directly in the route
 handler -- no read abstraction here; a proper panel-reading contract belongs
-to T-1001-3. This whole module is throwaway, superseded once T-1001-5 wires
+to T-0001-3. This whole module is throwaway, superseded once T-0001-5 wires
 the real tool endpoints.
 """
 
@@ -28,7 +28,7 @@ def ping() -> SpikePingResponse:
     Exists to prove a WebMCP tool's ``execute()`` can reach this backend
     over a real HTTP request and get back data sourced from a separate,
     genuinely running process -- not a hardcoded or in-process response
-    (T-1001-2 AC3/AC4).
+    (T-0001-2 AC3/AC4).
     """
     if not PANEL_PATH.exists():
         raise HTTPException(

@@ -1,4 +1,4 @@
-// T-1001-9 AC4: how current the loaded price panel is.
+// T-0001-9 AC4: how current the loaded price panel is.
 //
 // A dedicated GET rather than a field on getWorkspace: getWorkspace runs
 // purely client-side and never touches the network (docs/plan.md's

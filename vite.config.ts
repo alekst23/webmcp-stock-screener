@@ -11,7 +11,7 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			// T-1001-8: static output for Cloudflare Workers (static assets).
+			// T-0001-8: static output for Cloudflare Workers (static assets).
 			// Every route already disables SSR (see src/routes/+layout.ts --
 			// there's no backend session to render against), so this is a pure
 			// client-side SPA: no route declares `prerender = true`, so

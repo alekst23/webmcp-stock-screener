@@ -9,7 +9,7 @@
 	import WorkspaceView from '$lib/workspace/WorkspaceView.svelte';
 	import type { ToolResult } from '$lib/webmcp/types';
 
-	// Real fetch-based ResearchEngine (T-1001-5), wired to the FastAPI
+	// Real fetch-based ResearchEngine (T-0001-5), wired to the FastAPI
 	// backend. Lets a developer exercise the full tool surface without an AI
 	// agent or a WebMCP-capable browser (AC3), against the same store the
 	// human view reads from (AC4) and the same live backend an agent's tool

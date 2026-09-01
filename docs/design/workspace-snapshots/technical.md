@@ -17,7 +17,7 @@
 | `savedAt` | `string` | ISO timestamp, for display in the picker |
 | `state` | `WorkspaceState` | full captured state, same shape `store.ts` already persists |
 
-### Functions (`src/lib/workspace/snapshots.ts`, introduced by T-1005-1)
+### Functions (`src/lib/workspace/snapshots.ts`, introduced by T-0005-1)
 
 | Function | Signature | Description |
 |----------|-----------|--------------|
@@ -26,13 +26,13 @@
 | `deleteSnapshot` | `(name: string, storage?: Storage) => void` | removes the named snapshot; no-op if it doesn't exist |
 | `listSnapshots` | `(storage?: Storage) => SnapshotSummary[]` | every saved snapshot's `name`/`savedAt` |
 
-### `hasUnsavedChanges` (`src/lib/workspace/snapshotGuard.ts`, introduced by T-1005-2)
+### `hasUnsavedChanges` (`src/lib/workspace/snapshotGuard.ts`, introduced by T-0005-2)
 
 | Signature | Description |
 |-----------|--------------|
 | `(current: WorkspaceState, baseline: WorkspaceState \| null) => boolean` | structural (JSON) comparison of the live state against the state as of the last save/load this session; `baseline: null` (nothing saved/loaded yet) is treated as `store.ts`'s `emptyWorkspace()` |
 
-Used by `SnapshotPicker.svelte` (T-1005-2) to decide whether to warn
+Used by `SnapshotPicker.svelte` (T-0005-2) to decide whether to warn
 before replacing the live workspace with a different snapshot (spec.md's
 "Recall a snapshot" → "Unsaved changes" scenario).
 

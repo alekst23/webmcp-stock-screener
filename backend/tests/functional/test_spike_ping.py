@@ -7,7 +7,7 @@ from scripts.generate_mock_panel import generate_panel, write_panel
 
 class TestSpikePingEndpoint:
     def test_ping_endpoint_returns_sample_price_bar_from_mock_panel(self) -> None:
-        # The mock panel is a gitignored build artifact (T-1001-1); regenerate
+        # The mock panel is a gitignored build artifact (T-0001-1); regenerate
         # it at its real, documented path so this test exercises the same
         # file the endpoint reads in local dev, not a decoupled fixture.
         write_panel(generate_panel(), output_path=PANEL_PATH)

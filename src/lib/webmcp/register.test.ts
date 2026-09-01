@@ -134,7 +134,7 @@ describe('connectWebmcp bridge detection', () => {
 		).toBeGreaterThan(0);
 	});
 
-	// T-1004-2 AC1: a rejection must be distinguishable from "no bridge", so
+	// T-0004-2 AC1: a rejection must be distinguishable from "no bridge", so
 	// the page can render "failed" rather than "unavailable" or nothing.
 	it('propagates a registration failure rather than resolving to null', async () => {
 		const bridge = fakeBridge({
@@ -271,7 +271,7 @@ describe('connectWebmcp live registration signal', () => {
 	});
 });
 
-// T-1004-2 AC2. connect() closes over a fresh registered-Set per call while
+// T-0004-2 AC2. connect() closes over a fresh registered-Set per call while
 // document.modelContext keeps the previous mount's registrations, so a
 // remount double-registers. Reachable here: ssr is off and / <-> /dev is
 // client-side navigation, which unmounts and remounts +page.svelte.

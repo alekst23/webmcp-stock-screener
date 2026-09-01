@@ -12,8 +12,8 @@ SplitMode = Literal["outcome", "condition"]
 class PatternResearchEngine(Protocol):
     """The query engine's contract, implemented by an infra adapter over the
     panel (mock in early development, real EODHD-backed later — same
-    contract either way). T-1001-3 delivers define_study/define_setup/
-    find_instances; T-1001-4 adds the four methods below."""
+    contract either way). T-0001-3 delivers define_study/define_setup/
+    find_instances; T-0001-4 adds the four methods below."""
 
     def define_study(self, name: str, expression: str) -> Study:
         """Raises domain.errors.ExpressionError on an unsupported expression."""
@@ -78,5 +78,5 @@ class PatternResearchEngine(Protocol):
         strategy: SampleStrategy = "recent",
         window: tuple[int, int] = (-20, 20),
     ) -> list[InstanceWindow]:
-        """Backs showGrid's data needs (T-1001-7 renders the chart)."""
+        """Backs showGrid's data needs (T-0001-7 renders the chart)."""
         ...

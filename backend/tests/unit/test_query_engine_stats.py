@@ -9,9 +9,9 @@ from scripts.known_pattern_instances import KNOWN_PATTERN_INSTANCES
 
 # Target the real pandas-based PatternResearchEngine implementation, not
 # MockPatternResearchEngine — verifying real computed statistics against
-# T-1001-1's known fixture outcomes is the point of this suite.
+# T-0001-1's known fixture outcomes is the point of this suite.
 
-# Hand-computed (see T-1001-4's report) forward returns of each known
+# Hand-computed (see T-0001-4's report) forward returns of each known
 # fixture instance's breakout_date over a 5-trading-day horizon, straight
 # from the mock panel's close prices. All three happen to be losers in this
 # seeded panel (the random walk after the hand-authored pattern days has no

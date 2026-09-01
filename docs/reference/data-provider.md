@@ -109,7 +109,7 @@ receives small, per-query slices (e.g. a 12-instance × 40-day grid ≈
 
 The backfilled panel and its nightly delta persist in Cloudflare R2 (free
 tier covers this size, zero egress) or S3 (~$0.02/GB/mo), not a Render
-persistent disk. Decided during T-1001-8's deployment: Render requires a
+persistent disk. Decided during T-0001-8's deployment: Render requires a
 paid instance tier (~$25/mo) just to attach a disk, which costs far more
 than the object storage this data volume actually needs. The backend
 fetches the panel into memory/`/tmp` on startup; the nightly cron job

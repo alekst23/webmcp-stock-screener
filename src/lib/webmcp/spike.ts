@@ -1,14 +1,14 @@
-// T-1001-2 platform spike: a single, throwaway WebMCP tool proving an
+// T-0001-2 platform spike: a single, throwaway WebMCP tool proving an
 // agent-invoked execute() can reach a real, separately-running FastAPI
 // backend over HTTP and return data sourced from that backend's mock
 // dataset. NOT one of the 9 product tools (see ./tools.ts) -- do not extend
-// this file; it is superseded once T-1001-5 wires the real networked tool
+// this file; it is superseded once T-0001-5 wires the real networked tool
 // surface against a proper ResearchEngine/fetch client.
 import type { ModelContext, ToolResult } from './types';
 
 // Hardcoded on purpose: this spike only needs to prove `fetch()` reaches a
 // separate local process, not a configurable deploy target (that's
-// T-1001-5/T-1001-8's PUBLIC_API_BASE_URL). See backend/main.py for the
+// T-0001-5/T-0001-8's PUBLIC_API_BASE_URL). See backend/main.py for the
 // server this points at (`uv run uvicorn main:app --reload` from backend/).
 const SPIKE_BACKEND_URL = 'http://localhost:8000/api/spike/ping';
 
@@ -28,7 +28,7 @@ export interface SpikePingResponse {
 }
 
 // Real network call -- no mock/hardcoded response -- against the locally
-// running backend (T-1001-2 AC3/AC4).
+// running backend (T-0001-2 AC3/AC4).
 export async function spikePing(): Promise<SpikePingResponse> {
 	const response = await fetch(SPIKE_BACKEND_URL);
 	if (!response.ok) {
@@ -61,7 +61,7 @@ export async function registerSpikeTool(mc: ModelContext | undefined): Promise<b
 	await mc.registerTool({
 		name: 'spikePing',
 		description:
-			'T-1001-2 platform spike tool. Calls a live, locally-running FastAPI backend over HTTP ' +
+			'T-0001-2 platform spike tool. Calls a live, locally-running FastAPI backend over HTTP ' +
 			"and returns one sample OHLCV row read from that backend's mock data panel. Proves a " +
 			'WebMCP tool can reach a real, separately-running backend process rather than returning ' +
 			'a hardcoded or purely local response.',

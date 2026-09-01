@@ -231,10 +231,10 @@ describe('dev control surface', () => {
 	});
 });
 
-// T-1003-2: failing stubs written against removePanel's contract stub in
+// T-0003-2: failing stubs written against removePanel's contract stub in
 // store.ts (currently throws "not implemented") -- see
-// docs/plan/EPIC-1003/T-1003-2-individual-panel-close.md's Solution Approach.
-describe('individual panel removal (T-1003-2)', () => {
+// docs/plan/EPIC-0003/T-0003-2-individual-panel-close.md's Solution Approach.
+describe('individual panel removal (T-0003-2)', () => {
 	function storeWithPanels(
 		panels: WorkspaceState['panels'],
 		focus: WorkspaceState['focus']

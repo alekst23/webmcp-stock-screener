@@ -14,10 +14,19 @@ shows, arrange panels on a logical grid, synchronize state between them,
 and remove them — with every change visible to the human, reversible, and
 expressed against stable panel IDs rather than positional references.
 
+A panel's **source** — what data it shows (a screener run, a watchlist, a
+symbol list, or another panel) — and its **renderer** — how that data is
+shown (a table, a chart grid, a heatmap, a scatter plot) — are independent.
+Rebinding a panel's source does not change how it is rendered; changing
+its renderer does not change what data it is showing. This split is what
+lets the same screener run become a table, then a wall of small charts,
+without re-running anything.
+
 Panel *contents* are not this feature's concern. What lives inside a
 chart, a screener, a results table, or a similarity panel is owned by
 separate features; this feature owns the container, the layout, the
-links, and the typed registry those features plug their panel kind into.
+links, and the typed registries those features plug a panel kind, a
+source type, or a renderer type into.
 
 ## Preconditions
 
@@ -28,21 +37,36 @@ links, and the typed registry those features plug their panel kind into.
 
 ## Features
 
-1. **Add a panel** of a supported kind to the workspace.
-2. **Update a panel's** title, configuration, visibility, collapsed
-   state, or bound resource.
-3. **Lay out panels** on a logical grid — position and size in grid
-   cells, never pixels.
-4. **Link panels** so that a change in one propagates to the others on a
-   named channel.
-5. **Remove a panel** by its stable ID.
-6. **Register a panel kind** so a new kind of panel becomes addable
-   without changing the panel container itself.
+1. **Add a panel** of a supported kind, with an initial source and
+   renderer, to the workspace. **Duplicate** or **remove** one by its
+   stable ID.
+2. **Configure a panel's** title, view configuration (columns, studies,
+   axes, sorting, grouping, formatting), visibility, or collapsed state.
+3. **Bind or rebind a panel's source** — the screener run, watchlist,
+   symbol list, or panel it shows — independent of how it is rendered.
+4. **Change a panel's renderer** — table, chart grid, heatmap, scatter
+   plot — independent of its source.
+5. **Lay out panels** on a logical grid — position and size in grid
+   cells, never pixels; apply a named layout template; split a panel's
+   region; temporarily maximize one without changing the saved layout.
+6. **Link and unlink panels** so that a change in one propagates to the
+   others on a named channel, including a selected result.
+7. **Register a panel kind, source type, or renderer type** so a new
+   kind of panel, a new place data can come from, or a new way to show
+   it becomes addable without changing the panel container itself.
 
 ## Supported panel kinds
 
 `filter_builder`, `chart`, `study_library`, `results_table`,
 `similar_opportunities`, `watchlist`, `alerts`, `symbol_details`.
+
+## Source types
+
+`screener_results`, `watchlist`, `symbol_list`, `panel_reference`.
+
+## Renderer types
+
+`table`, `chart_grid`, `heatmap`, `scatter_plot`.
 
 ## Link channels
 
@@ -54,24 +78,48 @@ links, and the typed registry those features plug their panel kind into.
 
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
-| Happy path | a workspace | the agent adds a panel of a supported kind | a panel of that kind exists with a new stable ID, its kind's default title, default configuration, and a non-overlapping default position and size on the grid; the mutation envelope names the new panel |
+| Happy path | a workspace | the agent adds a panel of a supported kind with an initial source and renderer | a panel of that kind exists with a new stable ID, its kind's default title, default configuration, and a non-overlapping default position and size on the grid; the mutation envelope names the new panel |
 | Explicit placement | a workspace | the agent adds a panel and supplies a grid position and size | the panel is created at exactly that position and size, if it is valid and unoccupied |
 | Unknown kind | a workspace | the agent adds a panel of a kind that is not registered | the call fails, changes nothing, and the error lists every kind that *is* registered |
 | Invalid configuration | a workspace | the agent adds a panel with configuration its kind rejects | the call fails, changes nothing, and the error says which configuration values were rejected and why |
 | No room at the requested spot | a panel already occupies the requested cells | the agent adds a panel there | the call fails with an overlap error naming the occupying panel, and nothing is created |
 | Replay | a mutation was already applied under an idempotency key | the same call is repeated with that key | the original result is returned and no second panel is created |
 
-### Update a panel
+### Duplicate a panel
 
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
-| Retitle | an existing panel | the agent sets a new title | only the title changes; the panel keeps its ID, kind, configuration, and position |
-| Reconfigure | an existing panel | the agent supplies new configuration for the panel's kind | the configuration is validated against that kind and, if valid, replaces or merges into the panel's configuration |
+| Happy path | an existing panel | the agent duplicates it | a new panel exists with a fresh stable ID, copying the original's kind, configuration, source, and renderer; the original is unaffected |
+| Override on duplicate | an existing panel | the agent duplicates it and supplies a different symbol or source | the new panel is created with the overridden symbol or source instead of the original's; the original is unaffected |
+| Unknown panel | no panel with the given ID | the agent duplicates it | the call fails, changes nothing, and says the ID is unknown |
+
+### Configure a panel
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Retitle | an existing panel | the agent sets a new title | only the title changes; the panel keeps its ID, kind, configuration, source, renderer, and position |
+| Reconfigure the view | an existing panel | the agent supplies new view configuration (columns, studies, axes, sorting, grouping, formatting) for the panel's active renderer | the configuration is validated against that renderer's contract and, if valid, replaces or merges into the panel's configuration |
 | Hide and show | a visible panel | the agent hides it | the panel remains in the workspace with its position and configuration intact, but is not rendered; showing it again restores it in place |
 | Collapse | an expanded panel | the agent collapses it | the panel renders as a header only, retains its stored size, and expanding restores that size |
-| Rebind | a panel bound to a resource | the agent binds it to a different resource of a compatible type | the panel shows the newly bound resource; an incompatible resource type is rejected without changing the panel |
-| Unknown panel | no panel with the given ID | the agent updates it | the call fails, changes nothing, and says the ID is unknown |
-| Stale revision | the workspace has advanced past the caller's `expected_revision` | the agent updates a panel | the call is rejected as a conflict and nothing changes |
+| Unknown panel | no panel with the given ID | the agent configures it | the call fails, changes nothing, and says the ID is unknown |
+| Stale revision | the workspace has advanced past the caller's `expected_revision` | the agent configures a panel | the call is rejected as a conflict and nothing changes |
+
+### Bind a panel's source
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Rebind | a panel bound to a source | the agent binds it to a different source of a compatible type | the panel shows the newly bound source, unchanged renderer; an incompatible source type is rejected without changing the panel, and the error lists the accepted source types |
+| Initial bind | a panel with no source | the agent binds it to a source its kind and renderer accept | the panel adopts that source and begins showing its data |
+| Unknown panel | no panel with the given ID | the agent binds a source to it | the call fails, changes nothing, and says the ID is unknown |
+
+### Change a panel's renderer
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Happy path | a panel with a bound source | the agent changes its renderer to a compatible one | the same source is now shown by the new renderer; the source itself is unchanged |
+| Configuration carries over | a panel with renderer-specific configuration | the agent changes to a renderer whose contract recognizes some of the same configuration fields | the recognized fields carry over; fields the new renderer's contract does not recognize are dropped and reported as a warning, not an error |
+| Incompatible renderer | a panel's source does not accept a requested renderer | the agent requests that renderer | the call fails, changes nothing, and the error lists the renderers the current source accepts |
+| Unknown panel | no panel with the given ID | the agent changes its renderer | the call fails, changes nothing, and says the ID is unknown |
 
 ### Lay out panels
 
@@ -83,8 +131,14 @@ links, and the typed registry those features plug their panel kind into.
 | Overlap within one call | a batch of placements | two of them would occupy the same cell | the whole call fails identifying the conflicting pair, and no panel moves |
 | Partial ID set | a workspace with several panels | the agent lays out only some of them | the named panels move; the unnamed panels stay exactly where they are |
 | Unaffected by hidden panels | a hidden panel occupying cells | the agent places a visible panel over those cells | the placement is accepted — hidden panels reserve their stored position but do not block placement |
+| Apply a named template | a workspace with several panels | the agent applies a named layout template (`three_columns`, `quad`, `chart_wall_3x3`, `focus_with_sidebar`) | every named panel's footprint is replaced according to the template, atomically |
+| Unknown template | a workspace | the agent applies a template name that is not registered | the call fails, changes nothing, and the error lists every registered template |
+| Split a panel | an existing panel | the agent splits its region horizontally or vertically | a new panel is created in the freed cells and the original's footprint shrinks to make room; both keep their own ID, kind, source, and renderer |
+| Split below minimum | a panel whose kind declares a minimum size | a split would leave either resulting footprint below that minimum | the call fails naming the minimum, and no panel is split or resized |
+| Maximize | a panel among several | the agent maximizes it | that panel temporarily occupies the full grid; every other panel's saved position and size is unchanged |
+| Restore from maximize | a maximized panel | the agent clears the maximized state | the workspace renders exactly the layout it had before maximizing; the saved layout was never mutated by maximizing |
 
-### Link panels
+### Link and unlink panels
 
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
@@ -95,6 +149,8 @@ links, and the typed registry those features plug their panel kind into.
 | Independent channels | panels linked on one channel | the agent links a different pair on another channel | the two channels' groups are independent; a change on one does not propagate through the other |
 | Self-link | one panel | the agent links a panel to itself | the call fails and nothing changes |
 | Duplicate link | panels already linked on a channel | the agent links them again on that channel | the call succeeds without creating a duplicate, and the envelope reports no effective change |
+| Select and propagate | panels linked on the `result_selection` channel | the agent selects one or more results in one of them | the selection propagates to every other panel in that channel's group, and to no panel outside it |
+| Clear selection | a panel with a selection | the agent selects an empty set | the panel's selection is cleared, and the clear propagates to its `result_selection` group like any other change |
 
 ### Remove a panel
 
@@ -103,21 +159,33 @@ links, and the typed registry those features plug their panel kind into.
 | Happy path | an existing panel | the agent removes it by ID | the panel is gone from the workspace, its grid cells are freed, and the envelope names it as affected |
 | Link cleanup | a panel in one or more link groups | the agent removes it | it is dropped from every link group; a group left with fewer than two panels is dissolved, and the remaining panels are named as affected |
 | Unknown panel | no panel with the given ID | the agent removes it | the call fails, changes nothing, and says the ID is unknown |
-| Undo | a removed panel | the agent undoes the removal with the returned undo token | the panel returns with its ID, kind, title, configuration, position, size, and link memberships as they were |
+| Undo | a removed panel | the agent undoes the removal with the returned undo token | the panel returns with its ID, kind, title, configuration, source, renderer, position, size, and link memberships as they were |
 
 ### Register a panel kind
 
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
-| Happy path | a feature that owns a panel kind | it registers that kind with a title, default and minimum size, default configuration, a configuration validator, the link channels it participates in, and a body to render | panels of that kind can be added, configured, laid out, linked, and rendered without any change to the panel container |
+| Happy path | a feature that owns a panel kind | it registers that kind with a title, default and minimum size, default configuration, a configuration validator, the link channels it participates in, the source types it accepts, and a body to render | panels of that kind can be added, configured, laid out, linked, and rendered without any change to the panel container |
 | Discovery | a set of registered kinds | the agent asks what kinds are available | every registered kind is listed with the configuration it accepts and the link channels it supports |
 | Duplicate kind | a kind already registered under a name | the same name is registered again | the conflict is reported rather than silently overwriting the first registration |
 
+### Register a source or renderer type
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Happy path | a feature that owns a renderer (a table, a chart) or contributes a way to source panel data | it registers a source type (name, reference shape, the kind/renderer pairs it is compatible with) or a renderer type (name, configuration schema and validator, defaults, accepted source types) | panels can be bound to that source or switched to that renderer without any change to the panel container |
+| Discovery | a set of registered source and renderer types | the agent asks what is available | every registered source and renderer type is listed with its schema and compatibility rules |
+| Duplicate type | a source or renderer type already registered under a name | the same name is registered again | the conflict is reported rather than silently overwriting the first registration |
+
 ## Non-Goals
 
-- The contents of any panel — the filter builder's tree, the chart's
-  studies, the results table's columns, the similarity search — all owned
-  by separate features.
+- The contents of any panel — the filter builder's tree, the similarity
+  search — owned by separate features.
+- The renderer-specific catalogs and validation contracts a source or
+  renderer type registers (available result columns, available
+  studies/indicators, their defaults and formatting rules) — owned by the
+  feature that registers the type; this feature builds the registry
+  mechanism, not the contracts.
 - The shared workspace/revision model, stable-ID scheme, mutation
   envelope, `expected_revision`, `idempotency_key`, and undo tokens —
   owned by EPIC-1006 and consumed here.
@@ -147,11 +215,30 @@ links, and the typed registry those features plug their panel kind into.
    *Assumption:* they may not; overlapping placements are rejected rather
    than auto-reflowed, so the agent gets a clear error instead of a
    surprising rearrangement.
-5. **Hidden vs. removed.** The spec lists visibility as an `update_panel`
-   field, implying hiding is not removal.
+5. **Hidden vs. removed.** The spec lists visibility as a
+   `configure_panel_view` field, implying hiding is not removal.
    *Assumption:* a hidden panel keeps its ID, configuration, links, and
    stored position, and does not reserve grid space against new
    placements.
+6. **The "collection" kind.** `docs/reference/tool-spec.md`'s `create_panel`
+   example uses `"kind": "collection"`, which does not match any of the
+   eight registered kinds above (a `collection` reads as many items
+   sharing one `chart_grid`/heatmap renderer — e.g. the top nine matches
+   from a screener run, each as its own small chart).
+   *Assumption:* no new kind is added — an existing kind (`chart`) is
+   reused with its renderer set to `chart_grid`, and the source/renderer
+   contract, not the kind, is what determines whether a panel shows one
+   item or a collection. This is a stated assumption, not a resolved
+   decision — confirm before T-1007-1's placeholder registrations are
+   finalized.
+7. **Where title/visibility/collapsed-state live.** The `update_panel`
+   tool that used to own these no longer exists in the revised tool
+   surface, and `configure_panel_view`'s stated purpose ("columns,
+   studies, axes, sorting, grouping, formatting") does not name them.
+   *Assumption:* they are folded into `configure_panel_view` anyway, as
+   the closest remaining tool, per EPIC-1007 AC3 — flagged as unresolved
+   rather than settled; confirm, or a dedicated chrome-only tool may be
+   warranted instead.
 
 ---
 

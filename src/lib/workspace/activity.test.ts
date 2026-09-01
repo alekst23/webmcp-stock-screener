@@ -4,7 +4,7 @@ import { ok } from '../webmcp/tools';
 import { actorLabel, clearActivity, createActivityStore, recordAction } from './activity';
 import { memoryStorage } from './testSupport';
 
-// T-1002-2: activityStore persists to localStorage under its own key,
+// T-0002-2: activityStore persists to localStorage under its own key,
 // mirroring store.ts's read-on-init/write-on-update pattern for
 // WorkspaceState.
 describe('activity log persistence', () => {
@@ -44,10 +44,10 @@ describe('activity log persistence', () => {
 	});
 });
 
-// T-1002-3: the timeline UI shows each entry's actor as "Human" or
+// T-0002-3: the timeline UI shows each entry's actor as "Human" or
 // "Agent" -- extracted as a pure helper so the label mapping is testable
 // without mounting ActivityFeed.svelte (raw-dump removal and rendered
-// ordering are structural/covered by T-1002-1's ordering test, not
+// ordering are structural/covered by T-0002-1's ordering test, not
 // re-tested here).
 describe('actor label', () => {
 	it('labels a human-actor event "Human"', () => {

@@ -1,4 +1,4 @@
-"""Pandas/numpy-backed implementation of PatternResearchEngine (T-1001-3).
+"""Pandas/numpy-backed implementation of PatternResearchEngine (T-0001-3).
 
 Per-day condition series are computed panel-wide via pandas groupby/rolling
 (see `infra/expression.py`) rather than hand-rolled loops — this is why the

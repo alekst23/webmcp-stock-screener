@@ -29,7 +29,7 @@
 
 	const apiConfig = { baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' };
 
-	// The real fetch-based ResearchEngine (T-1001-5), the same one an agent's
+	// The real fetch-based ResearchEngine (T-0001-5), the same one an agent's
 	// WebMCP tool calls resolve against -- registered here so a real
 	// WebMCP-capable browser sees the live tool surface on this page.
 	const engine = createApiEngine(workspaceStore, apiConfig);
@@ -50,7 +50,7 @@
 	let bridgeState = $state<WebmcpBridgeState>('connecting');
 	let availableNames = $state<string[]>([]);
 
-	// How current the backend's price panel is (T-1001-9 AC4). Null while it
+	// How current the backend's price panel is (T-0001-9 AC4). Null while it
 	// is being fetched, and left null when the backend has no panel at all --
 	// claiming an unknown as-of date would be worse than showing none.
 	let panelStatus = $state<PanelStatus | null>(null);
@@ -179,7 +179,7 @@
 	}
 
 	/* Synthetic data must not read like real market data at a glance -- the
-	   whole point of showing this line (T-1001-9 AC4). */
+	   whole point of showing this line (T-0001-9 AC4). */
 	.panel-status.synthetic {
 		color: #7a5c00;
 		background: #fdf8e6;

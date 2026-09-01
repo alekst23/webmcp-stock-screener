@@ -62,7 +62,7 @@ users and judges actually open.
 - `docs/plan/EPIC-1015/` — T-1015-2's parity matrix, which names the
   capabilities that must still work; the representative flow in AC5
   should be one of them.
-- The prior deployment ticket's runbook under `docs/plan/EPIC-1001/` —
+- The prior deployment ticket's runbook under `docs/plan/EPIC-0001/` —
   the established shape of a hands-on deployment verification for this
   project, including which steps need a human.
 

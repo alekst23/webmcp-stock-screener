@@ -3,7 +3,7 @@
 Run locally from backend/:
     uv run uvicorn main:app --reload
 
-Serves the T-1001-2 platform spike endpoint and T-1001-5's 5 real networked
+Serves the T-0001-2 platform spike endpoint and T-0001-5's 5 real networked
 WebMCP tool endpoints (api/routes/research.py).
 """
 
@@ -56,7 +56,7 @@ def _panel_store() -> S3PanelStore | None:
 def _load_engine() -> tuple[PandasPatternResearchEngine | None, PanelStatus | None]:
     """Load the panel into memory once at startup (docs/plan.md: 'loaded into
     memory at startup for low-latency reads'), preferring the real
-    object-store panel over T-1001-1's mock one.
+    object-store panel over T-0001-1's mock one.
 
     Returns (None, None) when no panel exists anywhere -- api/routes/
     research.py's dependency then surfaces a clear 503 instead of crashing
@@ -77,7 +77,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 def _rate_limit_default() -> str:
     """Default per-client request budget for every route, from
     RATE_LIMIT_DEFAULT (limits' "<count>/<period>" syntax, e.g. "60/minute").
-    Deployed alone with mock data (T-1001-8), the goal is basic abuse
+    Deployed alone with mock data (T-0001-8), the goal is basic abuse
     protection, not tuned capacity planning -- see docs/plan.md's
     rate-limiting decision (backend/.env.example)."""
     return os.environ.get("RATE_LIMIT_DEFAULT", "60/minute")

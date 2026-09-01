@@ -2,7 +2,7 @@
 
 Both the mock generator (scripts/generate_mock_panel.py) and the real EODHD
 pipeline must produce byte-identical row shapes, since the whole point of
-T-1001-9 is swapping one panel for the other without touching the engine,
+T-0001-9 is swapping one panel for the other without touching the engine,
 tools, or frontend. Every read and write of that format goes through here.
 """
 

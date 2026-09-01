@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class PriceBar(BaseModel):
     """One adjusted daily OHLCV row. The shared schema both the mock generator
-    (T-1001-1) and the real EODHD pipeline (T-1001-9) must produce, so swapping
+    (T-0001-1) and the real EODHD pipeline (T-0001-9) must produce, so swapping
     one panel for the other requires no downstream code changes."""
 
     ticker: str

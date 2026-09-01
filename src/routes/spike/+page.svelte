@@ -2,12 +2,12 @@
 	import { onMount } from 'svelte';
 	import { registerSpikeTool, spikePing, type SpikePingResponse } from '$lib/webmcp/spike';
 
-	// T-1001-2 platform spike page: registers the throwaway `spikePing` tool
+	// T-0001-2 platform spike page: registers the throwaway `spikePing` tool
 	// on load (AC1) so a real agent in a WebMCP-capable browser can discover
 	// and invoke it (AC2). Not linked from the app's normal navigation --
 	// reached directly at /spike per the runbook in
-	// docs/plan/EPIC-1001/T-1001-2-live-verification-runbook.md. Superseded
-	// once T-1001-5 registers the real tool surface.
+	// docs/plan/EPIC-0001/T-0001-2-live-verification-runbook.md. Superseded
+	// once T-0001-5 registers the real tool surface.
 
 	let webmcpSupported = $state(false);
 	let toolRegistered = $state(false);
@@ -30,12 +30,12 @@
 </script>
 
 <main>
-	<h1>T-1001-2 platform spike</h1>
+	<h1>T-0001-2 platform spike</h1>
 	<p>
 		Temporary page. Registers one throwaway WebMCP tool, <code>spikePing</code>, that calls the
 		local FastAPI backend (<code>http://localhost:8000/api/spike/ping</code>) over a real HTTP
 		request. See the runbook at
-		<code>docs/plan/EPIC-1001/T-1001-2-live-verification-runbook.md</code> for how to drive this with
+		<code>docs/plan/EPIC-0001/T-0001-2-live-verification-runbook.md</code> for how to drive this with
 		a real agent in a WebMCP-capable browser.
 	</p>
 

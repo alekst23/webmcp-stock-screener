@@ -10,7 +10,7 @@ import type { ToolResult } from '../webmcp/types';
 // without reading raw tool results.
 export interface AgentActivityEvent {
 	id: string;
-	// Set statically per call site (T-1002-1), never runtime-detected.
+	// Set statically per call site (T-0002-1), never runtime-detected.
 	actor: 'human' | 'agent';
 	toolName: string;
 	// ISO timestamp of the call.
@@ -42,7 +42,7 @@ function readPersisted(storage: Storage | undefined): AgentActivityEvent[] {
 // log is a human-facing trust affordance (AC4), not shared session state
 // an agent needs to read back (unlike focus.selected -- see store.ts's
 // selectInstance) or that any tool contract depends on. Persists to its
-// own localStorage key (T-1002-2), mirroring store.ts's
+// own localStorage key (T-0002-2), mirroring store.ts's
 // createWorkspaceStore read-on-init/write-on-update pattern -- storage is
 // an explicit parameter (default: real browser localStorage) for the same
 // reason store.ts's is: tests need an isolated in-memory Storage.
@@ -77,7 +77,7 @@ let nextActivityId = 1;
 
 export const activityStore = createActivityStore();
 
-// The shared recording entry point (T-1002-1, AC1): the only place that
+// The shared recording entry point (T-0002-1, AC1): the only place that
 // appends to an activity store. register.ts's tool wrapper and
 // ChartToolbar.svelte's UI-control handlers both call this instead of
 // writing to their store directly, so the actor label and the
@@ -103,7 +103,7 @@ export function recordAction(
 	]);
 }
 
-// T-1002-3: the timeline UI's actor badge, extracted as a pure function so
+// T-0002-3: the timeline UI's actor badge, extracted as a pure function so
 // the label mapping is unit-testable without mounting ActivityFeed.svelte.
 export function actorLabel(actor: 'human' | 'agent'): 'Human' | 'Agent' {
 	return actor === 'human' ? 'Human' : 'Agent';

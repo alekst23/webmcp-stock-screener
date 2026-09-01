@@ -1,6 +1,6 @@
 # Deployment: Live URLs & Status
 
-Tracks the actual live deployment for T-1001-8 (mock data) and beyond.
+Tracks the actual live deployment for T-0001-8 (mock data) and beyond.
 Verify against these URLs directly rather than assuming the runbook's
 example URLs are current.
 
@@ -11,9 +11,9 @@ example URLs are current.
 | Backend (FastAPI) | Render | <https://webmcp-pattern-research-api.onrender.com> |
 | Frontend (SvelteKit static) | Cloudflare Workers | <https://webmcp-stock-screener.alekst23.workers.dev/> |
 
-## T-1001-8 verification status (2026-08-31)
+## T-0001-8 verification status (2026-08-31)
 
-Checked against `T-1001-8-deployment-runbook.md`'s "Verify" section:
+Checked against `T-0001-8-deployment-runbook.md`'s "Verify" section:
 
 | Check | AC | Result |
 |---|---|---|
@@ -24,7 +24,7 @@ Checked against `T-1001-8-deployment-runbook.md`'s "Verify" section:
 | Frontend talking to backend (CORS) | AC2 | ✅ `CORS_ALLOWED_ORIGINS` set to the real frontend origin and backend redeployed; `Access-Control-Allow-Origin` now present on responses |
 | Full example research session | AC5 | ✅ (backend path) — `POST /api/research/find-instances` against the live deployed backend, with the frontend's `Origin` header, returns real matched instances from the mock panel (not just the spike endpoint). Not yet driven through the actual frontend UI / a live WebMCP agent — that's a stronger check but wasn't required to confirm the deployed backend is functionally correct end-to-end |
 
-T-1001-8 is functionally verified. Backend and frontend are both live,
+T-0001-8 is functionally verified. Backend and frontend are both live,
 correctly wired to each other, and serving real product functionality
 over the network.
 
@@ -35,9 +35,9 @@ have been updated to match:
 
 - **No Render persistent disk** — free tier doesn't support one, and a
   paid tier just to persist the deterministic mock panel wasn't worth it.
-  The mock panel regenerates on every deploy instead. T-1001-9's real data
+  The mock panel regenerates on every deploy instead. T-0001-9's real data
   will use object storage (R2/S3) rather than a Render disk. See
-  `T-1001-9-real-data-pipeline.md` and `data-provider.md`.
+  `T-0001-9-real-data-pipeline.md` and `data-provider.md`.
 - **Cloudflare Workers (static assets), not classic Pages** — Cloudflare's
   current Git-connected onboarding routes new projects through its
   unified Workers flow (`npx wrangler deploy`), which needs a committed
@@ -49,7 +49,7 @@ have been updated to match:
 
 ## References
 
-- `docs/plan/EPIC-1001/T-1001-8-deployment-runbook.md` — full deploy steps
-- `docs/plan/EPIC-1001/T-1001-8-deploy-ops-mock.md` — the ticket this
+- `docs/plan/EPIC-0001/T-0001-8-deployment-runbook.md` — full deploy steps
+- `docs/plan/EPIC-0001/T-0001-8-deploy-ops-mock.md` — the ticket this
   fulfils, its acceptance criteria and implementation notes
 - `render.yaml`, `wrangler.jsonc` — the actual deploy config

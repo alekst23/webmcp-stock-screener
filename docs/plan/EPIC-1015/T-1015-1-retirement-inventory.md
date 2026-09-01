@@ -107,7 +107,7 @@ engine and a tool-spec list:
   `ResearchEngine`, `FUNCTION_CATALOG`, `ExpressionError`.
 - `src/lib/webmcp/spike.ts`, `spike.test.ts`, `src/routes/spike/`,
   `backend/api/routes/spike.py`, `backend/api/schemas/spike.py`,
-  `backend/tests/functional/test_spike_ping.py` — T-1001-2 throwaway
+  `backend/tests/functional/test_spike_ping.py` — T-0001-2 throwaway
   scaffolding. **Load-bearing caveat**: `render.yaml`'s
   `healthCheckPath` points at `/api/spike/ping`.
 - `src/lib/webmcp/integration.test.ts` — couples `createApiEngine` to
