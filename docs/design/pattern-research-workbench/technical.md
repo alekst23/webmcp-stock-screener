@@ -168,8 +168,8 @@ runs, for real WebMCP registration, it just no longer gates the header).
 `formatWebmcpStatus(status: WebmcpStatus) -> string` — always
 `"<toolCount> tools available"`, regardless of browser support or
 connection state. Unchanged by the `toolNames` addition — the name list
-renders as its own element in `+page.svelte`, not folded into this
-string, so the existing exact-match tests stay valid.
+is never rendered as visible UI (see below), so the existing exact-match
+tests stay valid.
 
 `buildWebmcpStatus(tools: { name: string }[]) -> WebmcpStatus` — new pure
 helper (hotfix/workbench-ui-refactor) so the count/name-list pairing is
@@ -177,6 +177,39 @@ computed and tested in one place instead of inline in `+page.svelte`.
 Takes the minimal shape it needs (structurally compatible with
 `ToolSpec[]`) rather than depending on the full `ToolSpec` type.
 `+page.svelte` calls it as `buildWebmcpStatus(buildTools(engine))`.
+
+`formatAgentToolsContext(status: WebmcpStatus) -> string` — new pure
+helper (hotfix/workbench-ui-refactor). Produces the preface + tool-name
+listing for the agent-only HTML comment described below; kept separate
+from `formatWebmcpStatus` because the two have different audiences and
+must never be merged into one string. Any literal `--` in the output is
+replaced with an em dash (`—`) before the caller wraps it in `<!-- -->`,
+since `--` is illegal inside an HTML comment body and could otherwise
+truncate it early — defensive only, `toolNames` is a static, hardcoded
+list, not user input.
+
+**Human-visible vs. agent-visible tool surface (hotfix/workbench-ui-refactor):**
+The original redlined mockup called for a tool-name list that's
+"invisible in the UI" — i.e. present for an agent reading the page, not
+rendered for the human researcher. (An earlier revision of this change
+got this backwards and rendered the names as a visible `<ul>`; corrected
+here.) `+page.svelte` renders the list as a real HTML comment node via
+`{@html}` immediately after the `.webmcp-status` count line:
+
+```svelte
+{@html `<!-- ${formatAgentToolsContext(webmcpStatus).replaceAll('--', '—')} -->`}
+```
+
+A literal `<!-- -->` written directly in a `.svelte` template is stripped
+by the Svelte compiler by default and would never reach the shipped
+HTML — using `{@html}` to inject the comment string at runtime avoids
+that, since Svelte's template-comment stripping only applies to comments
+written statically in the template source, not to strings passed through
+`{@html}`. The result: no visible text, no accessibility-tree entry
+(comment nodes aren't exposed to a11y trees), but the comment is present
+in the page's rendered HTML for anything that reads page source —
+exactly the "invisible in the UI, visible to an agent" scenario in
+`spec.md`.
 
 ### `clearActivity` — manual full-log clear (hotfix/workbench-ui-refactor)
 
