@@ -27,6 +27,17 @@ from domain.errors import PanelStoreError
 
 _BUCKET_VAR = "OBJECT_STORE_BUCKET"
 
+# T-0016-12: the single source of truth for the object-store variable names,
+# so a deployment manifest (render.yaml) can be checked against what this
+# module actually reads instead of drifting from it silently.
+OBJECT_STORE_VARS: tuple[str, ...] = (
+    _BUCKET_VAR,
+    "OBJECT_STORE_ENDPOINT_URL",
+    "OBJECT_STORE_REGION",
+    "OBJECT_STORE_ACCESS_KEY_ID",
+    "OBJECT_STORE_SECRET_ACCESS_KEY",
+)
+
 
 @dataclass(frozen=True)
 class ObjectStoreConfig:

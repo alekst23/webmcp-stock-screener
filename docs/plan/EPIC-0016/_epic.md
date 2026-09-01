@@ -66,6 +66,7 @@ when measured peak on the deployed container approaches its ceiling.
 | 9 | T-0016-9 | Measure absolute RSS on the deployed container | T-0016-6, T-0016-7 | Open |
 | 10 | T-0016-10 | Cutover — frontend origin, CORS, runbook, rollback | T-0016-6, T-0016-8, T-0016-9 | Open |
 | 11 | T-0016-11 | Decommission Render (user-gated) | T-0016-10 | Open |
+| 12 | T-0016-12 | No synthetic data in production | T-0016-3 | Open |
 
 ## Dependency Graph
 
@@ -86,6 +87,13 @@ T-0016-4 (foundation) ─┤                      │                     │
                                                                     v
                                                      T-0016-11 (decommission)
 ```
+
+T-0016-12 is not in the graph above: it was opened after Wave 1
+consolidation surfaced two defects in T-0016-3's own delivery (`render.yaml`
+left on the old `R2_*` variable names, and no opt-in way for a production
+deploy to refuse the mock-panel fallback). It depends only on T-0016-3 and
+does not gate or get gated by anything else in this epic; it can run
+alongside Wave 2 or later.
 
 ## Wave Plan
 
