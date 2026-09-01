@@ -42,3 +42,9 @@ npm-debug.log*
 
 # Vite
 vite.config.ts.timestamp-*
+
+# Dev files
+.dev/
+
+# Claude working files
+.claude/scheduled_tasks.lock
