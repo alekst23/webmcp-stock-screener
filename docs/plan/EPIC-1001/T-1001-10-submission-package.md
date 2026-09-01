@@ -1,10 +1,17 @@
 # T-1001-10: Submission package
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Open
-**Depends on**: T-1001-9
+**Status**: Superseded by #14
+**Depends on**: — (was T-1001-9)
 **Blocks**: —
 **Issue**: #1
+
+> **Superseded by issue #14** on 2026-09-01. Written against the
+> 2026-09-03 hackathon deadline, which is no longer the objective. The
+> deliverables (public repo + license, written description, demo video on
+> real data, live verification) carry over to #14; the deadline-bound
+> submission-field filing does not. Left here rather than deleted so
+> EPIC-1001's history stays readable — do not implement from this file.
 
 ## Description
 

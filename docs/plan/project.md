@@ -60,7 +60,9 @@ Dependencies only — everything within a wave runs in parallel.
 3. **EPIC-1015 cutover** — do not launch until the user confirms the new
    surface is good. It retires the currently-deployed submission's tools.
 4. (Deprioritized) EPIC-1001's remaining tickets: T-1001-2 (live verification,
-   needs a human), T-1001-9 (real data), T-1001-10 (submission package).
+   needs a human) and T-1001-9 (real data — implemented and CI-green on
+   `feat/T-1001-9-real-data-pipeline`, unmerged; its AC1/AC5 live run is
+   gated on EPIC-1016's T-1016-1/T-1016-2). T-1001-10 is superseded by #14.
 5. (Low priority) The 9 follow-up tickets left by EPIC-1002/1003/1004/1005 —
    T-1002-4/5, T-1003-3/4, T-1004-2, T-1005-3/4/5.
 
@@ -97,6 +99,7 @@ authoritative)._
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-01 | T-1001-10 moved out of EPIC-1001 to issue #14 | Its ACs required filing before the 2026-09-03 deadline, which is no longer the objective, so the ticket could never be honestly closed as written. It also sat Open marked `Depends on: T-1001-9`, making EPIC-1001 look incomplete for a reason that no longer applies. Deliverables carry over; the real-data requirement now runs through EPIC-1016's T-1016-6. |
 | 2026-09-01 | EPIC-1016 retargeted to POC scope; T-1016-4 (chunked streaming) deferred | User set the goal as a decent POC with a real DB understood as the production answer. Given that, a hand-rolled chunked scanner is a query engine built to be discarded when it starts mattering — it buys no latency (findInstances scans the whole universe by design), only headroom, which DuckDB-over-R2 gives for free off the same partitioned Parquet. Upgrade ladder recorded in technical.md. |
 | 2026-09-01 | Panel universe trimmed by a liquidity/market-cap floor rather than taking all ~6,268 listed names | Product decision as much as sizing: thinly-traded microcaps distort pattern base rates. T-1016-6 fixes and records the cut. |
 | 2026-09-01 | Filed #13 and triaged it as EPIC-1016 rather than patching `panel_io.py` in place | Fixing only the I/O boundary leaves residency linear in universe x history; panel size is a product input, so the ceiling would return. User chose the full-universe-on-free-tier target, which makes streaming in-scope. |
