@@ -55,6 +55,16 @@ def _panel_store() -> S3PanelStore | None:
     return S3PanelStore(config) if config else None
 
 
+def _require_real_panel() -> bool:
+    """T-0016-12: opt-in production guard, off by default, so a deploy can
+    refuse to start on the mock panel instead of silently serving synthetic
+    data as though it were real. Every local checkout and the whole test
+    suite leave REQUIRE_REAL_PANEL unset and are unaffected; render.yaml
+    turns it on for the production web service only (see
+    backend/.env.example)."""
+    return os.environ.get("REQUIRE_REAL_PANEL", "").strip().lower() in {"1", "true"}
+
+
 def _load_engine() -> tuple[PandasPatternResearchEngine | None, PanelStatus | None]:
     """Load the panel into memory once at startup (docs/plan.md: 'loaded into
     memory at startup for low-latency reads'), preferring the real
@@ -62,8 +72,10 @@ def _load_engine() -> tuple[PandasPatternResearchEngine | None, PanelStatus | No
 
     Returns (None, None) when no panel exists anywhere -- api/routes/
     research.py's dependency then surfaces a clear 503 instead of crashing
-    app startup, mirroring the spike endpoint's own guard."""
-    loaded = load_panel(_panel_store(), PANEL_PATH)
+    app startup, mirroring the spike endpoint's own guard. That fallback is
+    itself refused when REQUIRE_REAL_PANEL is set and no object store is
+    configured -- see `_require_real_panel` and `load_panel`."""
+    loaded = load_panel(_panel_store(), PANEL_PATH, require_object_store=_require_real_panel())
     if loaded is None:
         return None, None
     engine = PandasPatternResearchEngine(loaded.panel, loaded.universe)
