@@ -38,7 +38,7 @@ fan out behind it.
 | EPIC-1013: Safety layer (preview & apply) | epic | specced | `epic/EPIC-1013-…` merged to main | 6 tickets. 2 tools; atomic apply over the operation registry |
 | EPIC-1014: High-value follow-up tools | epic | specced | `epic/EPIC-1014-…` merged to main | 11 tickets. backtest, watchlists, alerts, computed fields, export |
 | EPIC-1015: Legacy surface cutover | epic | specced | `epic/EPIC-1015-…` merged to main | 8 tickets. Gated on user approval; runs last |
-| EPIC-1001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-1001-pattern-research-workbench` | 8/10 tickets done; T-1001-2 blocked, T-1001-9/10 deprioritized. T-1001-9 IS implemented on `feat/T-1001-9-real-data-pipeline` (`8448059`, unmerged, CI green): EODHD backfill + nightly delta CLIs, R2 object store, universe metadata, `GET /api/research/panel`, and the compact `PanelFrame` (141 -> 25.1 B/row) that EPIC-1016 builds on. ACs 1-4 done against recorded shapes; AC5 awaits the real backfill. |
+| EPIC-1001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-1001-pattern-research-workbench` | 8/10 tickets done. T-1001-2 blocked (needs human + real WebMCP browser). T-1001-10 superseded by #14. **T-1001-9 is implemented, CI-green, and UNMERGED** on `feat/T-1001-9-real-data-pipeline` (`8448059`): EODHD backfill + nightly delta CLIs, R2 object store, universe metadata, `GET /api/research/panel`, and the compact `PanelFrame` (141 -> 25.1 B/row) EPIC-1016 builds on. ACs 1-4 done against recorded shapes; AC5 live run gated on EPIC-1016's T-1016-1/T-1016-2. |
 | EPIC-1016: Market data storage | epic | specced | `epic/EPIC-1016-market-data-storage` | 5 tickets scheduled + 1 deferred, commits `13afd89`/`fc73984`, branch not merged. Triaged from #13 (panel load peaks ~13 GB — backend cannot boot on real data at any tier). **POC scope**: trimmed liquid universe (~2,000 tickers x 10+y, ~5M rows, ~130 MB) fully resident on 512 MB; removes cost that grows faster than the data, but does NOT decouple memory from dataset size. Streaming (T-1016-4) deferred — DuckDB-over-R2 is the designated next rung. Blocks T-1001-9's AC1 backfill and AC5 spot-check. |
 
 ## Implementation wave order
@@ -222,3 +222,45 @@ _EPIC-1001 is still in progress — ticket-level completions (T-1001-1, 3, 4,
   pure handlers required), then launch Wave 1 (`/at-epic-run EPIC-1006` and
   `/at-epic-run EPIC-1008` in parallel). Do not launch EPIC-1015 without
   explicit user sign-off on its two capability drops.
+
+## Last Run (2026-09-01, session closed via /at-project-sleep)
+
+- **Trigger:** `/at-project-go T-1001-9`, then user redirect. User note at
+  close: *"outline the next steps so we can resume next time"*.
+- **Shipped:** Nothing merged to an epic or to origin. Five plan/doc commits
+  on local `main` (`ea7ed84`, `8a8d1cb`, `413faff`, `582004b` + this one).
+- **Scaffolded, not launched:** EPIC-1016 (5 tickets scheduled + 1 deferred)
+  on `epic/EPIC-1016-market-data-storage` (`13afd89`, `fc73984`). T-1001-9's
+  implementation on `feat/T-1001-9-real-data-pipeline` (`8448059`).
+- **Filed:** #13 (panel load path, triaged -> EPIC-1016), #14 (POC packaging,
+  supersedes T-1001-10, untriaged).
+- **Deferred:** T-1016-4 (chunked streaming) — DuckDB-over-R2 is the
+  designated next rung instead.
+- **In-flight at close:** Nothing running. No worktrees. Another session has
+  been writing this repo concurrently — see Blockers.
+- **Next session should:** Merge `feat/T-1001-9-real-data-pipeline` first; it
+  is done, CI-green, and EPIC-1016 declares a hard dependency on it, so
+  leaving it unmerged makes 1016 stack on a branch. Then run EPIC-1016's
+  T-1016-1 and T-1016-2 — those two alone remove the ~13 GB load peak and
+  make a real backfill physically possible. A real backfill of a trimmed
+  liquid universe comes immediately after, which is when live data actually
+  arrives; the rest of EPIC-1016 (T-1016-3/5/6) hardens it. Verify before
+  starting that `main` has not moved again and that the EODHD key is still in
+  `backend/.env` (it is gitignored and was absent at the start of this
+  session despite the account being upgraded).
+
+### Verified live this session (2026-09-01)
+
+Facts established by real API calls, superseding `data-provider.md` estimates:
+
+- EODHD paid tier active: `dailyRateLimit` 100000, arbitrary tickers allowed,
+  NVDA 2016-2026 returned 2,680 rows in one call.
+- Bulk-by-exchange delta endpoint needs **no pagination** — one call returned
+  all 44,557 US rows for a single date. Closes a `data-provider.md` open item.
+  Its row shape differs from the per-ticker shape (adds `code`,
+  `exchange_short_name`).
+- Real listed universe is **6,268 tickers** (NASDAQ 3,690 + NYSE 2,321 +
+  AMEX 257), not the ~4,200 estimated. Filtering `Type == 'Common Stock'`
+  over all US symbols gives 17,992, but most are OTC.
+- Measured memory costs: `list[PriceBar]` 1,081 B/row; `(ticker,date)` index
+  dict 118 B/row; compact `PanelFrame` 25.1 B/row.
