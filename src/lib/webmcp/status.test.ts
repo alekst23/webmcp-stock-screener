@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildWebmcpStatus, formatWebmcpStatus } from './status';
+import { buildWebmcpStatus, formatAgentToolsContext, formatWebmcpStatus } from './status';
 
 describe('formatWebmcpStatus', () => {
 	it('formats as count and "tools available"', () => {
@@ -39,5 +39,29 @@ describe('buildWebmcpStatus', () => {
 		const status = buildWebmcpStatus([]);
 
 		expect(status).toEqual({ toolCount: 0, toolNames: [] });
+	});
+});
+
+// hotfix/workbench-ui-refactor: this text is embedded in an HTML comment,
+// never rendered visibly -- it's the only place the tool-name list is
+// spelled out, so it must actually explain what the tools are.
+describe('formatAgentToolsContext', () => {
+	it('includes the tool count, every tool name, and how to call them', () => {
+		const result = formatAgentToolsContext({
+			toolCount: 2,
+			toolNames: ['defineStudy', 'getWorkspace']
+		});
+
+		expect(result).toContain('2');
+		expect(result).toContain('defineStudy');
+		expect(result).toContain('getWorkspace');
+		expect(result).toContain('document.modelContext');
+	});
+
+	it('is not just a bare name list -- it reads as a sentence with a preface', () => {
+		const result = formatAgentToolsContext({ toolCount: 1, toolNames: ['getWorkspace'] });
+
+		expect(result.length).toBeGreaterThan('getWorkspace'.length + 20);
+		expect(result).toMatch(/^WebMCP agent context:/);
 	});
 });
