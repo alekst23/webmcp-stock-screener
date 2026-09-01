@@ -9,8 +9,7 @@ does not exist there at all.
 **Blocks**: T-0001-9 AC1 (real backfill) and AC5 (live spot-check);
 EPIC-0013's T-0013-6, which needs a deployed instance to measure on
 **Issue**: #16
-**Design**: (not started — run `/at-epic-design EPIC-0016`; feature slug
-`aws-replatform`)
+**Design**: `docs/design/aws-replatform/` (spec.md, technical.md)
 
 ## Description
 
@@ -59,11 +58,11 @@ when measured peak on the deployed container approaches its ceiling.
 | 1 | T-0016-1 | Container image for the backend | — | Open |
 | 2 | T-0016-2 | Health endpoint independent of the spike stack | — | Open |
 | 3 | T-0016-3 | Provider-neutral object store on the AWS credential chain | — | Open |
-| 4 | T-0016-4 | Terraform foundation — network, bucket, registry, IAM | — | Open |
+| 4 | T-0016-4 | Terraform foundation — state, bucket, registry, IAM, minimal network | — | Open |
 | 5 | T-0016-5 | Runtime secrets in AWS, out of the gitignored `.env` | T-0016-4 | Open |
-| 6 | T-0016-6 | Terraform service module — container service and task definition | T-0016-1, T-0016-2, T-0016-3, T-0016-4 | Open |
+| 6 | T-0016-6 | Terraform service module — App Runner service at 2 GB | T-0016-1, T-0016-2, T-0016-3, T-0016-4 | Open |
 | 7 | T-0016-7 | Migrate panel objects from R2 to S3 | T-0016-3, T-0016-4 | Open |
-| 8 | T-0016-8 | Nightly delta as a scheduled AWS job | T-0016-1, T-0016-3, T-0016-5, T-0016-7 | Open |
+| 8 | T-0016-8 | Nightly delta as an EventBridge-scheduled Fargate task | T-0016-1, T-0016-3, T-0016-5, T-0016-7 | Open |
 | 9 | T-0016-9 | Measure absolute RSS on the deployed container | T-0016-6, T-0016-7 | Open |
 | 10 | T-0016-10 | Cutover — frontend origin, CORS, runbook, rollback | T-0016-6, T-0016-8, T-0016-9 | Open |
 | 11 | T-0016-11 | Decommission Render (user-gated) | T-0016-10 | Open |
@@ -92,7 +91,9 @@ T-0016-4 (foundation) ─┤                      │                     │
 
 - **Wave 1** (parallel): T-0016-1, T-0016-2, T-0016-3, T-0016-4 — no
   dependencies. Three touch code, one touches Terraform, and they do not
-  overlap in files.
+  overlap in files. T-0016-4 is unaffected by the App Runner decision: it
+  provisions only what both platforms need (remote state, bucket, registry,
+  IAM) plus the public-subnet network the nightly Fargate task requires.
 - **Wave 2** (parallel): T-0016-5, T-0016-6, T-0016-7
 - **Wave 3** (parallel): T-0016-8, T-0016-9
 - **Wave 4**: T-0016-10
@@ -134,50 +135,93 @@ T-0016-4 (foundation) ─┤                      │                     │
 - `docs/plan/EPIC-0013/_epic.md`, `T-0013-6` — the memory work this epic
   deploys, and the measurement method T-0016-9 reuses
 
-## Open Questions
+## Resolved Decisions
 
-Recorded with a recommended default rather than guessed. Each needs a user
-decision before the ticket that depends on it starts.
+Settled by the user on 2026-09-01. Where a decision went against the
+recommendation recorded when this epic was written, the original reasoning
+is kept alongside it — a decision is easier to revisit when the argument it
+overrode is still legible.
 
-1. **Region.** Unknown — the issue asks it and nothing in the repo names an
-   AWS region. *Recommended default:* match the region of the existing
-   RDS/Aurora and the rest of the paid infrastructure, even though this epic
-   does not use the database. A later server-side workspace store or a
-   Postgres re-evaluation (EPIC-0015) would otherwise cross regions and pay
-   egress for the privilege.
-2. **ECS/Fargate vs App Runner.** *Recommended: ECS Fargate.* Reasoning in
-   T-0016-6. The short version: App Runner's advantage is less configuration
-   for a single HTTP service, but this system is not a single HTTP service —
-   it is an HTTP service plus a nightly batch job. App Runner cannot run the
-   batch job, so choosing it means operating two platforms and the
-   simplicity is spent. Fargate also exposes memory as an explicit task-level
-   number with per-task utilization metrics, and this epic exists to move
-   that number. The honest cost is more Terraform and a load balancer the
-   service must pay for monthly; App Runner bundles HTTPS and a hostname.
-3. **Memory ceiling: 2 GB or 4 GB.** *Recommended: 4 GB.* 723 MB is a
-   measured peak that is already known to move with user input (+65% simple
-   to complex pattern), so 2 GB is ~2.8x on a figure that grows for reasons
-   the epic does not fix. 4 GB is also what makes the untrimmed 2,000-ticker
-   x 10-year universe possible, which is the whole point. This is one task's
-   memory, not a fleet's.
-4. **Nightly delta: Lambda or scheduled container task.** *Recommended:
-   scheduled container task.* The issue is right that the ordinary nightly
-   run is Lambda-shaped. The recovery run is not: `--catch-up` resumes from
-   the panel's as-of date and applies every missing session in one rewrite,
-   which is the longest run the job has and the one that must not fail.
-   Rather than two mechanisms for one job, run both paths the same way. See
-   T-0016-8.
-5. **Static keys or the task role for S3.** *Recommended: the default
-   credential chain, with a task role.* `config_from_env` requires an access
-   key and secret and returns `None` when either is missing — and `None`
-   means silently serving the mock panel. A role-based deploy would look
-   healthy while serving synthetic data. See T-0016-3.
-6. **Does the health probe assert panel readiness?** *Recommended: no.*
-   T-0013-5 chose to disclose degradation rather than fail on it, and
-   `load_panel` deliberately falls back to the mock panel. Failing the load
-   balancer probe on that fallback makes a degraded-but-working deploy
-   unroutable. Liveness on the health endpoint; panel provenance stays on
-   `GET /api/research/panel`. See T-0016-2.
+| # | Question | Decision | Recommended was |
+|---|----------|----------|-----------------|
+| 1 | Region and account | **`us-east-1`, account `490284589142`, profile `alekst23`** | Same. Confirmed empirically: a `postgres` RDS instance `database-1` already runs in `us-east-1` on that account, and the profile's IAM principal is already `terraform-deploy-user`. |
+| 2 | ECS/Fargate vs App Runner for the API | **App Runner** | Fargate. Overridden — see below. |
+| 3 | Memory ceiling | **2 GB** | 4 GB. Overridden — see below. |
+| 4 | Nightly delta mechanism | **EventBridge Scheduler → standalone ECS Fargate task** | Scheduled container task. Held, but the platform changed as a consequence of #2 — see below. |
+| 5 | Static keys or task role for S3 | **Default credential chain, instance role** | Same. |
+| 6 | Health probe asserts panel readiness | **No — liveness only** | Same. |
+| 7 | How far agents go against the live account | **Full `terraform apply`, image push, object migration, and live RSS measurement** | Not previously asked. T-0016-11 (decommission Render) remains user-gated regardless. |
+
+### What decision 2 changes
+
+App Runner was chosen for the API. The argument recorded against it in
+T-0016-6 was not that it cannot serve this workload — it can — but that it
+serves **only** HTTP, so the nightly batch job needs a second platform and
+App Runner's one advantage, less configuration, is spent paying for it.
+
+That cost is now real and accepted. In exchange:
+
+- **No load balancer and no NAT gateway.** App Runner bundles HTTPS and a
+  stable `*.awsapprunner.com` hostname. Against the Fargate plan this
+  removes roughly $50/month of fixed infrastructure that exists only to
+  front one container — the single largest line item in the epic.
+- **Far less Terraform.** One `aws_apprunner_service` replaces a load
+  balancer, target group, listener, security groups, and an ECS
+  service/task-definition pair for the API.
+- **Mixed content is solved by default.** The frontend is served over HTTPS
+  from `*.workers.dev`; a plaintext backend origin would be blocked. App
+  Runner is HTTPS-only, so T-0016-10 has no certificate work.
+
+The costs, stated plainly so T-0016-9 and T-0016-10 measure against them:
+
+- **Memory is an instance-configuration choice, not a task-level number
+  with per-task utilization metrics.** T-0016-9 must therefore measure peak
+  RSS **from inside the container** rather than reading it off a platform
+  metric. This is the correction the project's blocker table already
+  records — absolute process RSS, no baseline subtraction — so the method
+  is the one already chosen, not a new one.
+- **Two platforms.** App Runner for the API, ECS Fargate for the nightly
+  job. Both run the same image from the same registry, which is what keeps
+  their dependency closures from drifting.
+- **Reaching RDS later needs a VPC connector.** Nothing in this epic
+  connects to the database, so this is a deferred cost, not a present one.
+
+### What decision 3 changes
+
+2 GB was chosen over the recommended 4 GB. The measurement this must be
+read against: **723 MB absolute peak RSS** on a 2,000-ticker × 5-year panel
+with a realistic 3-step/4-study pattern, and that figure grows **+65%**
+going from a simple pattern to a complex one on the *same* panel — it moves
+with expression complexity, not just row count.
+
+2 GB is therefore ~2.8× today's measured peak, and the thing it is
+protecting against is user input rather than dataset growth. It is a real
+removal of the 512 MB ceiling — a 4× increase, and the blocker this epic
+exists to clear is gone at 2 GB. What it does not buy is the untrimmed
+2,000 × 10-year universe with confidence.
+
+**Consequence to hold T-0016-9 to:** its AC6 ("fits the configured ceiling
+with stated headroom") is now a genuine test rather than a formality. If the
+measured peak on a complex pattern against the real panel exceeds ~1.4 GB,
+the honest outcome is to report the number and raise the instance size —
+which App Runner allows without re-architecture — not to quietly pass. The
+memory value stays a Terraform input (T-0016-6 AC1) precisely so that this
+is a one-line change.
+
+### What decision 4 changes
+
+The recommendation — one image, one code path, no hard execution ceiling on
+the `--catch-up` recovery run — is unchanged and still correct. Lambda's
+15-minute limit still binds on exactly the run that must not fail.
+
+What changed is where the container task runs. It can no longer share a
+platform with the API, so the nightly job gets an **EventBridge Scheduler
+rule invoking a standalone ECS Fargate task** — a task definition and a
+cluster with no long-running service, no load balancer, and no NAT gateway
+(the task runs in a public subnet with an assigned public IP, so its S3 and
+EODHD egress needs no paid gateway). Idle cost is therefore approximately
+zero: ECS clusters and task definitions are free, and the task bills only
+for the minutes it runs.
 
 ## Out of Scope
 

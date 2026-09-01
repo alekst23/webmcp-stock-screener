@@ -21,7 +21,12 @@ and observes correctly that the API's argument against Lambda does not apply
 here: this job is short, batch, and holds no resident panel. That is true of
 the **ordinary** run.
 
-**Recommendation: a scheduled container task, on the same image.** The
+**Settled: an EventBridge Scheduler rule invoking a standalone ECS Fargate
+task, on the same image.** The user's choice of App Runner for the API
+(`_epic.md`, Resolved Decisions) means this job cannot share the API's
+platform — App Runner serves HTTP and nothing else — so the "one platform"
+argument below no longer applies. Everything else in it does, and it is what
+still rules out Lambda. The
 deciding case is the recovery run. `nightly_delta.py --catch-up` resumes from
 the panel's own as-of date and applies every missing session in one rewrite —
 it is the longest run the job has, it is the one invoked after a stretch of
@@ -31,6 +36,13 @@ run onto Lambda and the recovery run onto something else means two
 mechanisms, two IAM configurations, and two dependency closures for one job.
 One image, one role, one code path is worth more than the marginal cost
 difference on a job that runs once a day.
+
+The shape this takes: a task definition and an ECS cluster with **no
+long-running service**, no load balancer, and no NAT gateway — the task runs
+in T-0016-4's public subnet with an assigned public IP. An empty ECS cluster
+and an unused task definition are free; the job bills only for the minutes
+it runs. The two-platform cost of the App Runner decision is therefore paid
+in Terraform and in operational surface, not in a monthly charge.
 
 Done looks like: the panel advancing by one session each night on AWS,
 idempotently, with a failed night visible rather than silent.

@@ -15,10 +15,20 @@ recorded anywhere. Everything downstream in this epic — the service, the
 scheduled job, the secrets, the object migration — needs somewhere to be
 created and an identity to act as.
 
-This ticket lays the substrate that is independent of which compute platform
-is chosen, so that the Fargate-vs-App-Runner question (epic Open Question 2)
-does not block it: a network, the panel bucket, somewhere to put the image,
-and the roles that let a task read the bucket and its secrets.
+This ticket lays the substrate every other ticket needs: remote state, the
+panel bucket, somewhere to put the image, and the roles that let a workload
+read the bucket and its secrets.
+
+The compute platform is now settled — **App Runner for the API, an
+EventBridge-scheduled Fargate task for the nightly job** — and that settles
+the network scope, which is the one place this ticket could have
+over-built. App Runner needs no VPC at all: it reaches S3 and EODHD over the
+public internet. The nightly Fargate task does need a VPC, but only a
+minimal one — public subnets with an internet gateway and
+`assign_public_ip`, so its egress needs no NAT gateway. **Provision no NAT
+gateway.** It is ~$32/month for a job that runs for a few minutes a night,
+and it is the single easiest way to make this migration cost more than the
+Render bill it replaces.
 
 Done looks like: `terraform apply` from a clean state produces an empty but
 correct account footprint, and a second apply reports no changes.
@@ -51,6 +61,8 @@ anyone reconstructing it from memory or a dashboard.
    actually performs, scoped to that bucket, with no wildcard resource.
 9. Region and environment name are inputs, not literals, and no account ID,
    credential, or secret value is committed.
+10. The network contains no NAT gateway and no other resource billed per
+    hour that is not required by a workload this epic actually deploys.
 
 ## Design References
 

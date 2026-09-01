@@ -1,4 +1,4 @@
-# T-0016-6: Terraform service module — container service and task definition
+# T-0016-6: Terraform service module — App Runner service at 2 GB
 
 **Epic**: EPIC-0016 (AWS Re-platform)
 **Status**: Open
@@ -15,31 +15,36 @@ HTTPS. It replaces `render.yaml`'s `web` service — `webmcp-pattern-research-ap
 `plan: free`, region oregon — one for one, including its whole environment
 contract.
 
-The compute choice is the epic's second open question. **Recommendation: ECS
-Fargate**, and the reasoning belongs here rather than in prose elsewhere:
+The compute choice is **settled: App Runner**, decided by the user on
+2026-09-01 against this ticket's original Fargate recommendation. The full
+reasoning on both sides is recorded in `_epic.md`'s Resolved Decisions; what
+matters here is what it means for this module.
 
-- **App Runner cannot run the nightly job.** It serves HTTP and nothing else.
-  Choosing it means T-0016-8 stands up ECS or Lambda anyway, so the project
-  operates two platforms and App Runner's one advantage — less configuration —
-  is spent. Fargate runs the API and the scheduled task from one task
-  definition family, one image, one role, one log destination.
-- **This epic is about a memory number.** Fargate states task memory
-  explicitly and reports per-task utilization, so T-0016-9 measures against a
-  ceiling it set. App Runner exposes memory as a coarser instance
-  configuration.
-- **The panel is a warm-up cost.** Startup downloads and parses the panel;
-  the design's whole premise is that it then stays resident. A fixed desired
-  count keeps it resident predictably.
-- **RDS is in the picture eventually.** It is already paid for, and reaching a
-  VPC from App Runner needs a connector — more moving parts, again cancelling
-  the simplicity claim.
+What App Runner gives this ticket for free, and therefore removes from its
+scope entirely: HTTPS termination, a stable public hostname, a rolling
+deployment with automatic rollback on a failed health check, and request
+routing. There is no load balancer, no target group, no listener, no
+certificate, and no NAT gateway — roughly $50/month of fixed infrastructure
+that would have existed only to front a single container.
 
-The honest cost of Fargate: materially more Terraform, and a load balancer
-with a monthly charge. App Runner bundles HTTPS and a hostname for free. TLS
-is not optional — the frontend is served over HTTPS from
-`*.workers.dev`, so a plaintext backend origin would be blocked as mixed
-content — so the choice is a load balancer, or App Runner, or some other
-managed HTTPS front. Record whichever is chosen and its monthly cost.
+What it costs, and what this module must therefore do differently:
+
+- **Memory is an instance-configuration size, not a task-level number.**
+  App Runner takes CPU and memory as an instance configuration (`1 vCPU` /
+  `2 GB` here). It reports request-level metrics but not per-task memory
+  utilization the way ECS does, so **T-0016-9 measures peak RSS from inside
+  the container** rather than reading a platform metric. That is the method
+  the project's blocker table already mandates — absolute process RSS with no
+  baseline subtraction — so nothing is lost, but AC1's memory input is the
+  only lever, and it must stay an input.
+- **The nightly job cannot live here.** App Runner serves HTTP only.
+  T-0016-8 stands up a separate EventBridge-scheduled Fargate task on the
+  same image. Both consume the same registry and the same application
+  identity so their dependency closures cannot drift.
+- **No VPC by default.** App Runner reaches S3 and EODHD over the public
+  internet without a connector. A connector becomes necessary only if
+  something later needs the VPC — RDS in particular — and nothing in this
+  epic does.
 
 Done looks like: the service running on AWS, healthy, serving the real panel,
 with memory set to a number someone chose on purpose.
@@ -57,9 +62,10 @@ without being killed for exceeding a free tier's cap.
 1. A long-running container service runs the API from the epic's image, at a
    stated CPU and memory allocation, and the allocation is a module input
    rather than a literal.
-2. The service is reachable over HTTPS at a stable hostname from outside AWS.
-3. Health probing targets the endpoint from T-0016-2, and a task that stops
-   serving HTTP is replaced automatically.
+2. The service is reachable over HTTPS at a stable hostname from outside
+   AWS, with no certificate or DNS record managed by this repo.
+3. Health probing targets the endpoint from T-0016-2 over HTTP, and an
+   instance that stops serving is replaced automatically.
 4. A task whose panel is the mock fallback, or which has no panel at all,
    stays healthy and in service rather than being recycled.
 5. Every environment value the Render web service carried has an equivalent:
@@ -69,13 +75,17 @@ without being killed for exceeding a free tier's cap.
    the task definition.
 7. Application logs from every task are collected to a single destination and
    retrievable by task, with a retention period set explicitly.
-8. Deploying a new image version replaces tasks without dropping in-flight
-   requests, and a failed deployment leaves the previous version serving.
+8. Deploying a new image version replaces instances without dropping
+   in-flight requests, and a deployment that fails its health check leaves
+   the previous version serving. Auto-deploy on registry push is set
+   deliberately one way or the other and the choice is recorded.
 9. The service reads the real panel from the bucket provisioned by the
    foundation module, using the application identity rather than static keys.
 10. `terraform fmt` reports no changes; the module is composed by the root
-    configuration and takes region, environment, image reference, and memory
-    as inputs.
+    configuration and takes region, environment, image reference, CPU, and
+    memory as inputs.
+11. The service's public hostname is a Terraform output, so T-0016-10 can
+    consume it without anyone reading it off a console.
 
 ## Design References
 
@@ -91,15 +101,21 @@ without being killed for exceeding a free tier's cap.
 
 ## Technical Considerations
 
-**Memory is epic Open Question 3, recommended 4 GB.** Measured absolute peak
-is 723 MB on a 2,000-ticker x 5-year panel with a realistic 3-step/4-study
-pattern. That figure moves with expression complexity, not just row count —
-the same panel measures +65% search growth going from a simple pattern to a
-complex one — so headroom here is protecting against user input, not against
-dataset growth. 2 GB is roughly 2.8x today's peak; 4 GB is what makes the
-untrimmed 2,000 x 10-year universe viable, which is the reason the epic
-exists. Set it as an input (AC1) so T-0016-9 can adjust it from measurement
-rather than from argument.
+**Memory is settled at 2 GB**, decided by the user against this epic's 4 GB
+recommendation. Measured absolute peak is 723 MB on a 2,000-ticker x 5-year
+panel with a realistic 3-step/4-study pattern, and that figure moves with
+expression complexity, not just row count — the same panel measures +65%
+search growth going from a simple pattern to a complex one. 2 GB is roughly
+2.8x today's peak, and the headroom is protecting against user input rather
+than dataset growth. It is a genuine 4x removal of the 512 MB ceiling this
+epic exists to clear; what it does not buy with confidence is the untrimmed
+2,000 x 10-year universe.
+
+Set it as an input (AC1) so T-0016-9 can raise it from measurement rather
+than from argument. App Runner's supported pairings are coarse — at 1 vCPU
+the choices are 2, 3, and 4 GB — so raising it later is a one-line change,
+not a re-architecture. That is the mitigation, and it is the reason 2 GB is
+a safe choice to start from rather than a gamble.
 
 Do not baseline-subtract when reasoning about this number. The container's
 limit applies to the whole process — interpreter, libraries, application
@@ -109,10 +125,13 @@ table records against the earlier 688 MB figure.
 AC4 is the counterpart to T-0016-2's liveness-only decision, stated at the
 infrastructure layer so the two cannot drift.
 
-AC8 matters more than usual because startup is slow: a task is not useful
-until the panel is downloaded and parsed. Whatever grace period the health
-check allows must exceed real panel load time against S3, not against a local
-file.
+AC8 matters more than usual because startup is slow: an instance is not
+useful until the panel is downloaded and parsed. App Runner's health-check
+configuration (interval, timeout, unhealthy threshold) must tolerate real
+panel load time against S3, not against a local file — the default
+20-second interval with a 3-failure threshold is unlikely to be enough, and
+getting this wrong presents as a deployment that rolls itself back forever
+with no error in the application logs.
 
 ## Out of Scope
 
