@@ -76,7 +76,7 @@ describe('panel status', () => {
 		expect(formatPanelStatus(status)).toContain('Not real market data');
 		expect(isMockPanel(status)).toBe(true);
 	});
-	// T-1016-5: a degraded panel still answers, and says so in the same line
+	// T-0013-5: a degraded panel still answers, and says so in the same line
 	// the as-of date lives in -- a notice somewhere else is a notice nobody
 	// reads next to the result it qualifies.
 	it('appends the backend degradation notices to the status line', () => {

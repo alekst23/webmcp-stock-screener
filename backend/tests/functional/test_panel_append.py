@@ -1,4 +1,4 @@
-"""T-1016-2: appending a session costs a session, and stays idempotent.
+"""T-0013-2: appending a session costs a session, and stays idempotent.
 
 The guarantee under test is narrow and load-bearing: re-applying a session
 must leave one row per (ticker, date). A duplicate row silently shifts every

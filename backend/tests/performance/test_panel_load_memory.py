@@ -1,4 +1,4 @@
-"""T-1016-1 AC1: the bulk load's cost is measured, not asserted.
+"""T-0013-1 AC1: the bulk load's cost is measured, not asserted.
 
 Each measurement runs in a fresh subprocess and reads peak RSS, because the
 allocations that matter here (arrow buffers, numpy arrays) never pass through

@@ -1,9 +1,9 @@
-# T-1016-2: Delta-proportional, idempotent panel append
+# T-0013-2: Delta-proportional, idempotent panel append
 
-**Epic**: EPIC-1016 (Market Data Storage)
+**Epic**: EPIC-0013 (Market Data Storage)
 **Status**: Complete
-**Depends on**: T-1016-1
-**Blocks**: T-1016-4
+**Depends on**: T-0013-1
+**Blocks**: T-0013-4
 **Issue**: #13
 **Design**: docs/design/market-data-storage/
 
@@ -84,7 +84,7 @@ any single-object store:
 | 1.2M rows / 40.8 MB | copy | 133.2 MB | 0.52 |
 | 1.2M rows / 40.8 MB | rows (old) | 2,252.1 MB | 5.58 |
 
-(Re-measured after T-1016-3 settled the row-group size at 25,000 rows, which
+(Re-measured after T-0013-3 settled the row-group size at 25,000 rows, which
 also cost the merge ~40 MB less peak on the larger panel.)
 
 Two readings across the 10x panel step:
@@ -99,7 +99,7 @@ Two readings across the 10x panel step:
 still O(panel): `PanelStore.put_object` takes `bytes`, so the whole panel is
 re-serialized whatever the merge does. That is the `copy` row above, and at
 the ~5M-row target it is the term that matters. Removing it needs either
-per-partition writes (T-1016-3) or a streaming upload through the store
+per-partition writes (T-0013-3) or a streaming upload through the store
 contract -- neither is this ticket. What this ticket removes is the ~50x
 constant on top of it.
 

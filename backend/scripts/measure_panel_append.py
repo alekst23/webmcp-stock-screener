@@ -1,6 +1,6 @@
 """Measure what appending one session to the panel costs.
 
-T-1016-2's claim is that the *work of applying a session* tracks the session,
+T-0013-2's claim is that the *work of applying a session* tracks the session,
 not the panel it lands on. Re-serializing the panel is not part of that
 claim: `PanelStore.put_object` takes bytes, so a single-object store rewrites
 the whole panel however clever the merge is. `--mode copy` measures exactly
@@ -64,7 +64,7 @@ def _session_bars(tickers: list[str], day: date) -> list[PriceBar]:
 
 
 def _row_object_merge(existing: bytes, incoming: list[PriceBar]) -> bytes:
-    """The pre-T-1016-2 append: every panel row as an object, keyed by
+    """The pre-T-0013-2 append: every panel row as an object, keyed by
     (ticker, date). Kept here only as the measurement baseline."""
     by_key = {(bar.ticker, bar.date): bar for bar in parquet_bytes_to_bars(existing)}
     by_key.update({(bar.ticker, bar.date): bar for bar in incoming})

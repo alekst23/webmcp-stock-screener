@@ -15,7 +15,7 @@ peak RSS is exactly what the second run measures.
 
 The panel is synthetic. That makes the memory figures real (the layout and
 the row count are what cost memory, not the prices in them) and the *results*
-meaningless -- which is why T-1016-6's acceptance also requires the same
+meaningless -- which is why T-0013-6's acceptance also requires the same
 measurement on the deployed instance against a real backfill.
 """
 

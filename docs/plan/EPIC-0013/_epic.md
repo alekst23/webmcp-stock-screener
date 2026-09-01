@@ -1,4 +1,4 @@
-# EPIC-1016: Market Data Storage
+# EPIC-0013: Market Data Storage
 
 **Depends on**: T-1001-9 (real data pipeline — `feat/T-1001-9-real-data-pipeline`,
 commit `8448059`, unmerged) — supplies the compact `PanelFrame`, R2 object
@@ -51,23 +51,23 @@ improves the research: microcaps distort pattern base rates.
 
 | Ticket | Title | Depends on |
 |--------|-------|-----------|
-| T-1016-1 | Vectorized panel I/O — remove row objects from the bulk path | — |
-| T-1016-2 | Delta-proportional, idempotent panel append | T-1016-1 |
-| T-1016-3 | Ticker-partitioned Parquet with pruning and projection | T-1016-1 |
-| T-1016-5 | Disclose panel staleness and partial coverage | T-1016-3 |
-| T-1016-6 | Verify at target universe scale on 512 MB | T-1016-3, T-1016-5 |
+| T-0013-1 | Vectorized panel I/O — remove row objects from the bulk path | — |
+| T-0013-2 | Delta-proportional, idempotent panel append | T-0013-1 |
+| T-0013-3 | Ticker-partitioned Parquet with pruning and projection | T-0013-1 |
+| T-0013-5 | Disclose panel staleness and partial coverage | T-0013-3 |
+| T-0013-6 | Verify at target universe scale on 512 MB | T-0013-3, T-0013-5 |
 
-T-1016-4 (streaming universe evaluation) is **deferred, not scheduled** —
+T-0013-4 (streaming universe evaluation) is **deferred, not scheduled** —
 see its ticket file for why, and `technical.md` for the upgrade ladder it
 sits outside of.
 
-Ordering is forced: until row objects leave the bulk path (T-1016-1) their
+Ordering is forced: until row objects leave the bulk path (T-0013-1) their
 transient peak dominates every measurement, so partitioning cannot be
 evaluated meaningfully before it lands.
 
 ## Out of Scope
 
 Intraday bars; fundamentals; multi-region replication. Streaming/chunked
-evaluation (T-1016-4, deferred) and DuckDB-over-R2 — both are the documented
+evaluation (T-0013-4, deferred) and DuckDB-over-R2 — both are the documented
 upgrade path, not this epic's scope. See
 `docs/design/market-data-storage/technical.md`.

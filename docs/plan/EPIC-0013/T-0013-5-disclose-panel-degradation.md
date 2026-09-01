@@ -1,9 +1,9 @@
-# T-1016-5: Disclose panel staleness and partial coverage
+# T-0013-5: Disclose panel staleness and partial coverage
 
-**Epic**: EPIC-1016 (Market Data Storage)
+**Epic**: EPIC-0013 (Market Data Storage)
 **Status**: Complete
-**Depends on**: T-1016-3
-**Blocks**: T-1016-6
+**Depends on**: T-0013-3
+**Blocks**: T-0013-6
 **Issue**: #13
 **Design**: docs/design/market-data-storage/
 
@@ -72,7 +72,7 @@ stopped.
 which reads the panel a row group at a time and skips the ones that fail,
 naming each skipped group by its ticker range. The range lives in the footer,
 so it survives corruption of the pages it describes. This is the *degraded*
-path only: `load_panel` runs T-1016-1's preallocated reader first and falls
+path only: `load_panel` runs T-0013-1's preallocated reader first and falls
 back only when that raises, because the resilient read concatenates and so
 costs a second copy of the panel. Schema drift is deliberately **not**
 salvaged — a drifted producer is a bug, and serving part of its output would

@@ -8,7 +8,7 @@ still boot rather than fail closed on a missing object.
 Damage is handled the same way: a panel with an unreadable row group is
 loaded without it and says which tickers are missing, rather than refusing to
 serve the ones that are fine. Only a panel with nothing readable in it is a
-failure (T-1016-5).
+failure (T-0013-5).
 """
 
 from __future__ import annotations

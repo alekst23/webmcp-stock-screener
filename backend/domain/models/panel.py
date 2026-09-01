@@ -10,7 +10,7 @@ class PanelStatus(BaseModel):
     current than the data behind them: `as_of` is the newest bar in the
     panel, not the time of the request.
 
-    The degradation fields (T-1016-5) carry the rest of the truth: whether the
+    The degradation fields (T-0013-5) carry the rest of the truth: whether the
     panel is synthetic, whether it has fallen behind, and which part of the
     universe could not be read. Serve and disclose -- a partial answer with
     its limits attached beats no answer, and beats a partial answer presented
@@ -32,7 +32,7 @@ class PanelStatus(BaseModel):
     missing: list[str] = Field(default_factory=list)
 
     # Computed per request rather than at load, so a panel that catches up
-    # stops being reported as stale without a restart (T-1016-5 AC5).
+    # stops being reported as stale without a restart (T-0013-5 AC5).
     is_stale: bool = False
     sessions_behind: int = 0
     notices: list[str] = Field(default_factory=list)

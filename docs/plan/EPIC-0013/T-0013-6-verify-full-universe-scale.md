@@ -1,8 +1,8 @@
-# T-1016-6: Verify at target universe scale on 512 MB
+# T-0013-6: Verify at target universe scale on 512 MB
 
-**Epic**: EPIC-1016 (Market Data Storage)
+**Epic**: EPIC-0013 (Market Data Storage)
 **Status**: Blocked — needs a real (paid) backfill and a deployed instance
-**Depends on**: T-1016-3, T-1016-5
+**Depends on**: T-0013-3, T-0013-5
 **Blocks**: —
 **Issue**: #13
 **Design**: docs/design/market-data-storage/
@@ -108,7 +108,7 @@ during residency. Two honest options for whoever picks this up:
    Cheap, measured, and consistent with the liquidity-floor rationale (the
    names that fall out are the least liquid, which distort base rates
    anyway).
-2. **Take rung 2 early** — DuckDB over the partitioned Parquet T-1016-3 now
+2. **Take rung 2 early** — DuckDB over the partitioned Parquet T-0013-3 now
    writes — which is what removes the evaluator's whole-panel float64
    intermediates rather than shrinking their input.
 

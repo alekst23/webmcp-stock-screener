@@ -1,9 +1,9 @@
-# T-1016-3: Ticker-partitioned Parquet with pruning and projection
+# T-0013-3: Ticker-partitioned Parquet with pruning and projection
 
-**Epic**: EPIC-1016 (Market Data Storage)
+**Epic**: EPIC-0013 (Market Data Storage)
 **Status**: Complete
-**Depends on**: T-1016-1
-**Blocks**: T-1016-4, T-1016-5
+**Depends on**: T-0013-1
+**Blocks**: T-0013-4, T-0013-5
 **Issue**: #13
 **Design**: docs/design/market-data-storage/
 
@@ -36,7 +36,7 @@ so that excluding most of the universe actually costs less.
 
 ## Out of Scope
 
-Streaming evaluation over the partitions (T-1016-4).
+Streaming evaluation over the partitions (T-0013-4).
 
 ## Implementation Plan
 
@@ -57,7 +57,7 @@ backfill writer, the nightly append, and tests alike -- a panel that is
 written differently prunes differently, and that would be an invisible
 regression.
 
-The engine is untouched (AC4). This is a capability the loader and T-1016-5's
+The engine is untouched (AC4). This is a capability the loader and T-0013-5's
 partial-coverage disclosure build on, not a change to how the panel is read
 today.
 

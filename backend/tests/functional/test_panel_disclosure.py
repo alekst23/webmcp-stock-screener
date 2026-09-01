@@ -1,4 +1,4 @@
-"""T-1016-5: serve what is there, and say what is wrong with it.
+"""T-0013-5: serve what is there, and say what is wrong with it.
 
 Every degradation below is reachable without object storage, which is the
 point of AC6: a failure mode that can only be produced in production is one

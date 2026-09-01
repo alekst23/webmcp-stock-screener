@@ -7,7 +7,7 @@ tools, or frontend. Every read and write of that format goes through here.
 
 The bulk path deliberately does not go through `PriceBar`. Validating every
 row with Pydantic to produce a frame that is 26 bytes/row costs ~1,560
-bytes/row at the margin while it runs (measured; see T-1016-1) -- tens of
+bytes/row at the margin while it runs (measured; see T-0013-1) -- tens of
 gigabytes on the real universe, which is why the backend could not boot on
 real data at any instance size. The bulk path here costs ~63 bytes/row at
 the margin, and the panel is the same frame either way. The schema gate is
@@ -54,7 +54,7 @@ _READ_BATCH_ROWS = 64_000
 # tickers' worth of ten-year daily history: a single-ticker read decodes
 # roughly ten tickers rather than the whole file, while the file itself is
 # within half a percent of any choice between 10k and 100k rows (measured;
-# see T-1016-3). Fixed rather than tuned per panel, so the same content
+# see T-0013-3). Fixed rather than tuned per panel, so the same content
 # always serializes to the same bytes.
 PANEL_ROW_GROUP_ROWS = 25_000
 

@@ -1,4 +1,4 @@
-"""T-1016-1: the bulk panel path is Parquet <-> compact frame, gated by column.
+"""T-0013-1: the bulk panel path is Parquet <-> compact frame, gated by column.
 
 The old path validated every row with Pydantic on the way in, which is what
 made the schema gate and the memory peak the same thing. Splitting them means

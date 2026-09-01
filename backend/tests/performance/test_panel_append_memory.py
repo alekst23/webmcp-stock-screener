@@ -1,8 +1,8 @@
-"""T-1016-2 AC1: appending a session costs a session, at any panel size.
+"""T-0013-2 AC1: appending a session costs a session, at any panel size.
 
 One floor cannot be measured away: `PanelStore.put_object` takes bytes, so a
 single-object store re-serializes the whole panel however clever the merge
-is. What T-1016-2 removes is everything *above* that floor -- the row objects
+is. What T-0013-2 removes is everything *above* that floor -- the row objects
 and the whole-panel `(ticker, date)` index, which cost ~50x the serialized
 panel and grew every night.
 

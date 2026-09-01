@@ -1,4 +1,4 @@
-"""T-1016-3: a narrower question reads less of the panel.
+"""T-0013-3: a narrower question reads less of the panel.
 
 The claim is about bytes decoded, so the tests assert on the read plan --
 which row groups and which column chunks a read will touch, taken from the

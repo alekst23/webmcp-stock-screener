@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api/research", tags=["research"])
 
 # Names the panel as the cause rather than reporting a generic outage: a
 # request that fails because there is no price data is a different problem
-# from one that fails because the service is broken (T-1016-5 AC4).
+# from one that fails because the service is broken (T-0013-5 AC4).
 _NO_PANEL = (
     "No price panel is loaded, so there is nothing to search. The panel could "
     "not be read from object storage and no local mock panel exists. From "
@@ -68,7 +68,7 @@ def panel(request: Request) -> PanelStatus:
 
     Degradation is computed here, per request, rather than stored at load:
     that is what lets a stale panel stop being reported as stale the moment
-    the nightly delta catches up, without a restart (T-1016-5 AC5).
+    the nightly delta catches up, without a restart (T-0013-5 AC5).
     """
     status = getattr(request.app.state, "panel_status", None)
     if not isinstance(status, PanelStatus):

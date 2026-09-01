@@ -70,7 +70,7 @@ The honest ladder is:
 
 Skipping rung 2 to hand-build rung 1.5 is the trap.
 
-Partitioning (T-1016-3) is on the path to rung 2, not wasted: DuckDB
+Partitioning (T-0013-3) is on the path to rung 2, not wasted: DuckDB
 reads the same partitioned Parquet and benefits from the same layout.
 
 ### float32, not scaled int32
@@ -123,7 +123,7 @@ engine's public surface and every existing test stay unchanged
 throughout; the mock panel keeps working at every step, which is what
 makes the change safe to land incrementally.
 
-Ordering is forced: the vectorized I/O and delta work (T-1016-1,
-T-1016-2) must land before partitioning, because until row objects
+Ordering is forced: the vectorized I/O and delta work (T-0013-1,
+T-0013-2) must land before partitioning, because until row objects
 leave the bulk path their transient peak dominates every other
 measurement and no amount of partitioning helps.

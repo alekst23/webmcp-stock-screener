@@ -15,7 +15,7 @@ export interface BackendPanelStatus {
 	ticker_count: number;
 	row_count: number;
 	source: string;
-	// T-1016-5. Optional because a deployed backend from before that ticket
+	// T-0013-5. Optional because a deployed backend from before that ticket
 	// answers without them, and a missing notice must read as "nothing to
 	// disclose" rather than breaking the status line entirely.
 	notices?: string[];

@@ -1,9 +1,9 @@
-# T-1016-1: Vectorized panel I/O — remove row objects from the bulk path
+# T-0013-1: Vectorized panel I/O — remove row objects from the bulk path
 
-**Epic**: EPIC-1016 (Market Data Storage)
+**Epic**: EPIC-0013 (Market Data Storage)
 **Status**: Complete
 **Depends on**: —
-**Blocks**: T-1016-2, T-1016-3
+**Blocks**: T-0013-2, T-0013-3
 **Issue**: #13
 **Design**: docs/design/market-data-storage/
 
@@ -42,7 +42,7 @@ so that the service starts within its memory budget instead of being killed.
 
 ## Out of Scope
 
-Partitioning (T-1016-3); streaming evaluation (T-1016-4).
+Partitioning (T-0013-3); streaming evaluation (T-0013-4).
 
 ## Implementation Plan
 
@@ -60,7 +60,7 @@ Partitioning (T-1016-3); streaming evaluation (T-1016-4).
    `PandasPatternResearchEngine.from_price_bars` is untouched and still
    serves every existing test.
 5. `scripts/measure_panel_memory.py` — the measurement harness, kept as a
-   runnable script so the numbers below can be reproduced (and so T-1016-6
+   runnable script so the numbers below can be reproduced (and so T-0013-6
    has an instrument).
 
 Three details each cost a full extra copy of the panel and were only found
