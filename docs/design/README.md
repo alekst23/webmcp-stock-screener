@@ -11,3 +11,6 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+- [Panel System](panel-system/spec.md) — the agent-driven panel
+  container: add, update, lay out on a logical grid, link, and remove
+  panels, plus the typed panel-kind registry other features plug into.
