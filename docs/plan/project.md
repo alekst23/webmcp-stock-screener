@@ -77,7 +77,7 @@ Dependencies only — everything within a wave runs in parallel.
 | T-0001-2 unverified | T-0001-2 | 2026-08-30 | Human + real WebMCP browser + real AI agent must complete `T-0001-2-live-verification-runbook.md`. Deprioritized. |
 | EPIC-0013 measured 688 MB peak at the epic's own target universe — 34% over the 512 MB budget | EPIC-0013 T-0013-6, T-0001-9 AC1/AC5 | 2026-09-01 | The ~13 GB load peak is gone, but a whole-universe search still widens to float64 panel-wide in `backend/infra/expression.py` (~121 B/row). Resident panel is 131 MB as predicted; the search is what overruns. Two options recorded in T-0013-6: trim the universe to ~1,000 names x 10y (measured 383 MB, fits today) or take the DuckDB-over-R2 rung early. **Needs a user decision.** Measured this session (synthetic panels, pessimistic "broad" pattern, `scripts/measure_universe_scale.py`): 2,000x10y = 5.04M rows -> 688 MB (fails); 1,500x7y = 2.65M rows -> 437 MB; 2,000x5y = 2.52M rows -> 385 MB; 1,000x10y = 2.52M rows -> 383 MB. Cost is ~linear in rows: peak ~= 83 MB fixed + ~120 B/row, so the budget is ~2.6M rows however it is sliced. **Correction (same session, absolute RSS):** those figures subtract a baseline taken *after* imports, but Render measures the whole process, and they used the trivial 2-step pattern. Measured absolutely on 2,000x5y with a realistic 3-step/4-study pattern: interpreter 14 MB -> +libs 90 MB -> +app imports 100 MB -> +whole-file Parquet read into `bytes` 217 MB -> +parse 364 MB -> before search 385 MB -> **peak during search 723 MB**, against a panel that is only 65.7 MB resident. **The 5-year cut does not fit 512 MB once studies are used.** Same panel, simple vs complex pattern: search growth 211 MB -> 348 MB (+65%). Three separable costs, data smallest: (1) `panel_io` reads the entire Parquet file into a Python `bytes` object before parsing, holding the compressed file and parsed frame live at once (~117 MB, and over R2 it forces a whole-object download); (2) a ~147 MB parse transient; (3) ~339 MB of search transients, the only one that grows with expression complexity. Chunking (T-0013-4) plus a streaming read projects to ~200 MB peak, flat in both universe size and expression complexity. Also fix `scripts/measure_universe_scale.py` to report absolute RSS -- as written, T-0013-6 would report success against a number the container never sees. |
 | The expression evaluator's peak memory grows with expression complexity, not just panel size | EPIC-1009, EPIC-1011, EPIC-0013 | 2026-09-01 | The 688 MB figure was measured on the *simplest realistic* pattern (2 steps, one rolling call each). Four properties of `backend/infra/expression.py` and `backend/infra/pandas_engine.py` make cost scale with the expression, so studies and multi-condition filters re-inflate it after any dataset cut: (1) **no memoization** -- `expression.py:197` re-parses and re-evaluates a study on every reference, so a study referenced three times is computed three times, and study-on-study composition multiplies; (2) `pandas_engine.py:123` materializes **all** steps' condition Series in one list comprehension and holds them simultaneously; (3) `expression.py:210` materializes every operand of an `and`/`or` before combining, with no incremental fold; (4) the rolling helpers use `groupby.transform` with a Python lambda, which materializes per-group results and concatenates. Consequence: trimming the universe (5y, one exchange, etc.) and narrowing to float32 both buy a constant factor and leave the growth intact. The structural fix is **per-ticker chunked evaluation** -- every function in the catalog (`sma`/`ema`/`atr`/`highest`/`lowest`/`days_since`) is already per-ticker, and the engine already groups by ticker for each rolling call, so intermediates would size to one ticker's history rather than the whole panel, making peak independent of universe size *and* of expression complexity. That is the deferred T-0013-4, whose deferral rationale ("buys only headroom, which DuckDB-over-R2 gives for free") assumed the constraint was panel size; it is not. **Revisit T-0013-4 before cutting the dataset.** |
-| `docs/design/` was not updated in the 2026-09-01 spec reconciliation | EPIC-1006, EPIC-1007, EPIC-1010, EPIC-1011 | 2026-09-01 | `docs/plan/` was reconciled thoroughly against the revised tool spec; the design docs those tickets cite as their authority were not. `docs/design/panel-system/technical.md:115` still says "Five `ToolSpec`s (`add_panel`, `update_panel`, ...)" against the ticket's fourteen; `spec.md:150` still treats visibility as `update_panel`'s job; `docs/design/workspace-revisions/` still names `get_workspace`; `docs/design/screener-core/technical.md:6` and `docs/design/discovery-and-catalog/technical.md:7,239` still name `select_result` and `edit_chart_studies`. An implementing agent reads both and gets contradictory instructions. T-1007-7 already anticipates this and instructs treating the design docs as silent, but that is a workaround, not a fix. |
+| `docs/design/screener-core/` and `docs/design/discovery-and-catalog/` were not updated in the 2026-09-01 spec reconciliation | EPIC-1009, EPIC-1008, EPIC-1011 | 2026-09-01 | `docs/design/panel-system/{spec,technical}.md` and `docs/design/workspace-revisions/{spec,technical}.md` are now fixed (same session, later pass) and match the fourteen-tool panel surface. Still stale: `docs/design/screener-core/technical.md:6` and `docs/design/discovery-and-catalog/technical.md:7,239` still name `select_result` and `edit_chart_studies`, tools retired by the reconciliation. An implementing agent reading either gets contradictory instructions. T-1007-7 anticipates this and instructs treating stale design docs as silent, but that is a workaround, not a fix. |
 | `save_workspace_template` is in the revised tool spec but owned by no epic | EPIC-1006 or EPIC-1007 | 2026-09-01 | The revision added a Persistence row, `save_workspace_template` ("Save a reusable layout and panel configuration"), that the reconciliation pass did not assign. EPIC-1007's `apply_layout_template` consumes templates that nothing in the program creates. Assign it (EPIC-1006 owns Persistence; EPIC-1007 owns layout) or drop it from the spec. |
 | Panel load path peaks ~13 GB (issue #13) | T-0001-9 AC1/AC5, EPIC-0013 | 2026-09-01 | Real blocker for real data. EODHD paid tier and R2 are NO LONGER blockers: key verified live 2026-09-01 (`dailyRateLimit` 100000, arbitrary tickers, 2,680 rows for NVDA over 10y) and R2 credentials are in the gitignored root `.env`. Land EPIC-0013's T-0013-1/T-0013-2 before attempting the backfill. |
 | EPIC-0013 (market data storage, still being triaged) rearchitects the same OHLCV panel that EPIC-1008/EPIC-1011 read from — overlaps cross-epic reconciliation #4 below (bars-port ownership) | EPIC-1008, EPIC-1011, EPIC-0013 | 2026-09-01 | Once EPIC-0013 lands a spec, reconcile its storage interface against EPIC-1008's/EPIC-1011's port assumptions before Wave 1 (EPIC-1008) implements against a port that EPIC-0013 might reshape. |
@@ -273,3 +273,59 @@ Facts established by real API calls, superseding `data-provider.md` estimates:
   over all US symbols gives 17,992, but most are OTC.
 - Measured memory costs: `list[PriceBar]` 1,081 B/row; `(ticker,date)` index
   dict 118 B/row; compact `PanelFrame` 25.1 B/row.
+
+## Last Run (2026-09-01, session closed via /at-project-sleep)
+
+- **Trigger:** User asked to revise `docs/reference/tool-spec.md`'s panel
+  tool table (user-supplied content: source/renderer separation, 14 panel
+  tools) and update the planned epics if necessary, then closed with
+  "lets save this plan for next session."
+- **Shipped:** Nothing to production — docs-only. Revised
+  `docs/reference/tool-spec.md`'s panel section and added its "Panels:
+  source and renderer are separate" section; reconciled
+  EPIC-1006/1007/1008/1010/1011/1012/1014 against it (EPIC-1007 gained
+  ticket T-1007-7 and grew from 5 to 14 tools; EPIC-1010/1011 shrank to
+  renderer-contract contributors); brought
+  `docs/design/panel-system/{spec,technical}.md` and
+  `docs/design/workspace-revisions/{spec,technical}.md` in line with the
+  same model. All of this is now on `main` (commits `cdc349e`, `83ed25d`).
+  Note: this session never ran `git commit` itself — a different,
+  concurrently-running session appears to have sweep-committed this
+  session's pending working-tree edits alongside its own unrelated work
+  (`83ed25d` bundles this session's design-doc fix together with an
+  unrelated epic-renumbering commit). Confirmed via `git log` that no
+  content was lost, but flagging the pattern — see
+  `feedback_concurrent_sessions_this_repo.md`.
+- **Scaffolded, not launched:** No change from this session — still zero
+  implementation code across the whole EPIC-1006-1015 program, aside from
+  EPIC-1008 and EPIC-0013's unmerged branches, which are the concurrent
+  session's work, not this one's.
+- **Filed:** Nothing.
+- **Deferred / needs your decision:**
+  1. EPIC-1007 Open Question #6 — the tool-spec's `"kind": "collection"`
+     example matches none of the 8 registered panel kinds; assumed `chart`
+     + `renderer: chart_grid` instead of a new kind.
+  2. EPIC-1007 Open Question #7 — where panel title/visibility/collapsed
+     state live now that `update_panel` is gone; provisionally folded into
+     `configure_panel_view`.
+  3. `save_workspace_template` (new in the revised spec) has no owning
+     epic — assign to EPIC-1006 (owns Persistence) or EPIC-1007 (owns
+     layout), or drop it.
+  4. `docs/design/screener-core/` and `docs/design/discovery-and-catalog/`
+     still reference retired tools (`select_result`, `edit_chart_studies`)
+     — same fix panel-system/workspace-revisions already got, not yet
+     applied to these two.
+- **In-flight at close:** Nothing running from this session. Confirmed via
+  `gh pr list` that no PRs are open. The concurrent session's own threads
+  (epic renumbering into the EPIC-0XXX/1XXX band split, EPIC-1008 and
+  EPIC-0013 implementation, EPIC-0015 filing) are visible in git history
+  but not this session's to manage.
+- **Next session should:** Get the user's call on the two EPIC-1007 open
+  questions and `save_workspace_template`'s ownership, finish the
+  screener-core/discovery-and-catalog design-doc fix, then — per the
+  existing wave order — launch EPIC-1006 first (still the one true
+  zero-dependency foundation with no code yet), followed by EPIC-1007
+  through T-1007-7, before EPIC-1010/1011's renderer contracts can wire
+  in. EPIC-1008 and EPIC-0013 already have unmerged, implemented branches
+  awaiting `/at-epic-close` — check those first since they may be quicker
+  wins than starting EPIC-1006 cold.
