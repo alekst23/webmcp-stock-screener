@@ -1,5 +1,6 @@
 # EPIC-1008: Discovery & Catalog
 
+**Status**: Done (7/8 tickets; T-1008-8 is a non-blocking follow-up filed at epic review)
 **Depends on**: —
 **Blocks**: EPIC-1009 (filter tree validates against the catalog registry),
 EPIC-1011 (chart studies resolve through the catalog registry)
@@ -47,6 +48,7 @@ available yet".
 | 5 | T-1008-5 | `search_catalog` tool | T-1008-2 | Done |
 | 6 | T-1008-6 | `describe_catalog_item` tool | T-1008-2 | Done |
 | 7 | T-1008-7 | Register the discovery tool group on the new surface | T-1008-4, T-1008-5, T-1008-6 | Done |
+| 8 | T-1008-8 | Make instrument-search unavailability detection structural, not string-matched | T-1008-3, T-1008-4 | Open |
 
 ## Dependency Graph
 
