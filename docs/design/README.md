@@ -11,3 +11,6 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+- [Similarity Search](similarity-search/spec.md) — from a captured chart
+  setup, find resembling symbols and historical windows, explain every
+  match feature by feature, and compare candidates visually.
