@@ -94,4 +94,11 @@ describe('clearActivity', () => {
 		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
 		expect(events[0]!.toolName).toBe('defineStudy');
 	});
+
+	it('is a no-op when the log is already empty', () => {
+		const activity = createActivityStore(memoryStorage());
+
+		expect(() => clearActivity(activity)).not.toThrow();
+		expect(get(activity)).toEqual([]);
+	});
 });
