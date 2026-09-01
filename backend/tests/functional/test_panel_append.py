@@ -21,9 +21,9 @@ from application.append_daily_delta import (
     append_sessions,
     catch_up_sessions,
     latest_completed_trading_day,
-    missing_sessions,
 )
 from domain.models.price import PriceBar
+from domain.trading_calendar import sessions_between
 from infra.panel_append import merge_panel_parquet
 from infra.panel_frame import PanelFrame
 from infra.panel_io import EPOCH_ORDINAL, PANEL_COLUMNS, parquet_bytes_to_panel
@@ -194,12 +194,12 @@ class TestCatchUp:
         assert status.as_of == date(2024, 1, 5), f"got {status.as_of}"
         assert status.row_count == 4 + 3, f"expected each missed session applied: {status}"
 
-    def test_missing_sessions_lists_weekdays_after_the_panel_as_of(self) -> None:
+    def test_sessions_between_lists_weekdays_after_the_panel_as_of(self) -> None:
         # Friday 2026-08-28 through Wednesday 2026-09-02.
-        assert missing_sessions(date(2026, 8, 28), date(2026, 9, 2)) == [
+        assert sessions_between(date(2026, 8, 28), date(2026, 9, 2)) == [
             date(2026, 8, 31),
             date(2026, 9, 1),
             date(2026, 9, 2),
         ]
-        assert missing_sessions(date(2026, 9, 1), date(2026, 9, 1)) == []
+        assert sessions_between(date(2026, 9, 1), date(2026, 9, 1)) == []
         assert latest_completed_trading_day(date(2026, 8, 31)) == date(2026, 8, 28)

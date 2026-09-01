@@ -15,6 +15,11 @@ export interface BackendPanelStatus {
 	ticker_count: number;
 	row_count: number;
 	source: string;
+	// T-1016-5. Optional because a deployed backend from before that ticket
+	// answers without them, and a missing notice must read as "nothing to
+	// disclose" rather than breaking the status line entirely.
+	notices?: string[];
+	is_stale?: boolean;
 }
 
 export interface PanelStatus {
@@ -23,6 +28,8 @@ export interface PanelStatus {
 	tickerCount: number;
 	rowCount: number;
 	source: string;
+	notices?: string[];
+	isStale?: boolean;
 }
 
 export async function fetchPanelStatus(config: ApiClientConfig): Promise<PanelStatus> {
@@ -36,7 +43,9 @@ export async function fetchPanelStatus(config: ApiClientConfig): Promise<PanelSt
 		firstDate: body.first_date,
 		tickerCount: body.ticker_count,
 		rowCount: body.row_count,
-		source: body.source
+		source: body.source,
+		notices: body.notices,
+		isStale: body.is_stale
 	};
 }
 
@@ -45,9 +54,15 @@ export async function fetchPanelStatus(config: ApiClientConfig): Promise<PanelSt
 export function formatPanelStatus(status: PanelStatus): string {
 	const universe = `${status.tickerCount.toLocaleString()} tickers`;
 	const span = `${status.firstDate} to ${status.asOf}`;
-	return status.source === 'mock'
-		? `Synthetic demo data — ${universe}, ${span}. Not real market data.`
-		: `Price data as of ${status.asOf} — ${universe}, ${span}.`;
+	const base =
+		status.source === 'mock'
+			? `Synthetic demo data — ${universe}, ${span}. Not real market data.`
+			: `Price data as of ${status.asOf} — ${universe}, ${span}.`;
+	// The backend's own synthetic notice is dropped: this line already says
+	// it, in the words this surface has always used, and saying it twice
+	// reads as a bug rather than as emphasis.
+	const disclosures = (status.notices ?? []).filter((notice) => !notice.startsWith('Synthetic'));
+	return disclosures.length ? `${base} ${disclosures.join(' ')}` : base;
 }
 
 export function isMockPanel(status: PanelStatus): boolean {

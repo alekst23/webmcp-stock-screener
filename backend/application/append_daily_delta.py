@@ -14,6 +14,7 @@ from domain.contracts.price_source import PriceSource
 from domain.errors import PanelStoreError
 from domain.models.panel import PanelStatus
 from domain.models.price import PriceBar
+from domain.trading_calendar import previous_weekday, sessions_between
 from infra.panel_append import merge_panel_parquet
 from infra.panel_io import panel_status_from_parquet
 
@@ -67,7 +68,7 @@ def catch_up_sessions(
     did not run for a week needs no record of which nights it missed."""
     existing = _stored_panel(store, key)
     as_of = panel_status_from_parquet(existing, source=_SOURCE).as_of
-    return _apply(source, store, exchange, missing_sessions(as_of, through), existing, key)
+    return _apply(source, store, exchange, sessions_between(as_of, through), existing, key)
 
 
 def _stored_panel(store: PanelStore, key: str) -> bytes:
@@ -96,30 +97,10 @@ def _apply(
     return status
 
 
-def missing_sessions(as_of: date, through: date) -> list[date]:
-    """Every weekday strictly after `as_of` and not after `through`.
-
-    Market holidays are not modelled: the provider returns no rows for one,
-    and an empty session is already a no-op. Building a holiday calendar here
-    would add a second source of truth for something the response answers.
-    """
-    days: list[date] = []
-    day = as_of
-    while day < through:
-        day = date.fromordinal(day.toordinal() + 1)
-        if day.weekday() < 5:
-            days.append(day)
-    return days
-
-
 def latest_completed_trading_day(today: date) -> date:
     """The most recent weekday strictly before `today`.
 
     The nightly job runs after the US close but is scheduled in UTC, so
     "yesterday" is the day whose bars are actually published.
     """
-    day = today
-    while True:
-        day = date.fromordinal(day.toordinal() - 1)
-        if day.weekday() < 5:
-            return day
+    return previous_weekday(today)

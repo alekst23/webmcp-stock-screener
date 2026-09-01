@@ -92,6 +92,47 @@ def parquet_bytes_to_subset(
     return _frame(parts, output, catalog)
 
 
+@dataclass(frozen=True)
+class ResilientRead:
+    """A panel read that survived what it could, and says what it lost."""
+
+    frame: pd.DataFrame
+    missing: list[str]
+
+
+def read_panel_resilient(data: bytes) -> ResilientRead:
+    """Read the panel row group by row group, skipping the ones that fail.
+
+    The degraded path, not the normal one: `panel_io.parquet_bytes_to_panel`
+    fills preallocated columns and is what runs when the file is intact. This
+    one concatenates, which costs a second copy at the end -- worth paying
+    only when the alternative is serving nothing at all.
+
+    A skipped group is named by its ticker range, which lives in the footer
+    and so survives corruption of the data pages it describes.
+    """
+    reader = pq.ParquetFile(pa.BufferReader(pa.py_buffer(data)))
+    validate_wire_schema(reader.schema_arrow)
+    parts: list[dict[str, np.ndarray]] = []
+    missing: list[str] = []
+    catalog: dict[str, int] = {}
+    for group in range(reader.metadata.num_row_groups):
+        try:
+            table = reader.read_row_group(group, columns=PANEL_COLUMNS)
+        except (pa.ArrowException, OSError, ValueError):
+            missing.append(_group_range(reader.metadata.row_group(group)))
+            continue
+        parts.append(_compact_group(table, None, PANEL_COLUMNS, catalog))
+    return ResilientRead(_frame(parts, list(PANEL_COLUMNS), catalog), missing)
+
+
+def _group_range(group: pq.RowGroupMetaData) -> str:
+    statistics = group.column(PANEL_COLUMNS.index("ticker")).statistics
+    if statistics is None or statistics.min is None or statistics.max is None:
+        return "unknown tickers"
+    return f"{statistics.min}..{statistics.max}"
+
+
 def _plan(
     reader: pq.ParquetFile, tickers: list[str] | None, columns: list[str] | None
 ) -> PanelReadPlan:
