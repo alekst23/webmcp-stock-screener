@@ -44,3 +44,12 @@ output "app_role_arn" {
   description = "App Runner instance role / ECS task role -- the panel bucket identity."
   value       = module.iam.app_role_arn
 }
+
+output "eodhd_api_key_parameter_name" {
+  description = "T-0016-5: SSM parameter name for T-0016-6/T-0016-8 to reference in the task's secrets, not its value."
+  value       = module.secrets.eodhd_api_key_parameter_name
+}
+
+output "eodhd_api_key_parameter_arn" {
+  value = module.secrets.eodhd_api_key_parameter_arn
+}

@@ -58,3 +58,11 @@ module "iam" {
   panel_bucket_arn        = module.panel_bucket.bucket_arn
   tags                    = local.common_tags
 }
+
+module "secrets" {
+  source = "./modules/secrets"
+
+  environment   = var.environment
+  app_role_name = module.iam.app_role_name
+  tags          = local.common_tags
+}
