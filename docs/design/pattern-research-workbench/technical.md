@@ -190,7 +190,9 @@ being the sole append-only mutator (see the amended Non-Goal in
 
 `ActivityFeed.svelte` gains an `onclear?: () => void` callback prop,
 mirroring the `ChartToolbar`/`SnapshotPicker` convention, wired in
-`+page.svelte` as `onclear={() => clearActivity(activityStore)}`.
+`+page.svelte` as `onclear={() => clearActivity(activityStore)}`. The
+Clear-log button's click handler guards the call with a plain global
+`confirm()`, mirroring `SnapshotPicker.svelte`'s `load()` guard.
 
 ### Page layout — activity log position and snapshot picker density (hotfix/workbench-ui-refactor)
 

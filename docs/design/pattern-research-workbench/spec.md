@@ -192,4 +192,4 @@ None outstanding.
 
 ---
 
-_Implemented by: EPIC-1001, EPIC-1002, EPIC-1003, EPIC-1004, hotfix/webmcp-tools-always-visible_
+_Implemented by: EPIC-1001, EPIC-1002, EPIC-1003, EPIC-1004, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor_
