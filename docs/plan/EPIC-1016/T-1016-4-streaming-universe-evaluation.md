@@ -1,11 +1,27 @@
 # T-1016-4: Streaming universe evaluation — bounded peak residency
 
 **Epic**: EPIC-1016 (Market Data Storage)
-**Status**: Open
+**Status**: Deferred — not in EPIC-1016's scope
 **Depends on**: T-1016-2, T-1016-3
-**Blocks**: T-1016-6
+**Blocks**: —
 **Issue**: #13
 **Design**: docs/design/market-data-storage/
+
+## Why this is deferred
+
+Cut from EPIC-1016's scope on 2026-09-01. This epic targets a POC:
+a trimmed liquid universe that stays fully resident, on the explicit
+understanding that a production version needs a real store.
+
+Given that, a hand-rolled chunked scanner is a query engine built to be
+discarded exactly when it starts mattering. It buys no latency
+(`findInstances` scans the whole universe by design), only headroom —
+and headroom is what DuckDB-over-R2 gives for free, reading the same
+partitioned Parquet T-1016-3 produces.
+
+Kept as a file rather than deleted because the analysis stays valid if
+the ladder is ever climbed in a different order. Do not implement this
+without first rejecting DuckDB for a stated reason.
 
 ## Description
 

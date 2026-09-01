@@ -24,19 +24,28 @@ T-1001-9 already fixed steady-state residency (141 -> 25.1 bytes/row) but
 left the I/O boundary in front of it row-object-based, so peak load was
 never addressed.
 
-Fixing only that would leave a second problem: 25.1 bytes/row is still
-linear in universe x history, and panel size is a product input. This epic
-therefore takes storage to where memory is bounded by the *query* rather
-than the dataset — the full US listed universe (~6,268 tickers, 10+ years,
-~12M rows) served from a 512 MB free-tier instance, with room to grow.
+Fixing only that leaves a second problem worth naming: cost that grows
+*faster* than the data. This epic removes that class of fault — no per-row
+objects, no index larger than what it indexes, no whole-panel work to append
+one day — and partitions the panel so a filtered universe actually costs
+less.
+
+It stops deliberately short of decoupling memory from dataset size. This is
+a POC: the panel stays fully resident over a trimmed liquid universe, on the
+explicit understanding that production needs a real store. A hand-rolled
+chunked scanner would be a query engine built to be discarded exactly when
+it starts mattering; DuckDB-over-R2 is the designated next rung, reading the
+same partitioned Parquet this epic produces.
 
 The engine's public surface, `PriceBar`, and every existing test stay
 unchanged throughout. Each ticket is independently shippable.
 
 ## Target
 
-~6,268 tickers x 10+ years (~12M ticker-days) on 512 MB. Memory bounded by
-query working set, not panel size.
+A trimmed liquid universe — on the order of 2,000 US listed common stocks
+across 10+ years (~5M ticker-days, ~130 MB resident) — on 512 MB with real
+headroom. Sized deliberately, not by accident. The liquidity floor also
+improves the research: microcaps distort pattern base rates.
 
 ## Tickets
 
@@ -45,15 +54,20 @@ query working set, not panel size.
 | T-1016-1 | Vectorized panel I/O — remove row objects from the bulk path | — |
 | T-1016-2 | Delta-proportional, idempotent panel append | T-1016-1 |
 | T-1016-3 | Ticker-partitioned Parquet with pruning and projection | T-1016-1 |
-| T-1016-4 | Streaming universe evaluation — bounded peak residency | T-1016-2, T-1016-3 |
 | T-1016-5 | Disclose panel staleness and partial coverage | T-1016-3 |
-| T-1016-6 | Verify at full universe scale on 512 MB | T-1016-4, T-1016-5 |
+| T-1016-6 | Verify at target universe scale on 512 MB | T-1016-3, T-1016-5 |
+
+T-1016-4 (streaming universe evaluation) is **deferred, not scheduled** —
+see its ticket file for why, and `technical.md` for the upgrade ladder it
+sits outside of.
 
 Ordering is forced: until row objects leave the bulk path (T-1016-1) their
-transient peak dominates every measurement, so partitioning and streaming
-cannot be evaluated meaningfully before it lands.
+transient peak dominates every measurement, so partitioning cannot be
+evaluated meaningfully before it lands.
 
 ## Out of Scope
 
-Intraday bars; fundamentals; DuckDB-over-R2 (considered and deferred — see
-`docs/design/market-data-storage/technical.md`); multi-region replication.
+Intraday bars; fundamentals; multi-region replication. Streaming/chunked
+evaluation (T-1016-4, deferred) and DuckDB-over-R2 — both are the documented
+upgrade path, not this epic's scope. See
+`docs/design/market-data-storage/technical.md`.

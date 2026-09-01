@@ -44,18 +44,34 @@ row-group size tuned to the read pattern. A hand-rolled ticker index
 would duplicate what the format already maintains and would have to be
 kept consistent with it. Use the format.
 
-### Sharding bounds memory; it does not buy speed
+### Partitioning earns its place; hand-rolled streaming does not
 
-`find_instances` scans the whole universe by design — that is the
-product, not an inefficiency. Ticker-partitioned storage lets the
-engine stream partition-by-partition so peak residency is one
-partition rather than the panel. Latency is unchanged or slightly
-worse (more reads); the win is that memory stops tracking dataset size.
+Ticker-partitioned storage pays for itself immediately: a filtered
+universe reads fewer partitions and fewer columns, using the format's
+own machinery, with no bespoke infrastructure to maintain.
 
-This is cheap to build because `pandas_engine.py` already iterates
-`panel.groupby("ticker")` per ticker: the per-ticker evaluation is
-already isolated, so streaming is a loop restructure rather than a
-rewrite of the matcher.
+Chunked streaming evaluation is a different proposition and is
+deliberately *not* built. It would decouple residency from dataset size
+— but `find_instances` scans the whole universe by design, so it buys
+no latency, only headroom. And the headroom it buys is exactly what a
+database gives you for free.
+
+The reasoning that settles it: this POC accepts that a production
+version needs a real store. Given that, a hand-rolled chunked reader is
+a query engine built to be discarded at the moment it starts mattering.
+The honest ladder is:
+
+1. **Now (POC):** fully resident, trimmed liquid universe (~2,000
+   tickers x 10+ years, ~130 MB), with no cost growing faster than the
+   data.
+2. **When it stops fitting:** DuckDB over the same R2 Parquet —
+   out-of-core execution and predicate pushdown, no custom scanner.
+3. **Prod:** a real time-series store.
+
+Skipping rung 2 to hand-build rung 1.5 is the trap.
+
+Partitioning (T-1016-3) is on the path to rung 2, not wasted: DuckDB
+reads the same partitioned Parquet and benefits from the same layout.
 
 ### float32, not scaled int32
 
@@ -66,13 +82,17 @@ bytes, spans the range, and holds ~7 significant digits — worst case
 ~0.06 on a $700k print, ~2e-10 on a sub-cent stock. Far finer than any
 return this engine measures.
 
-### Deferred: DuckDB over R2
+### The upgrade path: DuckDB over R2
 
-Out-of-core execution and predicate pushdown, without hand-rolled
-chunking — the cleaner end state. Deferred because it requires porting
-`infra/expression.py`'s `ExpressionEvaluator` to SQL, replacing a
-working, well-tested component. Revisit once streaming is in place and
-measured; adopt only if residency or latency is still unsatisfying.
+The designated rung 2, to be taken when the trimmed universe stops
+fitting — not before. It requires porting `infra/expression.py`'s
+`ExpressionEvaluator` to SQL, which is why it is not a POC task: it
+replaces a working, well-tested component to buy headroom this POC
+does not yet need.
+
+The trigger is explicit: when resident memory at the target universe
+exceeds the instance budget's headroom, adopt DuckDB rather than
+trimming further or hand-rolling a scanner.
 
 ## Contracts
 
@@ -104,6 +124,6 @@ throughout; the mock panel keeps working at every step, which is what
 makes the change safe to land incrementally.
 
 Ordering is forced: the vectorized I/O and delta work (T-1016-1,
-T-1016-2) must land before partitioning and streaming, because until
-row objects leave the bulk path their transient peak dominates every
-other measurement and no amount of partitioning helps.
+T-1016-2) must land before partitioning, because until row objects
+leave the bulk path their transient peak dominates every other
+measurement and no amount of partitioning helps.
