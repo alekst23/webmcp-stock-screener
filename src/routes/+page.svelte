@@ -31,10 +31,8 @@
 	let webmcpStatus = $state<WebmcpStatus | null>(null);
 
 	onMount(() => {
-		const toolCount = buildTools(engine).length;
-		void connectWebmcp(engine, activityStore).then((connection) => {
-			webmcpStatus = { connected: connection !== null, toolCount };
-		});
+		webmcpStatus = { toolCount: buildTools(engine).length };
+		void connectWebmcp(engine, activityStore);
 	});
 </script>
 

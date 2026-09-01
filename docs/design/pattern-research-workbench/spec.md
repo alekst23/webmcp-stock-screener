@@ -71,82 +71,81 @@ at every step.
 
 ### Study definition
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Happy path | a valid expression over supported price/volume functions | a study is defined with a name and that expression | the study is added to the workspace and becomes referenceable by name in patterns, metrics, and overlays |
-| Invalid expression | an expression using an unsupported function or malformed syntax | a study is defined with it | the definition is rejected with a response listing every currently supported function, so the caller can correct it in one attempt |
+| Scenario           | Given                                                           | When                                               | Then                                                                                                                               |
+| ------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Happy path         | a valid expression over supported price/volume functions        | a study is defined with a name and that expression | the study is added to the workspace and becomes referenceable by name in patterns, metrics, and overlays                           |
+| Invalid expression | an expression using an unsupported function or malformed syntax | a study is defined with it                         | the definition is rejected with a response listing every currently supported function, so the caller can correct it in one attempt |
 
 ### Temporal setup definition
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Happy path | 2+ condition steps, later steps constrained by a trading-day window after the prior step | a setup is defined | the setup is added to the workspace and becomes searchable via instance search |
-| Sustained condition | a step marked to hold continuously across its window | the setup is searched | a candidate only matches that step if the condition holds on every day of the window, not just one day within it |
+| Scenario            | Given                                                                                    | When                  | Then                                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Happy path          | 2+ condition steps, later steps constrained by a trading-day window after the prior step | a setup is defined    | the setup is added to the workspace and becomes searchable via instance search                                   |
+| Sustained condition | a step marked to hold continuously across its window                                     | the setup is searched | a candidate only matches that step if the condition holds on every day of the window, not just one day within it |
 
 ### Instance search
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Happy path | a defined setup and an optional date range/universe filter | instances are searched for | every ticker/date where the full sequence completed is returned, with a total count and the date range covered |
-| Sparse completed matches | fewer than 5 completed matches are found | the same search runs | in-progress matches (patterns that have satisfied their earlier steps but whose final step hasn't yet resolved, because the dataset's most recent day doesn't yet cover that step's window) are also included, each carrying a completion score (fraction of steps satisfied), and the result reports completed and partial counts separately |
-| Repeated occurrences | a ticker independently satisfies the full pattern more than once within the search window | instances are searched for | each occurrence counts as a separate instance — occurrences are not merged or deduplicated across independent completions |
-| Redundant completion of one occurrence | a single pattern start could technically be resolved by more than one valid completion within the allowed windows | instances are searched for | only the earliest valid completion for that start is counted — this is not treated as two separate instances |
+| Scenario                               | Given                                                                                                             | When                       | Then                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Happy path                             | a defined setup and an optional date range/universe filter                                                        | instances are searched for | every ticker/date where the full sequence completed is returned, with a total count and the date range covered                                                                                                                                                                                                                                |
+| Sparse completed matches               | fewer than 5 completed matches are found                                                                          | the same search runs       | in-progress matches (patterns that have satisfied their earlier steps but whose final step hasn't yet resolved, because the dataset's most recent day doesn't yet cover that step's window) are also included, each carrying a completion score (fraction of steps satisfied), and the result reports completed and partial counts separately |
+| Repeated occurrences                   | a ticker independently satisfies the full pattern more than once within the search window                         | instances are searched for | each occurrence counts as a separate instance — occurrences are not merged or deduplicated across independent completions                                                                                                                                                                                                                     |
+| Redundant completion of one occurrence | a single pattern start could technically be resolved by more than one valid completion within the allowed windows | instances are searched for | only the earliest valid completion for that start is counted — this is not treated as two separate instances                                                                                                                                                                                                                                  |
 
 ### Instance sampling
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
+| Scenario   | Given                                           | When                  | Then                                                                                         |
+| ---------- | ----------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------- |
 | Happy path | an existing result set and a selection strategy | a sample is requested | the requested number of concrete ticker/date instances are returned, chosen by that strategy |
 
 ### Outcome measurement
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Happy path | an existing result set and a measurement horizon | a metric is measured | summary statistics (count, central tendency, hit rate) are returned for the set, compared against the same statistic computed over the broader universe |
+| Scenario                  | Given                                                                      | When                       | Then                                                                                                                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Happy path                | an existing result set and a measurement horizon                           | a metric is measured       | summary statistics (count, central tendency, hit rate) are returned for the set, compared against the same statistic computed over the broader universe                                |
 | Partial instances present | a result set containing both completed and partial (in-progress) instances | a metric is measured on it | only completed instances are included in the statistic; the result states how many partial instances were excluded, since a forward return doesn't exist yet for an unresolved pattern |
 
 ### Instance splitting
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
+| Scenario   | Given                  | When                                            | Then                                                                                                                                      |
+| ---------- | ---------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Happy path | an existing result set | a split by outcome or by condition is requested | the set is divided into labeled child sets (e.g. winners/losers), each independently usable by every other tool that accepts a result set |
 
 ### Grid visualization
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Happy path | an existing result set | a grid is requested | a panel is created showing a sample of instances as small charts aligned at each instance's anchor date, optionally normalized and overlaid with studies |
-| Includes partial instances | a result set containing partial (in-progress) instances | a grid is requested including them | each partial instance's chart shows the price action that has occurred so far, without implying an outcome that hasn't happened yet |
-| Panel-scoped histogram | an open grid panel tied to an instance set | the panel's histogram action is used | a histogram of that same instance set's outcome distribution is shown, visibly associated with that panel — not a separate, disconnected control |
-| Individual panel removal | one or more open panels | a single panel is closed | only that panel is removed from the workspace; other open panels are unaffected |
+| Scenario                   | Given                                                   | When                                 | Then                                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Happy path                 | an existing result set                                  | a grid is requested                  | a panel is created showing a sample of instances as small charts aligned at each instance's anchor date, optionally normalized and overlaid with studies |
+| Includes partial instances | a result set containing partial (in-progress) instances | a grid is requested including them   | each partial instance's chart shows the price action that has occurred so far, without implying an outcome that hasn't happened yet                      |
+| Panel-scoped histogram     | an open grid panel tied to an instance set              | the panel's histogram action is used | a histogram of that same instance set's outcome distribution is shown, visibly associated with that panel — not a separate, disconnected control         |
+| Individual panel removal   | one or more open panels                                 | a single panel is closed             | only that panel is removed from the workspace; other open panels are unaffected                                                                          |
 
 ### Instance focus
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Happy path | an open panel | a specific instance is focused | the panel zooms to show that instance in detail |
+| Scenario                        | Given                                    | When                                   | Then                                                                                     |
+| ------------------------------- | ---------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Happy path                      | an open panel                            | a specific instance is focused         | the panel zooms to show that instance in detail                                          |
 | Does not affect human selection | a human has instances selected in the UI | the agent focuses a different instance | the human's selection is unchanged — focus and selection are independent pieces of state |
 
 ### Shared workspace & collaboration
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Happy path | any combination of defined studies/patterns/results/panels and current selection/focus | the workspace is read | the full current state is returned, including what the human has selected by hand, so the agent can act on references like "these ones" |
-| Persistence | a session with existing workspace state | the page is reloaded in the same browser | the workspace state is restored as it was |
-| Cross-actor visibility | the human changes something directly in the UI (e.g. selects an instance) | the agent subsequently reads the workspace | the agent sees the human's change |
-| Unified action log | any action that changes the session — a human interacting with a UI control, or an agent invoking a tool | the action completes (success or failure) | one entry is appended to a single ordered log, showing who did it ("Human" or "Agent"), what action, a human-readable summary of the result, and when |
-| Human actions are visible | a human triggers an action through a UI control (not the `/dev` testing harness) | the action completes | it appears in the same log as agent actions, in true chronological order relative to them |
-| Failed actions are visible | an action (human or agent) fails | the failure occurs | the log shows the failure with a readable reason, not silently dropped |
-| Log persists across reloads | a session with existing logged actions | the page is reloaded in the same browser | the full log is restored, matching how the rest of workspace state already persists |
-| WebMCP status visible | the page loads | the researcher looks at the page header | it shows whether WebMCP is connected and the total number of tools the app defines (e.g. "WebMCP connected · 11 tools available"), regardless of how many are currently unlocked by workflow state |
-| Not WebMCP-capable | the browser doesn't support `document.modelContext` | the page loads | the header shows that WebMCP isn't available in this browser, rather than a misleading "connected" state |
+| Scenario                         | Given                                                                                                    | When                                       | Then                                                                                                                                                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Happy path                       | any combination of defined studies/patterns/results/panels and current selection/focus                   | the workspace is read                      | the full current state is returned, including what the human has selected by hand, so the agent can act on references like "these ones"                                                               |
+| Persistence                      | a session with existing workspace state                                                                  | the page is reloaded in the same browser   | the workspace state is restored as it was                                                                                                                                                             |
+| Cross-actor visibility           | the human changes something directly in the UI (e.g. selects an instance)                                | the agent subsequently reads the workspace | the agent sees the human's change                                                                                                                                                                     |
+| Unified action log               | any action that changes the session — a human interacting with a UI control, or an agent invoking a tool | the action completes (success or failure)  | one entry is appended to a single ordered log, showing who did it ("Human" or "Agent"), what action, a human-readable summary of the result, and when                                                 |
+| Human actions are visible        | a human triggers an action through a UI control (not the `/dev` testing harness)                         | the action completes                       | it appears in the same log as agent actions, in true chronological order relative to them                                                                                                             |
+| Failed actions are visible       | an action (human or agent) fails                                                                         | the failure occurs                         | the log shows the failure with a readable reason, not silently dropped                                                                                                                                |
+| Log persists across reloads      | a session with existing logged actions                                                                   | the page is reloaded in the same browser   | the full log is restored, matching how the rest of workspace state already persists                                                                                                                   |
+| WebMCP tool count always visible | the page loads                                                                                           | the researcher looks at the page header    | it shows the total number of tools the app defines (e.g. "11 tools available"), regardless of whether the current browser can connect via WebMCP or how many are currently unlocked by workflow state |
 
 ### Progressive tool availability
 
-| Scenario | Given | When | Then |
-|----------|-------|------|------|
-| Happy path | no result set yet exists | the agent inspects available tools | tools that require a result set (sampling, measuring, splitting, grid) are not available; tools that don't (defining, searching, reading workspace) are |
-| Unlocking | a search produces a result set | the agent inspects available tools again | the previously unavailable tools become available immediately |
+| Scenario   | Given                          | When                                     | Then                                                                                                                                                    |
+| ---------- | ------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Happy path | no result set yet exists       | the agent inspects available tools       | tools that require a result set (sampling, measuring, splitting, grid) are not available; tools that don't (defining, searching, reading workspace) are |
+| Unlocking  | a search produces a result set | the agent inspects available tools again | the previously unavailable tools become available immediately                                                                                           |
 
 ## Non-Goals
 
@@ -186,4 +185,4 @@ None outstanding.
 
 ---
 
-*Implemented by: EPIC-1001, EPIC-1002, EPIC-1003, EPIC-1004*
+_Implemented by: EPIC-1001, EPIC-1002, EPIC-1003, EPIC-1004, hotfix/webmcp-tools-always-visible_

@@ -8,39 +8,41 @@ types in `src/lib/webmcp/types.ts` that the query-engine tickets
 
 ### `InstanceEvent` — needs a completeness field
 
-| Field | Type | Description |
-|----------------|------|-------------|
-| `ticker` | `string` | existing |
-| `date` | `string` | existing — anchor date |
+| Field          | Type                  | Description                                                                                                                                   |
+| -------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ticker`       | `string`              | existing                                                                                                                                      |
+| `date`         | `string`              | existing — anchor date                                                                                                                        |
 | `completeness` | `number \| undefined` | new — fraction of setup steps satisfied (0–1). Absent or `1` for a fully completed instance; present and `<1` for a partial/in-progress match |
 
 ### `InstanceSetSummary` — needs a completed/partial breakdown
 
-| Field | Type | Description |
-|----------------|------|-------------|
-| `count` | `number` | existing — total instances in the set |
-| `completeCount` | `number` | new |
-| `partialCount` | `number` | new — `count = completeCount + partialCount` |
+| Field           | Type     | Description                                  |
+| --------------- | -------- | -------------------------------------------- |
+| `count`         | `number` | existing — total instances in the set        |
+| `completeCount` | `number` | new                                          |
+| `partialCount`  | `number` | new — `count = completeCount + partialCount` |
 
 ### `FocusState` — focus and selection must be independent fields
 
 Current shape conflates them:
+
 ```
 FocusState { panelId, selected: InstanceEvent[] }
 ```
+
 Needed shape — `focusInstance` (agent-driven) must not mutate `selected`
 (human-driven):
 
-| Field | Type | Description |
-|----------------|------|-------------|
-| `panelId` | `string` | existing |
-| `selected` | `InstanceEvent[]` | existing — human multi-select, set only via direct UI interaction |
-| `focusedInstance` | `InstanceEvent \| null` | new — set only via `focusInstance`, independent of `selected` |
+| Field             | Type                    | Description                                                       |
+| ----------------- | ----------------------- | ----------------------------------------------------------------- |
+| `panelId`         | `string`                | existing                                                          |
+| `selected`        | `InstanceEvent[]`       | existing — human multi-select, set only via direct UI interaction |
+| `focusedInstance` | `InstanceEvent \| null` | new — set only via `focusInstance`, independent of `selected`     |
 
 ### `MeasureResult` — needs an exclusion note
 
-| Field | Type | Description |
-|----------------|------|-------------|
+| Field                  | Type                  | Description                                                                                        |
+| ---------------------- | --------------------- | -------------------------------------------------------------------------------------------------- |
 | `excludedPartialCount` | `number \| undefined` | new — present when the input set contained partial instances that were excluded from the statistic |
 
 ### `PriceBar` — backend panel row schema (T-1001-1)
@@ -50,15 +52,15 @@ shared schema the mock generator and the real EODHD pipeline (T-1001-9)
 both must produce, so swapping one panel for the other requires no
 downstream code changes.
 
-| Field | Type | Description |
-|----------------|------|-------------|
-| `ticker` | `str` | |
-| `date` | `date` | |
-| `open` | `float` | adjusted |
-| `high` | `float` | adjusted |
-| `low` | `float` | adjusted |
-| `close` | `float` | adjusted |
-| `volume` | `int` | |
+| Field    | Type    | Description |
+| -------- | ------- | ----------- |
+| `ticker` | `str`   |             |
+| `date`   | `date`  |             |
+| `open`   | `float` | adjusted    |
+| `high`   | `float` | adjusted    |
+| `low`    | `float` | adjusted    |
+| `close`  | `float` | adjusted    |
+| `volume` | `int`   |             |
 
 ### `SpikePingResponse` — throwaway spike DTO (T-1001-2)
 
@@ -66,10 +68,10 @@ downstream code changes.
 reach a live deployed backend. Superseded by the real tool endpoints wired
 in T-1001-5 — not part of the permanent API surface.
 
-| Field | Type | Description |
-|----------------|------|-------------|
-| `message` | `str` | |
-| `sample` | `PriceBar` | one row read from the mock panel |
+| Field     | Type       | Description                      |
+| --------- | ---------- | -------------------------------- |
+| `message` | `str`      |                                  |
+| `sample`  | `PriceBar` | one row read from the mock panel |
 
 ### `PatternResearchEngine` — query engine contract (T-1001-3, extended by T-1001-4)
 
@@ -77,15 +79,15 @@ in T-1001-5 — not part of the permanent API surface.
 adapter; a `MockPatternResearchEngine` fake lives in
 `backend/tests/mocks/` for callers' tests.
 
-| Method | Signature | Description |
-|----------------|------|-------------|
-| `define_study` | `(name, expression) -> Study` | raises `ExpressionError` (with catalog) on an unsupported function |
-| `define_setup` | `(name, steps) -> Setup` | |
-| `find_instances` | `(setup, from_date, to_date, min_market_cap, sectors) -> InstanceSet` | applies the partial-match fallback and dedup rules from `spec.md` |
-| `sample_instances` | `(instance_set, n, strategy, horizon_days) -> list[Instance]` | T-1001-4 |
-| `measure` | `(instance_set, horizon_days, metric, compare_to_base_rate) -> MeasureResult` | T-1001-4 — excludes partial instances |
-| `split_instances` | `(instance_set, mode, expression, horizon_days, threshold) -> list[InstanceSet]` | T-1001-4 |
-| `get_instance_windows` | `(instance_set, n, strategy, window) -> list[InstanceWindow]` | T-1001-4 — backs `showGrid`'s data needs |
+| Method                 | Signature                                                                        | Description                                                        |
+| ---------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `define_study`         | `(name, expression) -> Study`                                                    | raises `ExpressionError` (with catalog) on an unsupported function |
+| `define_setup`         | `(name, steps) -> Setup`                                                         |                                                                    |
+| `find_instances`       | `(setup, from_date, to_date, min_market_cap, sectors) -> InstanceSet`            | applies the partial-match fallback and dedup rules from `spec.md`  |
+| `sample_instances`     | `(instance_set, n, strategy, horizon_days) -> list[Instance]`                    | T-1001-4                                                           |
+| `measure`              | `(instance_set, horizon_days, metric, compare_to_base_rate) -> MeasureResult`    | T-1001-4 — excludes partial instances                              |
+| `split_instances`      | `(instance_set, mode, expression, horizon_days, threshold) -> list[InstanceSet]` | T-1001-4                                                           |
+| `get_instance_windows` | `(instance_set, n, strategy, window) -> list[InstanceWindow]`                    | T-1001-4 — backs `showGrid`'s data needs                           |
 
 ### `MeasureResult`, `BaseRateResult`, `InstanceWindow` — stats models (T-1001-4)
 
@@ -128,14 +130,14 @@ recording entry point so a human-triggered UI control (e.g.
 resulting store (T-1002-2, mirroring `store.ts`'s existing
 localStorage pattern).
 
-| Field | Type | Description |
-|----------------|------|-------------|
-| `id` | `string` | |
-| `actor` | `'human' \| 'agent'` | new (T-1002-1) — set statically per call site, not runtime-detected: the tool-registration path (`register.ts`) is always `'agent'`, a direct UI-control call site is always `'human'` |
-| `toolName` | `string` | |
-| `timestamp` | `string` | ISO |
-| `input` | `unknown` | the call's raw input |
-| `summary` | `string` | one-line human-readable result summary, not raw JSON |
+| Field       | Type                 | Description                                                                                                                                                                            |
+| ----------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`        | `string`             |                                                                                                                                                                                        |
+| `actor`     | `'human' \| 'agent'` | new (T-1002-1) — set statically per call site, not runtime-detected: the tool-registration path (`register.ts`) is always `'agent'`, a direct UI-control call site is always `'human'` |
+| `toolName`  | `string`             |                                                                                                                                                                                        |
+| `timestamp` | `string`             | ISO                                                                                                                                                                                    |
+| `input`     | `unknown`            | the call's raw input                                                                                                                                                                   |
+| `summary`   | `string`             | one-line human-readable result summary, not raw JSON                                                                                                                                   |
 
 **Shared recording entry point (T-1002-1):** `activity.ts` exports
 `recordAction(activity, actor, actionName, input, result: ToolResult)`.
@@ -147,35 +149,36 @@ writes to `activityStore` any other way. It reuses the existing
 `ok`/`fail` `ToolResult` builders are exported so `ChartToolbar.svelte`
 can build the same result shape without re-implementing it.
 
-### `WebmcpStatus` / `formatWebmcpStatus` — header status contract (T-1004-1)
+### `WebmcpStatus` / `formatWebmcpStatus` — header status contract (T-1004-1, hotfix/webmcp-tools-always-visible)
 
 `src/lib/webmcp/status.ts`. Pure formatter backing the header's "WebMCP
-status visible" / "Not WebMCP-capable" scenarios. `connected` is
-`connectWebmcp()`'s resolved value being non-null (i.e.
-`document.modelContext` was present); `toolCount` is
+tool count always visible" scenario. `toolCount` is
 `buildTools(engine).length` — the full defined tool surface, unaffected by
-feature #10's progressive availability.
+feature #10's progressive availability. Computed synchronously in
+`+page.svelte`'s `onMount`, independent of `connectWebmcp()`'s resolution
+— the header no longer waits on or reflects actual connection state
+(dropped by hotfix/webmcp-tools-always-visible; `connectWebmcp()` still
+runs, for real WebMCP registration, it just no longer gates the header).
 
-| Field | Type | Description |
-|----------------|------|-------------|
-| `connected` | `boolean` | whether `connectWebmcp()` returned a non-null connection |
+| Field       | Type     | Description                 |
+| ----------- | -------- | --------------------------- |
 | `toolCount` | `number` | `buildTools(engine).length` |
 
-`formatWebmcpStatus(status: WebmcpStatus) -> string` — "WebMCP connected ·
-N tools available" when connected, otherwise a message stating WebMCP
-isn't available in this browser.
+`formatWebmcpStatus(status: WebmcpStatus) -> string` — always
+`"<toolCount> tools available"`, regardless of browser support or
+connection state.
 
 ### `TickerMetadata` — universe classification (T-1001-9)
 
 `backend/domain/models/universe.py`. Sourced from a free Nasdaq screener
 CSV export, not EODHD.
 
-| Field | Type | Description |
-|----------------|------|-------------|
-| `ticker` | `str` | |
-| `sector` | `str \| None` | |
-| `market_cap` | `float \| None` | |
-| `as_of` | `date` | |
+| Field        | Type            | Description |
+| ------------ | --------------- | ----------- |
+| `ticker`     | `str`           |             |
+| `sector`     | `str \| None`   |             |
+| `market_cap` | `float \| None` |             |
+| `as_of`      | `date`          |             |
 
 ### `removePanel` — single-panel removal (T-1003-2)
 
@@ -183,8 +186,8 @@ CSV export, not EODHD.
 `ResearchEngine`/WebMCP tool method — same category as `selectInstance`.
 Called directly from `GridPanel.svelte`'s close button.
 
-| Signature | Description |
-|-----------|-------------|
+| Signature                                                             | Description                                                                                                                                                                                                                                                                |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `removePanel(store: Writable<WorkspaceState>, panelId: string): void` | removes the matching panel from `ws.panels`; if it was the focused panel (`ws.focus?.panelId === panelId`), resets `ws.focus` to `null` (mirrors `clearPanels()`'s full focus reset, scoped to the single-panel case). Leaves `instanceSets`/`studies`/`setups` untouched. |
 
 ## Data Flow
@@ -203,4 +206,4 @@ not re-derive or change them without updating the spec first.
 
 ---
 
-*Product design: [spec.md](spec.md)*
+_Product design: [spec.md](spec.md)_
