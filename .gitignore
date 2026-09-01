@@ -50,3 +50,12 @@ vite.config.ts.timestamp-*
 .claude/scheduled_tasks.lock
 # Agent worktrees (isolation: worktree)
 .claude/worktrees/
+
+# Terraform (the .terraform.lock.hcl provider lockfile IS committed)
+terraform/**/.terraform/
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/**/*.tfplan
+terraform/**/crash.log
+terraform/**/override.tf
+terraform/**/override.tf.json
