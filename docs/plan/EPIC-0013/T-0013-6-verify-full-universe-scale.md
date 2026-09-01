@@ -1,7 +1,7 @@
 # T-0013-6: Verify at target universe scale on 512 MB
 
 **Epic**: EPIC-0013 (Market Data Storage)
-**Status**: Blocked — needs a real (paid) backfill and a deployed instance
+**Status**: Blocked — needs a real (paid) backfill and the AWS container from #16
 **Depends on**: T-0013-3, T-0013-5
 **Blocks**: —
 **Issue**: #13
@@ -96,25 +96,28 @@ liquid names over 10 years**, which measures 383 MB peak with ~130 MB spare.
 That is the universe this POC can actually serve today, and half the epic's
 stated target.
 
-### What this means for the epic
+### Retargeted — 2026-09-01
 
-`technical.md` already names the trigger and the answer: *"when resident
-memory at the target universe exceeds the instance budget's headroom, adopt
-DuckDB rather than trimming further or hand-rolling a scanner."* The trigger
-has now fired, one rung earlier than expected — during evaluation rather than
-during residency. Two honest options for whoever picks this up:
+The measurements that prompted the two options below were taken against
+Render's free-tier 512 MB. The backend is moving to a large AWS container
+(#16), so that budget is no longer the target and neither option is needed:
 
-1. **Halve the universe** to ~1,000 names and ship the POC within budget.
-   Cheap, measured, and consistent with the liquidity-floor rationale (the
-   names that fall out are the least liquid, which distort base rates
-   anyway).
-2. **Take rung 2 early** — DuckDB over the partitioned Parquet T-0013-3 now
-   writes — which is what removes the evaluator's whole-panel float64
-   intermediates rather than shrinking their input.
+- *Halve the universe* — dropped. The universe no longer has to be trimmed
+  to fit. A liquidity floor stays (AC1), but as a product decision about
+  base-rate quality, which is how it was justified originally.
+- *Take the DuckDB rung early* — dropped. EPIC-0015 is closed; its
+  justification was this same ceiling.
 
-Trimming the *evaluator's* intermediates (float32 arithmetic, chunked
-condition evaluation) is the third option and is exactly the hand-rolled
-query engine `technical.md` argues against building.
+What this ticket still has to do is unchanged in substance: verify against
+**real** data on the **deployed** instance. Only the number it verifies
+against moves, from 512 MB to whatever the provisioned container is sized
+at. Measure absolute RSS, not baseline-subtracted — the container measures
+the whole process.
+
+Retained for the record: the compact path costs ~318 MB at 2,000 x 10y and
+~995 MB at the full 6,268-ticker universe, versus 5.45 GB and 17.1 GB on
+the row-object path this epic replaced. That fix is required at any
+instance size; it was never a free-tier workaround.
 
 ### Still outstanding for this ticket
 
