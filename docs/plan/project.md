@@ -2,65 +2,74 @@
 
 ## Objective
 
-Ship the WebMCP-native Pattern Research Workbench for the WebMCP hackathon
-(deadline **2026-09-03, 1:00pm PT**) — a shared human+agent research session
-where a user and their AI agent define chart patterns, search historical
-data for matching instances, and evaluate whether the pattern holds up,
-entirely through the app's WebMCP tool surface. See
-`docs/plan/EPIC-1001/_epic.md` for full scope.
+Rebuild the app's WebMCP tool surface to match `.dev/design/tool-spec.md` — a
+~33-core-tool (+13 follow-up) screener/research workbench covering context,
+discovery, workspaces, panels, charts, screeners, results, similarity, an
+agent-safety preview/apply layer, and persistence — replacing the current
+11-tool pattern-research surface.
+
+The 2026-09-03 hackathon submission is **no longer the driving constraint**
+(user decision, 2026-09-01: "full spec, deadline is secondary"). EPIC-1001's
+remaining tickets stay open but are no longer the critical path.
 
 ## Current Phase
 
-Human-gated verification and deployment. The core product (engine,
-WebMCP tool wiring, frontend shell + visualization) is functionally
-complete against the mock dataset. The remaining path to submission runs
-through two tickets that require hands-on human action an autonomous
-coding agent cannot perform, followed by paid real-data integration and
-submission packaging.
+Program build-out: EPIC-1006 through EPIC-1015 implement the new surface in
+new files while the legacy surface keeps `main` deployable. EPIC-1015 cuts
+over and retires the legacy surface last, gated on explicit user approval.
 
-**Why this phase:** T-1001-2 (live verification) and T-1001-8 (deployment)
-each have a runbook explicitly written for a human to execute — real
-WebMCP browser + real AI agent for one, real Render/Cloudflare accounts
-for the other. T-1001-9 (real data) and T-1001-10 (submission) are
-sequenced behind those by design.
+**Why this phase:** the user chose full replacement per spec over retrofitting
+the existing tools. The spec's common contract (stable IDs,
+`expected_revision`, `idempotency_key`, the mutation envelope, provenance) is
+shared by every mutating tool, so EPIC-1006 is a hard foundation and the rest
+fan out behind it.
 
 ## Active Work
 
 | Item | Type | Status | Branch | Notes |
 |------|------|--------|--------|-------|
-| EPIC-1001: WebMCP Pattern Research Workbench | epic | in-progress | `epic/EPIC-1001-pattern-research-workbench` (merged to main) | 8/10 tickets done (1,3,4,5,6,7,8); 1 blocked (2); 1 ready to start (9), 1 pending (10) |
-| T-1001-2: Platform spike (live verification) | ticket | blocked | — | Needs human + real WebMCP browser + real AI agent to complete the runbook |
-| T-1001-9: Real data pipeline | ticket | ready to start | — | T-1001-8 verified done; EODHD paid-tier upgrade and R2/S3 bucket creation still need human action (see Blockers) |
+| EPIC-1006: Workspace, revisions & common tool contract | epic | creating | — | Foundation: envelope, revisions, idempotency, undo, operation registry |
+| EPIC-1007: Panel system | epic | creating | — | 5 tools; owns panel-kind registry |
+| EPIC-1008: Discovery & catalog | epic | creating | — | 3 read-only tools; owns catalog registry + live-data ports |
+| EPIC-1009: Screener core | epic | creating | — | 6 tools; 8 filter-condition types |
+| EPIC-1010: Results & explain | epic | creating | — | 4 tools; no-silent-rerun guarantee |
+| EPIC-1011: Chart tools | epic | creating | — | 5 tools; owns captured-setup contract |
+| EPIC-1012: Similarity search | epic | creating | — | 3 tools |
+| EPIC-1013: Safety layer (preview & apply) | epic | creating | — | 2 tools; atomic apply over the operation registry |
+| EPIC-1014: High-value follow-up tools | epic | creating | — | backtest, watchlists, alerts, computed fields, export |
+| EPIC-1015: Legacy surface cutover | epic | creating | — | Gated on user approval; runs last |
+| EPIC-1001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-1001-pattern-research-workbench` | 8/10 tickets done; T-1001-2 blocked, T-1001-9/10 deprioritized |
 
-_EPIC-1002 through EPIC-1005 are fully closed — see Completed below. Each
-left 2-3 non-blocking follow-up tickets (Open) on GitHub-deleted epic
-branches; those ticket files still exist under `docs/plan/EPIC-100N/` on
-`main` for whenever someone picks them up. None are urgent — deadline focus
-should stay on EPIC-1001._
+## Implementation wave order
+
+Dependencies only — everything within a wave runs in parallel.
+
+| Wave | Epics | Why sequenced here |
+|------|-------|--------------------|
+| W1 | EPIC-1006, EPIC-1008 | Independent foundations. 1006 owns the mutation contract; 1008 is read-only so it needs nothing from 1006. |
+| W2 | EPIC-1007, EPIC-1009, EPIC-1011, EPIC-1013 | All consume 1006's contract; mutually independent. |
+| W3 | EPIC-1010, EPIC-1012 | 1010 needs `run_id` from 1009; 1012 needs `capture_chart_setup` from 1011. |
+| W4 | EPIC-1014, then EPIC-1015 | 1014 builds on all core epics. 1015 cutover is last and user-gated. |
 
 ## Backlog
 
-1. **Record T-1001-2's outcome** once a human completes the live-verification
-   session — update ticket status to Done and append the outcome per
-   the runbook's "Record the outcome (AC5)" section.
-2. **User upgrades the EODHD account to paid tier + creates an R2/S3
-   bucket** for T-1001-9 (human action — account/billing dashboards).
-   Pre-approved (see Decisions Log) — proceed without re-asking once done.
-3. Once both are ready: start **T-1001-9** (real data pipeline) —
-   `/at-ticket-start T-1001-9`.
-4. Once T-1001-9 is done: start **T-1001-10** (submission package) —
-   `/at-ticket-start T-1001-10`.
-5. (Low priority, post-deadline) Pick up the follow-up tickets left by
-   EPIC-1002/1003/1004/1005's epic reviews — none are blocking, see the
-   Completed table for the ticket IDs and what each covers.
+1. **Review the Wave 0 ticket breakdown** once all ten epic-creation agents
+   report, then launch implementation Wave 1 (EPIC-1006, EPIC-1008).
+2. Launch Waves 2-4 as their dependencies land.
+3. **EPIC-1015 cutover** — do not launch until the user confirms the new
+   surface is good. It retires the currently-deployed submission's tools.
+4. (Deprioritized) EPIC-1001's remaining tickets: T-1001-2 (live verification,
+   needs a human), T-1001-9 (real data), T-1001-10 (submission package).
+5. (Low priority) The 9 follow-up tickets left by EPIC-1002/1003/1004/1005 —
+   T-1002-4/5, T-1003-3/4, T-1004-2, T-1005-3/4/5.
 
 ## Blockers
 
 | Blocker | Affects | Since | Action needed |
 |---------|---------|-------|----------------|
-| T-1001-2 unverified | T-1001-2 | 2026-08-30 | Human + real WebMCP browser + real AI agent must complete `T-1001-2-live-verification-runbook.md`. |
-| EODHD account not yet upgraded to paid tier | T-1001-9 | 2026-08-31 | Human upgrades the EODHD account to the paid EOD Historical Data plan ($19.99/mo, pre-approved). |
-| R2/S3 bucket not yet created | T-1001-9 | 2026-08-31 | Human creates a Cloudflare R2 (or S3) bucket and credentials for the panel object store — new step, decided during T-1001-8's deploy (see `data-provider.md`). |
+| Live reference/fundamental market data (sectors, industries, indexes, exchanges, countries, fundamentals, earnings calendars) is being set up in a separate thread | EPIC-1008, EPIC-1009, EPIC-1014 | 2026-09-01 | Epics define domain ports and code against them; the parallel workstream supplies the implementation. Not blocking epic work — only end-to-end verification. |
+| T-1001-2 unverified | T-1001-2 | 2026-08-30 | Human + real WebMCP browser + real AI agent must complete `T-1001-2-live-verification-runbook.md`. Deprioritized. |
+| EODHD paid tier / R2/S3 bucket | T-1001-9 | 2026-08-31 | Deprioritized along with T-1001-9. |
 
 ## Decisions Log
 
@@ -74,7 +83,15 @@ should stay on EPIC-1001._
 | 2026-08-31 | EPIC-1002's PR was squash-merged to origin/main via GitHub while local `main` still carried unpushed plan-doc commits, causing a divergent-history merge conflict on reconcile | Resolved by resetting local `main` to origin's tip (a pure superset for all code — origin already contained everything local had via the epic branch's ancestry) and reapplying only the local-only `project.md` tracking edits on top |
 | 2026-08-31 | EPIC-1003/1004/1005 all shared the same problem as EPIC-1002 above (forked from a stale pre-EPIC-1002 `main`, causing inflated diffs and would-be merge conflicts) — rebased each onto the current `main` tip before its CI/review pass, resolving real content conflicts (shared `spec.md`/`+page.svelte` sections) by hand each time | Kept each epic's PR diff scoped to its own actual changes instead of re-showing already-merged sibling-epic content, and avoided GitHub-side merge conflicts at squash time |
 | 2026-08-31 | EPIC-1005's epic review found one genuine functional bug (loading a snapshot left a stale `focusedView`, risking the chart showing data for the wrong instance) — fixed it directly on the epic branch before opening the PR, rather than filing a follow-up ticket | Unlike the other findings across all four epics (real but lower-severity/non-blocking), this one could silently show factually wrong research data to the user — judged worth fixing before close rather than deferring |
+| 2026-09-01 | R2 bucket blocker closed — credentials (`R2_BUCKET_NAME`, `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_TOKEN_VALUE`) are present in the gitignored root `.env` | User created the bucket between runs; the panel object store T-1001-9 depends on is ready |
+| 2026-09-01 | Built T-1001-9's full pipeline against fixtures rather than waiting for the API key, deferring only the live backfill run and the AC5 spot-check | The key's absence blocks one command, not the code; with the 2026-09-03 deadline there was no reason to leave the implementation idle while waiting for a paste |
 | 2026-08-31 | Dropped the Render persistent disk from `render.yaml`/T-1001-8's mock deploy; T-1001-9's real panel data will persist in object storage (R2/S3) instead of a Render disk | Discovered live during T-1001-8 deployment that Render's free tier doesn't support disks at all, and the paid tier needed for one (~$25/mo) costs far more than R2/S3 object storage for this data volume (~60-90MB); the mock panel regenerates deterministically on every deploy instead, at zero functional cost. Considered a full AWS re-platform instead but rejected given the 2026-09-03 deadline — real migration work for marginal savings over the object-storage fix, which keeps the already-working Render pipeline intact |
+| 2026-09-01 | Objective changed: implement `.dev/design/tool-spec.md` as a **full replacement** of the 11-tool pattern surface, with the 2026-09-03 hackathon deadline explicitly secondary | User chose "Full replacement per spec" + "Full spec, deadline is secondary" when presented with the scope options and the concern that 33 tools are not buildable to quality in two days |
+| 2026-09-01 | New surface is built **alongside** the legacy one in new files; a final user-gated epic (EPIC-1015) retires the legacy tools/UI | User chose "Build new alongside, retire at the end" — keeps `main` deployable throughout and keeps the deployed hackathon submission working while the replacement is under construction |
+| 2026-09-01 | Reference/fundamental market data is sourced from a **separate parallel workstream**, not a mock pipeline built here; epics define domain ports and code against them | User: "Live data is being set up in another thread." Avoids duplicating that effort and avoids blocking the screener epics on the EODHD paid-tier upgrade |
+| 2026-09-01 | Behavioral specs derived from `.dev/design/tool-spec.md` instead of running ten `/at-epic-design` intent interviews | The doc is already a detailed design artifact the user wrote; its two genuine gaps (screener data source, legacy migration) were resolved by direct question. Epics record any remaining gap as an explicit "Open question" rather than guessing |
+| 2026-09-01 | EPIC-1006 owns the spec's common contract (stable IDs, `expected_revision`, `idempotency_key`, mutation envelope, provenance type, extensible operation registry) as shared infrastructure the other nine epics import | The contract is shared by every mutating tool; letting six epics each invent their own envelope would make consolidation a wreck. Makes 1006 the one genuine hard dependency in the program |
+| 2026-09-01 | Wave 0 (epic creation) run as ten parallel worktree agents with **pinned** epic numbers | Concurrent `/at-epic-new` runs would each auto-assign the same next number and collide |
 
 ## Completed
 
@@ -85,6 +102,12 @@ should stay on EPIC-1001._
 | EPIC-1004: WebMCP Status Header | epic | 2026-08-31 | Merged via [PR #8](https://github.com/alekst23/webmcp-stock-screener/pull/8) (squash), closing #4. 5-agent review passed; 1 non-blocking follow-up filed (T-1004-2, Open) — 3 of 5 agents independently converged on the same finding (unhandled connect-failure rejection). |
 | EPIC-1005: Workspace Snapshots | epic | 2026-08-31 | Merged via [PR #9](https://github.com/alekst23/webmcp-stock-screener/pull/9) (squash), closing #5. 5-agent review found one real bug (stale `focusedView` after snapshot load) — fixed directly on the branch before merge. 3 non-blocking follow-ups filed (T-1005-3, T-1005-4, T-1005-5, Open). |
 | T-1001-8: Deploy & ops (mock) | ticket | 2026-08-31 | Backend live on Render, frontend live on Cloudflare Workers. All 5 ACs verified (HTTPS, mock data, CORS, rate limiting, real product endpoint working end-to-end). See `docs/reference/deployment.md`. Live during deployment: Render disk isn't supported on free tier (dropped it); Cloudflare's current onboarding needed `wrangler.jsonc` instead of classic Pages config. Unblocks T-1001-9. |
+
+| UI/WebMCP hotfixes (#10, #11, #12 + bridge follow-up) | hotfix | 2026-08-31/09-01 | Four hotfixes landed on `main` after the last plan update, all judge-visible-surface fixes: always show the tool count in the header (#10), workbench UI refactor — visible tool list, log moved to the bottom, compact snapshots (#11), report whether WebMCP tools are actually callable rather than merely present (#12), and `7e6f4a6`, which installs a page-owned WebMCP bridge instead of trying to predict browser support. |
+| #10 always-visible tool count | fix | 2026-08-31 | Merged (PR #10). Header shows the tool count unconditionally. |
+| #11 workbench UI refactor | fix | 2026-09-01 | Merged (PR #11). Visible tool list, log moved to bottom, compact snapshots. |
+| #12 bridge status accuracy | fix | 2026-09-01 | Merged (PR #12). Status reports whether WebMCP tools are actually callable, not whether the browser claims support. |
+| Page-owned WebMCP bridge | fix | 2026-09-01 | Commit `7e6f4a6`. The page installs its own bridge instead of predicting browser support, so the advertised tool surface is always the callable one. Typecheck clean, 112/112 tests pass. |
 
 _EPIC-1001 is still in progress — ticket-level completions (T-1001-1, 3, 4,
 5, 6, 7) are tracked in `docs/plan/EPIC-1001/_epic.md`._
