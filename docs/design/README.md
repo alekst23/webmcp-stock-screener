@@ -11,3 +11,8 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+- [Results & Explain](results-and-explain/spec.md) — the Results area of
+  the new WebMCP surface: a configurable results table, bounded paging
+  over a pinned screener run with no silent rerun, selection that
+  propagates to linked panels, and a per-instrument explanation of every
+  filter and ranking contribution.
