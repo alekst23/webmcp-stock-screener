@@ -4,11 +4,13 @@ export interface WebmcpStatus {
 }
 
 // Whether an agent can actually call this page's tools right now.
-// `unavailable` and `failed` both mean zero callable tools but must stay
-// distinct: one is "this browser can't", the other is "this browser could
-// and didn't". `connecting` must never render as `connected` -- claiming a
-// live bridge before one exists is the failure this type was added to fix.
-export type WebmcpBridgeState = 'connecting' | 'connected' | 'unavailable' | 'failed';
+// There is deliberately no "this browser doesn't support WebMCP" state: the
+// page installs its own document.modelContext when the browser supplies
+// none (bridge.ts), so browser support is never in question and was never
+// something this code could predict. `connecting` must never render as
+// `connected` -- claiming a live bridge before one exists is the failure
+// this type was added to fix.
+export type WebmcpBridgeState = 'connecting' | 'connected' | 'failed';
 
 // Renders WebmcpStatus into the header string. Always shows the tool
 // count -- no connection-state branching (hotfix/webmcp-tools-always-visible).
@@ -28,18 +30,15 @@ export function formatAvailableStatus(availableCount: number): string {
 	return `${availableCount} available`;
 }
 
-// One short clause per bridge state (hotfix/webmcp-bridge-status).
-// `unavailable` and `failed` both mean zero callable tools but never share
-// wording: one is "this browser can't", the other is "this browser could and
-// didn't".
+// One short clause per bridge state (hotfix/webmcp-bridge-status). No state
+// blames the browser: `failed` means registration threw here and now, which
+// the console error explains, not that this browser lacks a capability.
 export function formatBridgeStatus(state: WebmcpBridgeState): string {
 	switch (state) {
 		case 'connecting':
 			return 'agent bridge connecting…';
 		case 'connected':
 			return 'agent bridge connected';
-		case 'unavailable':
-			return 'agent bridge unavailable in this browser';
 		case 'failed':
 			return 'agent bridge failed to connect';
 	}
@@ -69,6 +68,16 @@ const UI_FALLBACK =
 	`Every operation these tools perform is also reachable through the page's ` +
 	`visible UI controls — drive those instead.`;
 
+// The page supplies its own document.modelContext where the browser has none,
+// so a reader whose client shows no native WebMCP tool list is not out of
+// luck — it just has to call the object itself. Saying so is what makes
+// "pretend every browser has it" true in practice rather than only in the
+// header.
+const DIRECT_CALL =
+	`If your client does not surface these natively, call them yourself: ` +
+	`await document.modelContext.executeTool('<name>', { …input }), and ` +
+	`await document.modelContext.getTools() for the live list.`;
+
 function connectedBody(status: WebmcpStatus): string {
 	return (
 		`this page registers ${status.toolCount} tools via document.modelContext for the ` +
@@ -76,7 +85,7 @@ function connectedBody(status: WebmcpStatus): string {
 		`${status.toolNames.join(', ')}. ${SURFACE_CAVEAT} Query document.modelContext ` +
 		`directly for authoritative live availability and schemas. Call the tools through ` +
 		`the WebMCP protocol to read and modify workspace state a human researcher can see ` +
-		`and steer directly.`
+		`and steer directly. ${DIRECT_CALL}`
 	);
 }
 
@@ -97,28 +106,16 @@ function connectingBody(status: WebmcpStatus): string {
 	);
 }
 
-// A bridge IS present here -- registration threw. Saying
-// "document.modelContext is not connected here" (the unavailable wording)
-// would be flatly false and would send the reader looking for a missing
-// object it can see.
+// A bridge IS present here -- registration threw. The reason belongs in the
+// console, not in a guess about the browser.
 function failedBody(status: WebmcpStatus): string {
 	return (
-		`this page defines ${status.toolCount} tools and document.modelContext is present ` +
-		`in this browser, but registering them against it failed, so they are not callable ` +
+		`this page defines ${status.toolCount} tools and document.modelContext is present, ` +
+		`but registering them against it failed, so they are not callable ` +
 		`in this session. Defined tools: ${status.toolNames.join(', ')}. ${SURFACE_CAVEAT} ` +
 		`${UI_FALLBACK} The underlying registration error is logged to the browser console. ` +
 		`document.modelContext itself, not this static list, stays authoritative for ` +
 		`whatever it does hold.`
-	);
-}
-
-function unavailableBody(status: WebmcpStatus): string {
-	return (
-		`this page defines ${status.toolCount} tools, but they are not callable in this ` +
-		`session — document.modelContext is not connected here. Defined tools: ` +
-		`${status.toolNames.join(', ')}. ${SURFACE_CAVEAT} ${UI_FALLBACK} Should a bridge ` +
-		`appear, document.modelContext itself is authoritative for live availability and ` +
-		`schemas, not this static list.`
 	);
 }
 
@@ -128,8 +125,6 @@ function agentToolsBody(status: WebmcpStatus, bridge: WebmcpBridgeState): string
 			return connectingBody(status);
 		case 'connected':
 			return connectedBody(status);
-		case 'unavailable':
-			return unavailableBody(status);
 		case 'failed':
 			return failedBody(status);
 	}
@@ -141,7 +136,7 @@ function agentToolsBody(status: WebmcpStatus, bridge: WebmcpBridgeState): string
 // human researcher looking at the rendered UI.
 // `bridge` is required rather than defaulted (hotfix/webmcp-bridge-status):
 // a default would either re-create the false "these are callable" claim or
-// silently mislabel any caller that forgot to pass it. All four states get
+// silently mislabel any caller that forgot to pass it. All three states get
 // their own wording -- collapsing any pair asserts something untrue about
 // callability for at least one of them.
 export function formatAgentToolsContext(status: WebmcpStatus, bridge: WebmcpBridgeState): string {

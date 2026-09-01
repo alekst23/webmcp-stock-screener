@@ -1,4 +1,5 @@
 import type { Writable } from 'svelte/store';
+import { ensureModelContext, onBridgeReplaced } from './bridge';
 import { buildTools } from './tools';
 import { recordAction, type AgentActivityEvent } from '../workspace/activity';
 import type {
@@ -30,6 +31,8 @@ const toolOwners = new Map<string, number>();
 let lastGeneration = 0;
 
 interface ConnectionState {
+	// Reassigned when a browser bridge arrives after the page installed its
+	// own; see adoptBridge.
 	mc: ModelContext;
 	engine: ResearchEngine;
 	activity?: Writable<AgentActivityEvent[]>;
@@ -43,9 +46,12 @@ interface ConnectionState {
 	registered: Set<string>;
 	notified: boolean;
 	disposed: boolean;
+	// Drops this connection's adoptBridge hook on teardown.
+	unsubscribeReplacement?: () => void;
 }
 
-// Registers the tool surface against document.modelContext and keeps it in
+// Registers the tool surface against document.modelContext -- the browser's
+// if it supplied one, otherwise the page's own (bridge.ts) -- and keeps it in
 // sync with workspace state: tools appear as the workflow unlocks them
 // (measure only once an instance set exists, focusInstance only once a panel
 // exists) and retire if their prerequisites go away. `activity` is where
@@ -57,16 +63,17 @@ interface ConnectionState {
 // mid-session instead of showing a one-time snapshot. It always fires at
 // least once on connect, even with nothing registered, so the caller can tell
 // "connected with zero tools" from "never heard back".
+// There is no browser-support check here and must not be one: which browsers
+// expose document.modelContext is not knowable from inside the page, and
+// guessing wrong suppressed a working tool surface. ensureModelContext always
+// yields a bridge, so this never returns null and the caller has no
+// "unavailable" case to render.
 export async function connectWebmcp(
 	engine: ResearchEngine,
 	activity?: Writable<AgentActivityEvent[]>,
 	onToolsChanged?: (names: string[]) => void
-): Promise<WebmcpConnection | null> {
-	const mc = document.modelContext;
-	if (!mc) {
-		return null;
-	}
-	return connect(mc, engine, activity, onToolsChanged);
+): Promise<WebmcpConnection> {
+	return connect(ensureModelContext(), engine, activity, onToolsChanged);
 }
 
 async function connect(
@@ -92,6 +99,10 @@ async function connect(
 		registeredNames: () => [...state.registered],
 		dispose: () => dispose(state)
 	};
+
+	// A bridge injected mid-connect must not be missed, so this is hooked up
+	// before the first registration rather than after it settles.
+	state.unsubscribeReplacement = onBridgeReplaced((next) => void adoptBridge(state, next));
 
 	try {
 		await connection.refresh();
@@ -159,6 +170,8 @@ async function retire(state: ConnectionState, spec: ToolSpec): Promise<boolean> 
 // re-registers everything against a bridge that already has it.
 async function dispose(state: ConnectionState): Promise<void> {
 	state.disposed = true;
+	state.unsubscribeReplacement?.();
+	state.unsubscribeReplacement = undefined;
 	if (!state.unregisterTool) {
 		// Nothing can come off this bridge, so the tools are still callable and
 		// still this connection's; leave them reported rather than claim a
@@ -180,6 +193,38 @@ async function dispose(state: ConnectionState): Promise<void> {
 			// Best effort: one rejecting unregisterTool must not strand the rest,
 			// and the name stays reported because it may well still be live.
 		}
+	}
+}
+
+// A browser bridge that appears after the page installed its own (an
+// extension injecting late, a flag-gated bootstrap losing the race to a fast
+// static page) has never heard of this connection's tools. Re-register onto
+// it rather than leave the surface stranded on the object it replaced --
+// that stranding was the original "unavailable in this browser" bug wearing
+// a new hat.
+async function adoptBridge(state: ConnectionState, mc: ModelContext): Promise<void> {
+	if (state.disposed || state.mc === mc) {
+		return;
+	}
+	state.mc = mc;
+	state.unregisterTool = mc.unregisterTool?.bind(mc);
+	// Ownership restarts: nothing this connection holds exists on the new
+	// bridge, so keeping the old names would let a later retire() try to
+	// unregister them from a bridge that never had them.
+	for (const name of state.registered) {
+		if (toolOwners.get(name) === state.generation) {
+			toolOwners.delete(name);
+		}
+	}
+	state.registered.clear();
+	state.generation = ++lastGeneration;
+	// Forces the count callback even if the re-registration lands on the same
+	// set of names, so the caller sees the new bridge acknowledged.
+	state.notified = false;
+	try {
+		await refresh(state);
+	} catch (error) {
+		console.error('WebMCP re-registration onto a newly injected bridge failed', error);
 	}
 }
 

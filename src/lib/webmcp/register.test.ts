@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Writable } from 'svelte/store';
 import { connectWebmcp } from './register';
-import { fakeBridge } from './testSupport';
+import { clearModelContext, fakeBridge } from './testSupport';
 import { createApiEngine } from '../workspace/apiEngine';
 import { createWorkspaceStore } from '../workspace/store';
 import { memoryStorage } from '../workspace/testSupport';
@@ -41,17 +41,84 @@ function withoutInstanceSets(store: Writable<WorkspaceState>): void {
 
 describe('connectWebmcp bridge detection', () => {
 	afterEach(() => {
-		document.modelContext = undefined;
+		clearModelContext();
 	});
 
-	// The condition a real agent hit on the deployed site: the page advertised
-	// its tools, but there was no bridge object to call them through.
-	it('returns null when document.modelContext is absent, so the caller can report "unavailable"', async () => {
-		document.modelContext = undefined;
+	// The regression this whole change exists to kill: the page saw no
+	// document.modelContext, concluded the browser could not do WebMCP, and
+	// advertised 11 tools that nothing could call. It must now supply its own
+	// bridge and register against that instead of predicting browser support.
+	it('registers the full surface when the browser supplies no bridge of its own', async () => {
+		clearModelContext();
 
 		const connection = await connectWebmcp(engine());
 
-		expect(connection, 'no bridge must be reported as null, not a hollow connection').toBeNull();
+		expect(
+			connection.registeredNames().length,
+			'a browser without WebMCP must still end up with callable tools'
+		).toBeGreaterThan(0);
+		const tools = await document.modelContext!.getTools!();
+		expect(
+			tools.map((tool) => tool.name).sort(),
+			'the page-installed bridge must expose exactly what the connection reports'
+		).toEqual(connection.registeredNames().sort());
+	});
+
+	// The page bridge is only useful if an agent can actually invoke through
+	// it; registering into a write-only registry would be the same lie in a
+	// new place.
+	it('executes a tool called through the page-installed bridge', async () => {
+		clearModelContext();
+
+		await connectWebmcp(engine());
+		const result = await document.modelContext!.executeTool!('defineStudy', {
+			name: 'gap',
+			expression: 'sma(close, 20)'
+		});
+
+		expect(result.isError ?? false, `defineStudy must run, got: ${JSON.stringify(result)}`).toBe(
+			false
+		);
+	});
+
+	// A native bridge must win outright: shadowing it with the page's own
+	// would hide the tools from the one browser that can see them natively.
+	it('registers against the browser bridge rather than installing its own', async () => {
+		const bridge = fakeBridge();
+		document.modelContext = bridge.mc;
+
+		const connection = await connectWebmcp(engine());
+
+		expect(document.modelContext, 'a browser-supplied bridge must not be replaced').toBe(bridge.mc);
+		expect(
+			[...bridge.registered.keys()].sort(),
+			'every tool must land on the browser bridge'
+		).toEqual(connection.registeredNames().sort());
+	});
+
+	// An extension that injects after this script ran used to leave the tools
+	// stranded on the object it replaced, which is the "unavailable in this
+	// browser" bug wearing a new hat.
+	it('re-registers onto a bridge that is injected after the page installed its own', async () => {
+		clearModelContext();
+
+		const connection = await connectWebmcp(engine());
+		const registeredOnPageBridge = connection.registeredNames().sort();
+
+		const late = fakeBridge();
+		document.modelContext = late.mc;
+		await vi.waitFor(() => {
+			expect(late.registered.size).toBeGreaterThan(0);
+		});
+
+		expect(
+			[...late.registered.keys()].sort(),
+			'the surface must move onto the bridge that arrived late'
+		).toEqual(registeredOnPageBridge);
+		expect(
+			connection.registeredNames().sort(),
+			'the reported set must describe the new bridge, not the abandoned one'
+		).toEqual(registeredOnPageBridge);
 	});
 
 	it('returns a connection when a bridge is present', async () => {
@@ -114,7 +181,7 @@ describe('connectWebmcp bridge detection', () => {
 // #10 unlocks and retires tools mid-session.
 describe('connectWebmcp live registration signal', () => {
 	afterEach(() => {
-		document.modelContext = undefined;
+		clearModelContext();
 	});
 
 	it('reports the registered tool names to the caller on connect', async () => {
@@ -210,7 +277,7 @@ describe('connectWebmcp live registration signal', () => {
 // client-side navigation, which unmounts and remounts +page.svelte.
 describe('connectWebmcp remount cleanup', () => {
 	afterEach(() => {
-		document.modelContext = undefined;
+		clearModelContext();
 	});
 
 	it('unregisters every tool it registered when disposed', async () => {
@@ -336,7 +403,7 @@ describe('connectWebmcp remount cleanup', () => {
 // bridge held 12 tools, 6 of them duplicates).
 describe('connectWebmcp against a bridge without unregisterTool', () => {
 	afterEach(() => {
-		document.modelContext = undefined;
+		clearModelContext();
 	});
 
 	it('does not report a disposal it could not perform', async () => {
@@ -384,7 +451,7 @@ describe('connectWebmcp against a bridge without unregisterTool', () => {
 // wiped mount B's live registrations while B still reported 6 available.
 describe('connectWebmcp ownership across overlapping mounts', () => {
 	afterEach(() => {
-		document.modelContext = undefined;
+		clearModelContext();
 	});
 
 	it('does not let a stale mount unregister the tools a newer mount owns', async () => {

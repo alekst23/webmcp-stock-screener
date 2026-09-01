@@ -1,5 +1,14 @@
 import type { ModelContext, ModelContextToolDescriptor } from './types';
 
+// Removes whatever `document.modelContext` currently is -- a fake bridge, or
+// the accessor bridge.ts installs when the browser supplies none. Deleting
+// the property (rather than assigning undefined) is what bridge.ts recognises
+// as its accessor being gone, so the next ensureModelContext() starts from a
+// clean registry with no listeners left over from the previous test.
+export function clearModelContext(): void {
+	delete (document as { modelContext?: ModelContext }).modelContext;
+}
+
 // Shared across register.test.ts and session.test.ts, mirroring
 // workspace/testSupport.ts's convention, so the two files cannot drift into
 // disagreeing about what a bridge does.

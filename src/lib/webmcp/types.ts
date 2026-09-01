@@ -212,9 +212,21 @@ export interface ModelContextToolDescriptor {
 	execute(input: unknown): Promise<ToolResult>;
 }
 
+// What getTools() reports back: the descriptor without its execute callback.
+export interface RegisteredToolInfo {
+	name: string;
+	description: string;
+	inputSchema: object;
+}
+
 export interface ModelContext {
 	registerTool(tool: ModelContextToolDescriptor): Promise<void>;
 	unregisterTool?(name: string): Promise<void>;
+	// Optional because a browser-supplied bridge need not expose them. The
+	// page-provided bridge in bridge.ts implements both, so an agent that can
+	// only evaluate JS in the tab can still discover and call the surface.
+	getTools?(): Promise<RegisteredToolInfo[]>;
+	executeTool?(tool: string | { name: string }, input?: unknown): Promise<ToolResult>;
 }
 
 declare global {
