@@ -1,7 +1,7 @@
 # T-0016-6: Terraform service module — App Runner service at 2 GB
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done — deployed and verified 2026-09-01 (see Verification Evidence).
 **Depends on**: T-0016-1, T-0016-2, T-0016-3, T-0016-4
 **Blocks**: T-0016-9, T-0016-10
 **Issue**: #16
@@ -139,3 +139,146 @@ The scheduled nightly job (T-0016-8). Measuring memory (T-0016-9). Pointing
 the frontend at the new origin (T-0016-10). Autoscaling policy — one task is
 correct for a POC whose whole design is a resident in-memory panel, and
 scaling out multiplies that panel per task rather than sharing it.
+
+## Verification Evidence (2026-09-01)
+
+Module: `terraform/modules/apprunner_service`, composed by `terraform/main.tf`
+alongside the existing network/panel_bucket/registry/iam/secrets modules.
+Deployed image: `490284589142.dkr.ecr.us-east-1.amazonaws.com/webmcp-backend-prod:f411683`,
+digest `sha256:af6a3061ed43f41efeff0a826dbc8e2fc92bcc41f938995157d4655fcf0d1823`
+(T-0016-1's verified image, built `--platform linux/amd64`, pushed to the
+IMMUTABLE-tagged ECR repo T-0016-4 provisioned).
+
+### Two real bugs found and fixed during `terraform apply` (not hypothetical)
+
+1. **AC9 (app identity reads the real bucket)**: `infra/object_store.py`'s
+   `ensure_reachable()` calls S3 `HeadBucket`, which IAM authorizes under
+   `s3:ListBucket` — not `s3:GetObject`. The app role (T-0016-4) had only
+   object-level `GetObject`/`PutObject`, confirmed missing via `aws iam
+   simulate-principal-policy` (`implicitDeny`). Fixed in
+   `terraform/modules/iam/main.tf`: added a `PanelBucketReachabilityCheck`
+   statement granting `s3:ListBucket` on the bucket ARN only (not
+   `${bucket_arn}/*`) — the app still never lists objects, this exists
+   solely to authorize the HEAD check.
+2. **AC6 (secrets by reference)**: the App Runner service failed
+   `CREATE_FAILED` twice, image pulled successfully both times but zero
+   application-log lines were ever written (the container never launched).
+   Isolated by temporarily deploying with an empty
+   `runtime_environment_secrets` map, which succeeded — proving secret
+   resolution was the blocker, not networking/health-check/CPU-memory.
+   Root cause, confirmed via `aws iam simulate-principal-policy`: App
+   Runner resolves `runtime_environment_secrets` on the **instance role**
+   using the batch `ssm:GetParameters` (plural) API and `kms:DescribeKey`,
+   not the singular `ssm:GetParameter`/`kms:Decrypt` pair a manual `aws ssm
+   get-parameter` call uses. `terraform/modules/secrets/main.tf`'s
+   `app_read_eodhd_api_key` policy only granted the singular actions.
+   Fixed by adding `ssm:GetParameters` and `kms:DescribeKey` to that
+   policy. Re-applied with the secret restored; the running service
+   updated in place (4m15s) and came up healthy with the secret injected.
+
+### Service replacement / hostname stability (answering the coordinator's question)
+
+The service's hostname changed once during this session (`ymh82a3n4m` →
+`awiz9fcu3b`), but **not** as a property of ordinary operation. Sequence:
+a `CREATE_FAILED` service from bug #2 above sat in Terraform state; my
+diagnostic apply (secrets removed) tried to `UpdateService` a service that
+was never running, which AWS's App Runner API does not support in place --
+the provider deleted and recreated the service, producing a new
+`service_id` and therefore a new `*.awsapprunner.com` hostname. This is a
+failure-recovery path, not steady state: once the service reached
+`RUNNING`, the very next apply (restoring the secret) updated the **same**
+service in place (`aws_apprunner_service.this: Modifying...`, 4m15s, "0
+added, 3 changed, 0 destroyed") with **no ARN or URL change** -- confirmed
+directly, since `apprunner_service_url` was identical before and after
+that apply. An ordinary image-tag bump (T-0016-9/T-0016-10's normal
+deploy path) only ever touches `image_identifier`, which App Runner
+updates via rolling deployment in place. The hostname is stable for T-0016-10
+to hardcode, as long as future applies don't hit a `CREATE_FAILED` state.
+
+### AC-by-AC
+
+- **AC1**: `instance_configuration { cpu = "1024", memory = "2048" }`, both
+  module inputs (`var.apprunner_cpu`/`var.apprunner_memory`, root defaults),
+  not literals in the module.
+- **AC2**: `https://awiz9fcu3b.us-east-1.awsapprunner.com/health` →
+  `{"status":"ok"}`, `200`. No certificate/DNS record in this repo --
+  App Runner's own `*.awsapprunner.com` + managed TLS.
+- **AC3/AC4**: health check targets `/health` (T-0016-2, liveness only).
+  `interval=20s` (AWS max), `timeout=15s`, `healthy_threshold=1`,
+  `unhealthy_threshold=10` -- chosen to tolerate S3-backed panel load
+  blocking startup (default 5s/2s/threshold-5 gives ~25s, nowhere near
+  enough). Measured real cold start against the **real** panel from
+  CloudWatch application logs: `Started server process` at
+  `19:50:52.397` ET, `Application startup complete` at `19:50:55.150` ET --
+  **2.75s**, comfortably inside the ~200s budget the configured thresholds
+  allow. AC4 verified structurally: the health endpoint (`api/routes/health.py`)
+  makes no file/object-store/panel call at all, so a mock-panel or no-panel
+  instance answers identically -- this is what T-0016-2 already guarantees.
+- **AC5**: `CORS_ALLOWED_ORIGINS=https://webmcp-stock-screener.alekst23.workers.dev`,
+  `RATE_LIMIT_DEFAULT=60/minute`, `REQUIRE_REAL_PANEL=true`,
+  `OBJECT_STORE_BUCKET=webmcp-panel-prod-490284589142`,
+  `OBJECT_STORE_REGION=us-east-1`, `EODHD_API_KEY` by SSM reference --
+  every render.yaml env var has an AWS equivalent (confirmed live via
+  `aws apprunner describe-service`).
+- **AC6**: `EODHD_API_KEY` is a `runtime_environment_secrets` entry
+  referencing the SSM parameter ARN, never a value; `describe-service`
+  shows only the ARN. No secret value in any Terraform file, state diff
+  shown above, or this document.
+- **AC7**: logs land in `/aws/apprunner/webmcp-prod-api/<id>/application`
+  and `.../service`; both imported into Terraform state and
+  `retention_in_days=30` applied (`terraform plan` confirms 0 -> 30 took
+  effect, no further drift).
+- **AC8**: rolling deploy with automatic rollback is App Runner's built-in
+  behavior (unchanged by this module). `auto_deployments_enabled = false`,
+  deliberately: ECR tags are immutable (T-0016-4), so this deployment tags
+  images by git SHA -- a given `image_identifier` is never repushed, and a
+  new commit always needs a Terraform apply to change the tag anyway.
+  Auto-deploy would never fire in this tagging scheme; leaving it off keeps
+  every deploy an explicit, auditable Terraform change.
+- **AC9**: live `GET /api/research/panel` (with the frontend's Origin
+  header) returned `{"source":"object-store","is_synthetic":false,
+  "ticker_count":1999,"row_count":2338597,"as_of":"2026-09-01",
+  "is_stale":false}` -- the real, T-0016-7-backfilled panel, read via the
+  app role's default credential chain (no static keys anywhere in this
+  module).
+- **AC10**: `terraform fmt -check -recursive` exits 0. Module composed by
+  root `main.tf`; region/environment/image/cpu/memory are all inputs
+  (`var.region`, `var.environment`, `var.apprunner_image_tag`,
+  `var.apprunner_cpu`, `var.apprunner_memory`).
+- **AC11**: `output "apprunner_service_url"` = `awiz9fcu3b.us-east-1.awsapprunner.com`.
+
+### REQUIRE_REAL_PANEL decision
+
+Set to `true`, matching render.yaml's production value. Justification:
+`load_panel`'s guard only fires when `store is None` (`OBJECT_STORE_BUCKET`
+entirely unset) -- with a bucket configured but empty (the state this
+service was in for part of this session, mid-backfill), `ensure_reachable()`
+succeeds and `object_exists(panel.parquet)` returns `False`, falling
+through to the mock panel exactly as it does today, **unaffected** by this
+flag. A wrong bucket or denied permission still aborts startup loudly
+either way, via `ensure_reachable()` -- the actual hazard T-0016-12 exists
+to close. This was proven in both directions during this session: the
+service ran healthy on the mock panel before the real `panel.parquet`
+existed, and now serves the real panel now that it does, with no
+Terraform or code change in between -- only a rolling deploy picking up
+what's in the bucket at container-start time.
+
+### `terraform plan` after apply -- no drift
+
+```
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration
+and found no differences, so no changes are needed.
+```
+
+### Cost
+
+App Runner 1 vCPU / 2 GB, one fixed instance (`aws_apprunner_auto_scaling_configuration_version`
+pinned `min_size=max_size=1`), running continuously: roughly **$55-60/month**
+at published per-vCPU-hour / per-GB-hour active-tier rates. Plus negligible
+CloudWatch Logs storage (30-day retention) and ECR storage for one ~150 MB
+image layer set. No load balancer, NAT gateway, or VPC connector -- none
+were created (confirmed: `network` module's public-subnet-only design was
+untouched by this ticket, and this module creates no networking resources
+at all).

@@ -98,14 +98,30 @@ resource "aws_iam_role" "app" {
 }
 
 # Scoped to exactly the two object keys load_panel.py reads and
-# nightly_delta.py writes (AC8) -- not "${bucket_arn}/*". No
-# s3:ListBucket, no delete action: object_store.py never calls them.
+# nightly_delta.py writes (AC8) -- not "${bucket_arn}/*". No delete action:
+# object_store.py never calls one.
 data "aws_iam_policy_document" "app_permissions" {
   statement {
     sid       = "PanelObjectReadWrite"
     effect    = "Allow"
     actions   = ["s3:GetObject", "s3:PutObject"]
     resources = [for key in var.panel_object_keys : "${var.panel_bucket_arn}/${key}"]
+  }
+
+  # object_store.py's ensure_reachable() (T-0016-3) calls HeadBucket before
+  # anything else, to fail loudly on a wrong bucket or denied permission
+  # rather than degrade to the mock panel (the "silent-mock hazard" the
+  # migration exists to remove). HeadBucket is authorized under
+  # s3:ListBucket, not s3:GetObject -- verified against this exact role with
+  # `aws iam simulate-principal-policy` (implicitDeny without this
+  # statement). Scoped to the bucket ARN only, not "${bucket_arn}/*": the
+  # app never calls ListObjects, this exists solely to authorize the HEAD
+  # check.
+  statement {
+    sid       = "PanelBucketReachabilityCheck"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [var.panel_bucket_arn]
   }
 }
 
