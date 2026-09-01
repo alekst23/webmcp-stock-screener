@@ -48,8 +48,10 @@
 		{@html `<!-- ${formatAgentToolsContext(webmcpStatus).replaceAll('--', '—')} -->`}
 	{/if}
 	<p>
-		This is the shared research session — the same workspace state an agent reads and writes through
-		WebMCP tools. It persists in this browser across reloads.
+		WebMCP Pattern Research Workbench lets a trader or researcher and an AI agent turn a vague chart
+		pattern into a tested hypothesis together, in the same browser tab. They share one visible
+		research session — defining patterns, searching price history, and measuring outcomes — that
+		persists in this browser across reloads.
 		<a href="/dev">Dev control surface →</a>
 	</p>
 
