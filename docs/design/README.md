@@ -22,3 +22,6 @@ feature spec may be touched by multiple epics as it evolves.
   fields, operators, studies, indicators, patterns, intervals, universes,
   and templates. Owns the catalog registry the filter-tree and chart-study
   epics validate against.
+- [Screener Core](screener-core/spec.md) — create a screener, set its
+  universe, build a nested filter tree from typed conditions, rank and
+  validate it, and execute one revision into a pinned `run_id`.
