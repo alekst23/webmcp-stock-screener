@@ -61,7 +61,7 @@ when measured peak on the deployed container approaches its ceiling.
 | 4 | T-0016-4 | Terraform foundation — state, bucket, registry, IAM, minimal network | — | Open |
 | 5 | T-0016-5 | Runtime secrets in AWS, out of the gitignored `.env` | T-0016-4 | Open |
 | 6 | T-0016-6 | Terraform service module — App Runner service at 2 GB | T-0016-1, T-0016-2, T-0016-3, T-0016-4 | Open |
-| 7 | T-0016-7 | Backfill panel to S3 (retargeted from R2->S3 migration -- R2 held nothing) | T-0016-3, T-0016-4 | Open |
+| 7 | T-0016-7 | Backfill panel to S3 (retargeted from R2->S3 migration -- R2 held nothing) | T-0016-3, T-0016-4 | Done |
 | 8 | T-0016-8 | Nightly delta as an EventBridge-scheduled Fargate task | T-0016-1, T-0016-3, T-0016-5, T-0016-7 | Open |
 | 9 | T-0016-9 | Measure absolute RSS on the deployed container | T-0016-6, T-0016-7 | Open |
 | 10 | T-0016-10 | Cutover — frontend origin, CORS, runbook, rollback | T-0016-6, T-0016-8, T-0016-9 | Open |

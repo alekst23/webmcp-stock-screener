@@ -1,7 +1,7 @@
 # T-0016-7: Backfill the real panel directly into S3
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done -- verified against the live account, see Verification below
 **Depends on**: T-0016-3, T-0016-4
 **Blocks**: T-0016-8, T-0016-9
 **Issue**: #16
@@ -152,6 +152,105 @@ objects describe the same universe rather than drifting apart.
 per-ticker range endpoint returns any span in one call), so 2,000 tickers
 is ~2,000 calls -- well inside the 100,000/day cap and roughly half the
 ~4,000-4,500 estimated for the full ~6,268-ticker listed universe.
+
+## Verification
+
+Universe: 2,000 tickers selected by the market-cap floor (Solution
+Approach); 1 could not be fetched from EODHD (per-ticker failures are
+recorded and skipped by design, `backfill_panel()`), so the panel covers
+1,999 tickers. Range requested: 2021-09-01 .. 2026-09-01.
+
+**AC2 (dry run before spending quota):**
+
+```
+Universe: 2000 tickers x ~5.0y ~= 2,519,655 ticker-days ~= 66 MB resident, 2000 API calls
+Dry run -- no data fetched, no panel written.
+```
+
+**AC3 (live backfill, real key from SSM, real store):** 2,000 EODHD calls
+spent (one per ticker, independent of success). Output:
+
+```
+Backfilling 2021-09-01 .. 2026-09-01...
+  ... (progress every 100 tickers) ...
+Wrote 2338597 rows for 1999 tickers to panel.parquet (2021-09-01 .. 2026-09-01).
+```
+
+S3 objects written, both SSE-S3 (`AES256`) and versioned, at exactly the
+two keys the app role's IAM policy is scoped to:
+
+| Key | Size | VersionId present |
+|---|---|---|
+| `panel.parquet` | 81,254,506 bytes (~77.5 MiB) | yes |
+| `universe.csv` | 84,437 bytes (~82.5 KiB) | yes |
+
+**AC4 (read-back on the default credential chain, no static keys):**
+
+```
+config (no static keys): ObjectStoreConfig(bucket='webmcp-panel-prod-490284589142', endpoint_url=None, region='us-east-1', access_key_id=None, secret_access_key=None)
+bucket reachable OK
+source: object-store
+is_synthetic: False
+as_of: 2026-09-01
+row_count: 2338597
+ticker_count: 1999
+first_date: 2021-09-01
+universe metadata entries: 2000
+panel frame len: 2338597
+```
+
+`OBJECT_STORE_ACCESS_KEY_ID` / `OBJECT_STORE_SECRET_ACCESS_KEY` were unset
+for this call -- boto3 resolved credentials from the ambient chain
+(`AWS_PROFILE`), the same mechanism the App Runner instance role uses in
+production. `is_synthetic: False` and `source: object-store` confirm this
+is the real panel, not the mock fallback.
+
+**AC5 (usable panel, representative query, absolute peak RSS):** measured
+with `scripts/measure_universe_scale.py` against the real downloaded panel,
+wrapped in `/usr/bin/time -l` for whole-process absolute RSS (no baseline
+subtraction, per the epic's Resolved Decision #2's methodology correction).
+
+| Pattern | Rows | Resident panel | Anchors matched | Absolute peak RSS |
+|---|---|---|---|---|
+| `narrow` (realistic first step) | 2,338,597 | 60,990,506 bytes (~58.2 MiB) | 16,820 | 589,774,848 bytes (~562.5 MiB) |
+| `broad` (pessimistic, ~half of rows) | 2,338,597 | 60,990,506 bytes (~58.2 MiB) | 436,466 | 831,864,832 bytes (~793.3 MiB) |
+
+Both fit the 2 GB App Runner ceiling with real headroom: `narrow` leaves
+~1.46 GB (73%), and `broad` -- the deliberately pessimistic pattern -- still
+leaves ~1.25 GB (61%), well clear of the ~1.4 GB line past which this
+ticket would have had to report a real failure to fit rather than
+rationalize one. `resident_bytes / rows` came out to 26.1 bytes/row,
+consistent with `panel_frame.py`'s measured compact-frame cost.
+
+**AC6 (no large artifact left behind):**
+
+```
+$ df -h /   # before download
+Filesystem   Size  Used  Avail Capacity  Mounted on
+/dev/disk3s1s1 460Gi 12Gi  87Gi   12%     /
+
+$ df -h /   # after download + measurement + cleanup
+Filesystem   Size  Used  Avail Capacity  Mounted on
+/dev/disk3s1s1 460Gi 12Gi  87Gi   12%     /
+```
+
+The downloaded copy of `panel.parquet` (81 MB) and the intermediate Nasdaq
+screener JSON pull (2.2 MB) used to build the universe were both removed
+from scratch after measurement; nothing was left in the working tree or
+committed.
+
+**AC7 (CI gate, no regression):**
+
+```
+$ uv run pytest -q
+123 passed, 5 skipped, 1 warning in 9.36s
+```
+
+Matches this branch's stated baseline exactly. `black --check`/`mypy`
+findings on this branch are pre-existing (touch files this ticket never
+edited -- `domain/contracts/*.py`, two test files, `infra/eodhd_client.py`'s
+missing `types-requests` stub) and out of scope for a docs+data ticket that
+changed no Python source.
 
 ## Out of Scope
 
