@@ -124,10 +124,11 @@ T-1008-1 ──┬──> T-1008-2 ──┬──> T-1008-5 ──┐
 ## Out of Scope
 
 - **Building the reference/fundamental data itself.** Sectors, industries,
-  indexes, exchanges, countries, fundamentals, and earnings calendars are
-  delivered by a separate parallel workstream. This epic defines the port
-  they implement against and nothing more — no ingestion, no mock data
-  pipeline, no fixture dataset masquerading as real reference data.
+  indexes, exchanges, countries, fundamentals, and earnings calendars have
+  no source and no owner — sourcing them is an open project decision. This
+  epic defines the port such a source would implement against and nothing
+  more — no ingestion, no mock data pipeline, no fixture dataset
+  masquerading as real reference data.
 - Mutation tooling of any kind (`expected_revision`, `idempotency_key`,
   `undo_token`) — these three tools are read-only. EPIC-1006 owns that.
 - `create_computed_field` and `create_custom_study` — user-authored catalog

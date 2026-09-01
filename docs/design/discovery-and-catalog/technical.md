@@ -184,7 +184,7 @@ includeDelisted?, limit? }` — `limit` bounded by a documented maximum.
 `getInstrument` resolves `data: null` for an unknown ID — a not-found
 outcome, never a throw and never a fabricated record.
 
-#### Implementer's checklist (reference-data workstream)
+#### Implementer's checklist (a future reference-data source)
 
 1. Implement both methods; return `DiscoveryEnvelope`, never a bare array.
 2. Populate every required `Provenance` field. For a directory sourced from
@@ -230,7 +230,7 @@ agent
   │  search_instruments
   ├─────────────> InstrumentDirectory (port)
   │                 ├── unavailableInstrumentDirectory   (default, today)
-  │                 └── <reference-data workstream adapter>  (later)
+  │                 └── <real reference-data adapter>        (later)
   │
   │  search_catalog / describe_catalog_item
   └─────────────> catalog registry (in-app, static)

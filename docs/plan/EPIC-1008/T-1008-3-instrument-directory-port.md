@@ -9,17 +9,18 @@
 ## Description
 
 Resolving "Apple" or "AAPL" to a canonical instrument needs reference data
-— exchanges, listings, asset types, countries, currencies — that a separate
-parallel workstream is building. This ticket delivers the boundary between
-the two: a domain port describing exactly what this program asks of that
-workstream, and a default adapter that reports the data as unavailable so
-every downstream tool works, honestly, before the real source lands. This
-is the **integration seam** for the whole program, so the contract and its
+— exchanges, listings, asset types, countries, currencies — that this
+project does not yet have a source for. No workstream owns it; sourcing it
+is an open decision (see the project plan's Blockers). This ticket delivers
+the boundary anyway: a domain port stating exactly what the program needs,
+and a default adapter that reports the data as unavailable so every
+downstream tool works, honestly, before any real source lands. This is the
+**integration seam** for the whole program, so the contract and its
 documentation are the deliverable, not a data source.
 
 ## User Story
 
-As the parallel reference-data workstream,
+As whoever eventually sources reference data,
 I want one documented port with a fixed request and response shape and a
 worked description of what each field means,
 so that I can implement against it independently and know my adapter will
@@ -48,8 +49,8 @@ drop into the discovery tools without either side changing.
    outcome rather than throwing or returning a fabricated record.
 7. A default adapter, used when no reference-data source is configured,
    returns a well-formed empty result whose provenance marks the source as
-   unconfigured and whose warnings name the reference-data workstream as the
-   dependency. It never throws and never returns invented instruments.
+   unconfigured and whose warnings state that no reference-data source is
+   configured. It never throws and never returns invented instruments.
 8. Which adapter is in use is decided at composition time by the caller, not
    by a module-level global, so a real adapter can replace the default
    without editing consuming code.
@@ -86,9 +87,9 @@ drop into the discovery tools without either side changing.
   correct behavior is "no data, here is why", not "plausible-looking sample
   data". A configurable test double is fine — it lives with the tests, not
   in the shipped default path.
-- The reference-data workstream may implement this over HTTP against the
-  existing FastAPI backend. Document the expected wire shape in
-  `technical.md` so that choice does not require renegotiating the port.
+- A future adapter may implement this over HTTP against the existing
+  FastAPI backend. Document the expected wire shape in `technical.md` so
+  that choice does not require renegotiating the port.
 - Ambiguity is the normal case for this tool ("Apple" matches several
   listings). The contract must make returning several ranked candidates the
   natural outcome, and picking one silently the awkward one.

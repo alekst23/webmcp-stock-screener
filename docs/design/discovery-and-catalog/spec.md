@@ -107,9 +107,9 @@ Questions below and implemented as stated.
 ## Non-Goals
 
 - **Supplying reference or fundamental market data.** Sectors, industries,
-  indexes, exchanges, countries, fundamentals, and earnings calendars come
-  from a separate parallel workstream. This feature defines the port that
-  workstream implements against, and reports honest unavailability until it
+  indexes, exchanges, countries, fundamentals, and earnings calendars have
+  no source and no owner yet. This feature defines the port such a source
+  would implement against, and reports honest unavailability until one
   lands. No mock pipeline, no fixture dataset presented as real.
 - **User-authored catalog entries.** `create_computed_field` and
   `create_custom_study` extend the catalog at runtime; the registry is
