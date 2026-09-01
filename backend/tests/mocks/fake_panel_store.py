@@ -13,6 +13,11 @@ class InMemoryPanelStore:
         self.objects: dict[str, bytes] = dict(objects or {})
         self.put_count = 0
 
+    def ensure_reachable(self) -> None:
+        # A fake in-memory store models a bucket that is already reachable;
+        # there is nothing to probe.
+        return None
+
     def object_exists(self, key: str) -> bool:
         return key in self.objects
 

@@ -1,14 +1,17 @@
-"""PanelStore adapter over the S3 API, used against Cloudflare R2.
+"""PanelStore adapter over the S3 API -- AWS S3 in production, Cloudflare R2
+in earlier deployments and still supported for any S3-compatible endpoint.
 
-R2 speaks the S3 API, so boto3 talks to it unchanged given a custom endpoint
-URL. Region is fixed to "auto": R2 has no regions, but botocore's SigV4
-signer requires *some* region name in the credential scope, and "auto" is the
-value Cloudflare documents for S3-compatible clients.
+Credentials come from the standard boto3 resolution chain (environment,
+shared config, or -- on AWS App Runner / ECS -- the instance/task role) when
+no static key pair is supplied. Static keys plus a custom endpoint keep
+working unchanged, which is what an R2 deployment needs.
 
-Config comes from the environment (R2_BUCKET_NAME / R2_ENDPOINT_URL /
-R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY -- see backend/.env.example). Values
-are never committed; on Render they are dashboard secrets (`sync: false` in
-render.yaml).
+Config comes from the environment (OBJECT_STORE_BUCKET /
+OBJECT_STORE_ENDPOINT_URL / OBJECT_STORE_REGION / OBJECT_STORE_ACCESS_KEY_ID
+/ OBJECT_STORE_SECRET_ACCESS_KEY -- see backend/.env.example). Values are
+never committed; on Render they were dashboard secrets (`sync: false` in
+render.yaml); on AWS they are not set at all, since the task role supplies
+credentials.
 """
 
 from __future__ import annotations
@@ -22,63 +25,60 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from domain.errors import PanelStoreError
 
-# R2 has no regions; botocore's SigV4 signer still needs a scope name.
-_R2_REGION = "auto"
+_BUCKET_VAR = "OBJECT_STORE_BUCKET"
 
 
 @dataclass(frozen=True)
 class ObjectStoreConfig:
     bucket: str
-    endpoint_url: str
-    access_key_id: str
-    secret_access_key: str
+    endpoint_url: str | None = None
+    region: str | None = None
+    access_key_id: str | None = None
+    secret_access_key: str | None = None
 
 
 def config_from_env(env: dict[str, str] | None = None) -> ObjectStoreConfig | None:
-    """Read the object-store config, or None when it is not fully set.
+    """Read the object-store config, or None when no bucket is named.
 
-    None rather than an error: a local checkout with no R2 credentials must
-    still boot against the mock panel (main.py's fallback), which is how
-    every test and every pre-T-0001-9 workflow runs.
+    The bucket is the sole signal of "configured": everything else -- region,
+    endpoint, static credentials -- has a value boto3 can resolve on its own,
+    so leaving it unset must not be mistaken for "no store". None rather than
+    an error here: a local checkout with no bucket named must still boot
+    against the mock panel (application/load_panel.py's fallback), which is
+    how every test and every pre-T-0001-9 workflow runs.
     """
     source = env if env is not None else dict(os.environ)
-    values = {
-        name: source.get(name, "").strip()
-        for name in (
-            "R2_BUCKET_NAME",
-            "R2_ENDPOINT_URL",
-            "R2_ACCESS_KEY_ID",
-            "R2_SECRET_ACCESS_KEY",
-        )
-    }
-    if not all(values.values()):
+    bucket = source.get(_BUCKET_VAR, "").strip()
+    if not bucket:
         return None
     return ObjectStoreConfig(
-        bucket=values["R2_BUCKET_NAME"],
-        endpoint_url=values["R2_ENDPOINT_URL"],
-        access_key_id=values["R2_ACCESS_KEY_ID"],
-        secret_access_key=values["R2_SECRET_ACCESS_KEY"],
+        bucket=bucket,
+        endpoint_url=_optional(source, "OBJECT_STORE_ENDPOINT_URL"),
+        region=_optional(source, "OBJECT_STORE_REGION"),
+        access_key_id=_optional(source, "OBJECT_STORE_ACCESS_KEY_ID"),
+        secret_access_key=_optional(source, "OBJECT_STORE_SECRET_ACCESS_KEY"),
     )
+
+
+def _optional(source: dict[str, str], name: str) -> str | None:
+    value = source.get(name, "").strip()
+    return value or None
 
 
 def missing_object_store_vars(env: dict[str, str] | None = None) -> list[str]:
     """Names of the object-store variables that are unset or blank, for CLI
-    entry points that must fail with a message naming what to set."""
+    entry points that must fail with a message naming what to set.
+
+    Only the bucket is unconditionally required -- everything else is
+    optional, so a role-based deploy that sets nothing else is not "missing"
+    credentials it was never meant to have.
+    """
     source = env if env is not None else dict(os.environ)
-    return [
-        name
-        for name in (
-            "R2_BUCKET_NAME",
-            "R2_ENDPOINT_URL",
-            "R2_ACCESS_KEY_ID",
-            "R2_SECRET_ACCESS_KEY",
-        )
-        if not source.get(name, "").strip()
-    ]
+    return [_BUCKET_VAR] if not source.get(_BUCKET_VAR, "").strip() else []
 
 
 class S3PanelStore:
-    """PanelStore over any S3-API endpoint (R2 in this project's deployment).
+    """PanelStore over any S3-API endpoint (AWS S3 or Cloudflare R2).
 
     `client` is injectable so the adapter's own key handling and error
     chaining are unit-testable without a live bucket.
@@ -93,8 +93,24 @@ class S3PanelStore:
             endpoint_url=config.endpoint_url,
             aws_access_key_id=config.access_key_id,
             aws_secret_access_key=config.secret_access_key,
-            region_name=_R2_REGION,
+            region_name=config.region,
         )
+
+    def ensure_reachable(self) -> None:
+        """Confirm the bucket itself can be reached under the resolved
+        credentials. Raises PanelStoreError, naming the bucket and chaining
+        the original exception, on any failure -- wrong bucket, denied
+        permission, or a credential chain that never resolves.
+
+        Deliberately separate from `object_exists`: a HEAD against a missing
+        *key* and a HEAD against a missing *bucket* can both come back as a
+        bare 404, and only the former is the benign "not seeded yet" case
+        load_panel is allowed to fall through on.
+        """
+        try:
+            self._client.head_bucket(Bucket=self._bucket)
+        except (ClientError, BotoCoreError) as exc:
+            raise PanelStoreError(f"Object store bucket {self._bucket!r} is not reachable") from exc
 
     def object_exists(self, key: str) -> bool:
         try:

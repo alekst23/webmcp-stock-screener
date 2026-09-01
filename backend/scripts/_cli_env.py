@@ -34,5 +34,7 @@ def require_panel_store() -> S3PanelStore:
         )
     config = config_from_env()
     if config is None:
-        sys.exit("Object store configuration became unreadable; check the R2_* variables.")
+        sys.exit(
+            "Object store configuration became unreadable; check the OBJECT_STORE_* variables."
+        )
     return S3PanelStore(config)
