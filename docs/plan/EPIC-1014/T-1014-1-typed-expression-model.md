@@ -69,7 +69,7 @@ I execute.
 - `docs/design/screener-followup-tools/spec.md` — "Author a computed
   field" and "Author a custom study" scenarios; the validation and
   no-code-execution rows in particular.
-- `.dev/design/tool-spec.md` — the exclusion of raw SQL and JavaScript
+- `docs/reference/tool-spec.md` — the exclusion of raw SQL and JavaScript
   execution, and `describe_catalog_item`'s declared parameters, units,
   valid ranges, defaults, and outputs, which are what validation resolves
   against.

@@ -41,7 +41,7 @@ convention.
 ## Casing: internal vs. wire
 
 Internal TypeScript is camelCase, per project convention. The agent-facing
-JSON is snake_case, per `.dev/design/tool-spec.md`. One serializer bridges
+JSON is snake_case, per `docs/reference/tool-spec.md`. One serializer bridges
 them; nothing else in the codebase writes snake_case.
 
 - Tool `inputSchema` property names are snake_case: `expected_revision`,

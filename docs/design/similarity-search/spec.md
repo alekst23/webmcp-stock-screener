@@ -147,7 +147,7 @@ calls, with the data's provenance stated at every step.
 
 ## Open Questions
 
-Not settled by `.dev/design/tool-spec.md`; each carries the assumption this
+Not settled by `docs/reference/tool-spec.md`; each carries the assumption this
 spec is written against.
 
 1. **Candidate universe bounds.** No default universe or result cap is

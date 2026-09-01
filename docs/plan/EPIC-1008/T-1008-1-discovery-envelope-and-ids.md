@@ -8,7 +8,7 @@
 
 ## Description
 
-`.dev/design/tool-spec.md` requires that every market-data result state
+`docs/reference/tool-spec.md` requires that every market-data result state
 `as_of`, source, live/delayed status, timezone, currency, adjusted or
 unadjusted prices, fundamentals reporting period, and the
 calculation-engine version — and that every resource be addressed by a
@@ -59,7 +59,7 @@ rather than re-remembered in every tool.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — "Common contract for every tool": the
+- `docs/reference/tool-spec.md` — "Common contract for every tool": the
   stable-ID rule and the market-data provenance list this ticket encodes.
 - `docs/design/discovery-and-catalog/technical.md` — the envelope and ID
   contracts.

@@ -56,7 +56,7 @@ name that looks reasonable.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — `search_catalog`'s stated purpose and the
+- `docs/reference/tool-spec.md` — `search_catalog`'s stated purpose and the
   eight kinds it must cover.
 - `docs/design/discovery-and-catalog/spec.md` — the "Search the catalog"
   scenarios.

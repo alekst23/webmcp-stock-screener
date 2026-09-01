@@ -71,7 +71,7 @@ the losers were quietly excluded.
 
 - `docs/design/screener-followup-tools/spec.md` — "Backtest a screener"
   and "Read backtest results" scenario tables.
-- `.dev/design/tool-spec.md` — `backtest_screener` /
+- `docs/reference/tool-spec.md` — `backtest_screener` /
   `get_backtest_results` ("historical frequency, forward returns,
   drawdowns, and survivorship assumptions"); the market-data provenance
   requirement every result must carry.

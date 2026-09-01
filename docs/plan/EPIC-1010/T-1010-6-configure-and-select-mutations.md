@@ -67,7 +67,7 @@ undoable.
   table" and "Select results" scenarios.
 - `docs/plan/EPIC-1010/T-1010-1-results-table-config-model.md` — the
   configuration model and its validation.
-- `.dev/design/tool-spec.md` — the common mutation contract and its
+- `docs/reference/tool-spec.md` — the common mutation contract and its
   envelope shape.
 
 ## Technical Considerations

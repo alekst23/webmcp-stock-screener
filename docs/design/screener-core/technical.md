@@ -71,7 +71,7 @@ and is skipped by both validation and execution.
 ### `Condition`
 
 A discriminated union on `type`, one variant per condition type in
-`.dev/design/tool-spec.md`. No variant carries a free-form string that is
+`docs/reference/tool-spec.md`. No variant carries a free-form string that is
 parsed or evaluated — that is what makes "no raw SQL or JavaScript" an
 enforceable property of the model rather than a review convention.
 

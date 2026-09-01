@@ -63,7 +63,7 @@ landed on the revision I expected.
 
 - `docs/design/chart-tools/spec.md` — "Configure the chart" scenarios
 - `docs/design/chart-tools/technical.md` — chart configuration contract
-- `.dev/design/tool-spec.md` — the `configure_chart` row and "Common
+- `docs/reference/tool-spec.md` — the `configure_chart` row and "Common
   contract for every tool"
 - `src/lib/webmcp/tools.ts` — existing `ToolSpec` shape, input-schema
   style, and the `ok`/`fail`/`run` result conventions to follow in new

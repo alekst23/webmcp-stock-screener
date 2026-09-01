@@ -75,7 +75,7 @@ validation, and saving without falling off the end of the tool set.
 - `docs/design/screener-followup-tools/spec.md` — the full scenario set;
   the "Contract obligations shared by every mutating tool here" table is
   what AC4 and AC5 verify.
-- `.dev/design/tool-spec.md` — the complete follow-up tool list and the
+- `docs/reference/tool-spec.md` — the complete follow-up tool list and the
   common contract.
 - `docs/plan/EPIC-1006/_epic.md` — the mutation envelope, revision
   checks, idempotency, and `undo_change` that the cross-tool tests

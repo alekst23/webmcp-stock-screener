@@ -56,7 +56,7 @@ guessing the payload shape.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the two Safety-row tool names and the
+- `docs/reference/tool-spec.md` — the two Safety-row tool names and the
   exclusion list this ticket must honour
 - `docs/design/safety-preview-apply/spec.md` — the scenario tables the
   end-to-end tests should mirror

@@ -60,7 +60,7 @@ live, delayed, adjusted, or stale.
 - `docs/design/results-and-explain/spec.md` — "Read a bounded page of
   results" scenarios, including "No silent rerun", "Expired or unknown
   run", and "Provenance".
-- `.dev/design/tool-spec.md` — the `get_screener_results` row and the
+- `docs/reference/tool-spec.md` — the `get_screener_results` row and the
   market-data provenance paragraph in the common contract.
 - `backend/domain/contracts/engine.py` — the existing Protocol-based
   contract style for engine boundaries.

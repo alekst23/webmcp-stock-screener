@@ -120,7 +120,7 @@ Cutover therefore ends with an explicit live-deploy verification ticket
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the ~33-core-tool target surface this program
+- `docs/reference/tool-spec.md` — the ~33-core-tool target surface this program
   builds toward, and the source of truth all specs derive from. Note: this
   file is **not tracked in git**; it lives only in the main working copy.
 - `docs/design/pattern-research-workbench/spec.md` — the legacy product
@@ -142,7 +142,7 @@ Cutover therefore ends with an explicit live-deploy verification ticket
 ## Open Questions
 
 Recorded rather than resolved, per the program's standing decision that
-specs derive from `.dev/design/tool-spec.md` and no design interview is
+specs derive from `docs/reference/tool-spec.md` and no design interview is
 run. Each carries a stated assumption so the epic can proceed.
 
 1. **The event-atom research model has no obvious home in the new surface.**

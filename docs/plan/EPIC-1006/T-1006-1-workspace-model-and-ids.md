@@ -57,7 +57,7 @@ else's do, and reordering never changes what an ID points at.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — "Common contract for every tool" (stable
+- `docs/reference/tool-spec.md` — "Common contract for every tool" (stable
   IDs); the Workspace rows name the panel kinds and the logical-grid
   layout requirement.
 - `docs/design/workspace-revisions/technical.md` — "T-1006-1" section

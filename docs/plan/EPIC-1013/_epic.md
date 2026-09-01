@@ -98,7 +98,7 @@ T-1013-1 ─────────┼──> T-1013-3 ──┼──> T-1013-
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the program's tool surface; the Safety row
+- `docs/reference/tool-spec.md` — the program's tool surface; the Safety row
   (`preview_workspace_changes`, `apply_previewed_changes`), the common
   mutation contract (`expected_revision`, `idempotency_key`, and the
   returned envelope), and the explicit exclusion of
@@ -144,7 +144,7 @@ must not re-implement any of it.
 Recorded rather than escalated; each proceeds on the stated assumption
 (see `docs/design/safety-preview-apply/spec.md` for the rationale).
 
-1. **Preview lifetime.** `.dev/design/tool-spec.md` does not state how long
+1. **Preview lifetime.** `docs/reference/tool-spec.md` does not state how long
    a preview stays redeemable. *Assumption*: previews are session-scoped
    and in-memory with a bounded count and a TTL; expiry is a
    resource-hygiene measure only — safety comes from the revision check at

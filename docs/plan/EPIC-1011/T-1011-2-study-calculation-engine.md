@@ -53,7 +53,7 @@ changed underneath a saved setup.
 
 - `docs/design/chart-tools/spec.md` — "Manage studies" and "Read a
   bounded slice of the chart" behavioral sections
-- `.dev/design/tool-spec.md` — the `edit_chart_studies` row names the
+- `docs/reference/tool-spec.md` — the `edit_chart_studies` row names the
   study set; "Common contract" requires the calculation-engine version
 - `src/lib/workspace/visualization.ts` — the existing convention of
   keeping numeric chart logic in a pure, DOM-free module with its own

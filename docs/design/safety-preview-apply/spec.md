@@ -113,7 +113,7 @@ below is in service of one of them.
 
 ## Assumptions and open questions
 
-`.dev/design/tool-spec.md` is the source of truth and does not settle the
+`docs/reference/tool-spec.md` is the source of truth and does not settle the
 following. Each proceeds on the stated assumption; revisit only if the
 program's owner says otherwise.
 
@@ -147,4 +147,4 @@ program's owner says otherwise.
 - A human-facing UI for reviewing a pending preview.
 - Cross-session or cross-device preview sharing.
 - Any generic state-setting, arbitrary code execution, or DOM automation
-  path — explicitly excluded by `.dev/design/tool-spec.md`.
+  path — explicitly excluded by `docs/reference/tool-spec.md`.

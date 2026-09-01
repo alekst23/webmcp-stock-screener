@@ -9,7 +9,7 @@ container and panel-kind registry), EPIC-1009 (screeners and the pinned
 ## Description
 
 Delivers the Results area of the new ~33-tool WebMCP surface described in
-`.dev/design/tool-spec.md`: `configure_results_table`,
+`docs/reference/tool-spec.md`: `configure_results_table`,
 `get_screener_results`, `select_result`, and `explain_result`. Together
 they turn a screener run from an opaque count into something a person and
 an agent can read, page through, select from, and audit. The defining
@@ -116,7 +116,7 @@ T-1010-1 ────> T-1010-6 ───┘
 
 - `docs/design/results-and-explain/spec.md` — the behavioral spec this
   epic implements; every ticket's AC traces to a scenario in it.
-- `.dev/design/tool-spec.md` — program-level design source of truth: the
+- `docs/reference/tool-spec.md` — program-level design source of truth: the
   Results tool row definitions, the common mutation contract, and the
   market-data provenance requirement.
 - `src/lib/webmcp/tools.ts` — existing tool-definition conventions

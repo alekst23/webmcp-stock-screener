@@ -71,7 +71,7 @@ to the screener's field list.
 
 - `docs/design/screener-followup-tools/spec.md` — "Author a computed
   field" and "Author a custom study" scenario tables.
-- `.dev/design/tool-spec.md` — `create_computed_field` and
+- `docs/reference/tool-spec.md` — `create_computed_field` and
   `create_custom_study` in the follow-up list; the "typed expression
   model, never arbitrary JavaScript" requirement; the common mutation
   contract.

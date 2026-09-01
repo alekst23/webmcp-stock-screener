@@ -60,7 +60,7 @@ something I have to trust.
 - `docs/design/results-and-explain/spec.md` — "Explain a result"
   scenarios, including "Failed candidate" and "Unavailable data"; Open
   Questions 5 and 6.
-- `.dev/design/tool-spec.md` — the `explain_result` row, the
+- `docs/reference/tool-spec.md` — the `explain_result` row, the
   `edit_filter_tree` condition types (scalar, range, series comparison,
   temporal, event-relative, pattern, relative, study output) that
   explanations must be able to restate, and the ranking configuration

@@ -63,7 +63,7 @@ screener revision that produced them, however much I edit in between.
 
 - `docs/design/screener-followup-tools/spec.md` — "Backtest a screener"
   and "Read backtest results" scenario tables.
-- `.dev/design/tool-spec.md` — `backtest_screener` and
+- `docs/reference/tool-spec.md` — `backtest_screener` and
   `get_backtest_results`; the common mutation contract; the market-data
   provenance requirement.
 - `docs/plan/EPIC-1014/T-1014-5-backtest-evaluation-engine.md` — the

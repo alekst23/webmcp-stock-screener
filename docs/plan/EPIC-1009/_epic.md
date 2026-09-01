@@ -14,7 +14,7 @@ reference/fundamental market-data ports)
 The app today ships an 11-tool pattern-research surface that answers
 "where has this pattern happened before". It has no way to answer "which
 instruments look like this right now". This epic delivers the screener
-half of the WebMCP workbench described in `.dev/design/tool-spec.md`: six
+half of the WebMCP workbench described in `docs/reference/tool-spec.md`: six
 tools that create a screener, choose its universe, build a nested filter
 tree out of eight typed condition types, rank the matches, validate the
 whole thing before it costs anything, and execute one specific screener
@@ -86,7 +86,7 @@ T-1009-2 ───────────────────────�
 3. `edit_filter_tree` supports add, update, remove, group, enable/disable,
    and reorder over arbitrarily nested `AND`, `OR`, and `NOT` groups,
    with node IDs that survive grouping and reordering.
-4. All eight condition types from `.dev/design/tool-spec.md` — scalar,
+4. All eight condition types from `docs/reference/tool-spec.md` — scalar,
    range, series comparison, temporal, event-relative, pattern, relative,
    and study output — can be expressed, are validated against EPIC-1008's
    catalog registry, and are rejected when they name unknown items or
@@ -118,7 +118,7 @@ T-1009-2 ───────────────────────�
 - `docs/design/screener-core/technical.md` — the screener definition
   shape, the filter-node and condition unions, and the pinned-run contract
   EPIC-1010 consumes.
-- `.dev/design/tool-spec.md` — the program-level ~33-tool surface this
+- `docs/reference/tool-spec.md` — the program-level ~33-tool surface this
   epic implements six of, and the common contract every tool obeys.
 - `src/lib/webmcp/tools.ts` and `src/lib/webmcp/types.ts` — the existing
   `ToolSpec` shape, `ok`/`fail` result helpers, and handle-based model to

@@ -6,7 +6,7 @@
 
 ## Description
 
-The new WebMCP surface described in `.dev/design/tool-spec.md` gives an
+The new WebMCP surface described in `docs/reference/tool-spec.md` gives an
 agent a real chart to drive: it can set what the chart shows, put studies
 on it, read a bounded slice of what is visible, mark it up, and capture
 the whole configuration as a reusable reference setup. This epic delivers
@@ -124,7 +124,7 @@ T-1011-7 ─┘
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the program's tool surface; the `Chart`
+- `docs/reference/tool-spec.md` — the program's tool surface; the `Chart`
   rows and the "Common contract for every tool" section are this epic's
   source requirements
 - `docs/design/chart-tools/spec.md` — behavioral spec for this feature
@@ -141,7 +141,7 @@ T-1011-7 ─┘
 
 ## Open Questions
 
-1. **Wire-format casing.** `.dev/design/tool-spec.md` names envelope
+1. **Wire-format casing.** `docs/reference/tool-spec.md` names envelope
    fields in `snake_case` (`expected_revision`, `change_id`, `as_of`);
    the existing tool surface uses `camelCase` on the wire. This epic
    assumes `snake_case` on the wire for every field the spec names

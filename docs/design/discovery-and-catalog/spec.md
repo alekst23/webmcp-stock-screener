@@ -18,7 +18,7 @@ parameters, units, ranges, defaults, outputs, and data availability, in one
 or two calls, and can always tell the difference between "the app does not
 support that" and "that data is not wired up yet".
 
-Derived from `.dev/design/tool-spec.md`. No design interview was
+Derived from `docs/reference/tool-spec.md`. No design interview was
 conducted; where the tool spec is silent, an assumption is stated in Open
 Questions below and implemented as stated.
 

@@ -11,7 +11,7 @@ An agent driving a screener has to name things before it can do anything:
 which instrument, which field, which operator, which study, which interval.
 Today it can only guess, and a guess that looks plausible ("RSI14",
 "AAPL") is indistinguishable from one that is wrong. This epic delivers the
-three read-only discovery tools from `.dev/design/tool-spec.md` —
+three read-only discovery tools from `docs/reference/tool-spec.md` —
 `search_instruments`, `search_catalog`, `describe_catalog_item` — plus the
 **catalog registry** they read from: the typed, stable-ID inventory of
 fields, operators, studies, indicators, patterns, intervals, universes, and
@@ -102,7 +102,7 @@ T-1008-1 ──┬──> T-1008-2 ──┬──> T-1008-5 ──┐
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the source of truth for the three tool
+- `docs/reference/tool-spec.md` — the source of truth for the three tool
   descriptions, the eight `edit_filter_tree` condition types the operator
   catalog must cover, the "stable IDs — never a bare ticker" rule, and the
   market-data provenance requirement.

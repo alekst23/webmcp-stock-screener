@@ -49,7 +49,7 @@ so that I can approve or reject the change without reading a state dump.
 ## Design References
 
 - `docs/design/safety-preview-apply/technical.md` — "Diff shape"
-- `.dev/design/tool-spec.md` — the envelope's `diff_summary` example
+- `docs/reference/tool-spec.md` — the envelope's `diff_summary` example
   (`"Added RSI study and RSI 40–70 filter"`) and `affected_ids`
 - `docs/design/safety-preview-apply/spec.md` — the honesty guarantee this
   output is measured against

@@ -75,7 +75,7 @@ one call.
 - `docs/plan/EPIC-1006/_epic.md` — the workspace/revision model, stable-ID
   minting, mutation envelope, `expected_revision`, `idempotency_key`, and
   undo token contracts this ticket consumes
-- `.dev/design/tool-spec.md` — the canonical envelope shape
+- `docs/reference/tool-spec.md` — the canonical envelope shape
 
 ## Technical Considerations
 

@@ -70,7 +70,7 @@ by a panel is provably the same object throughout.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the Similarity rows (the six feature
+- `docs/reference/tool-spec.md` — the Similarity rows (the six feature
   families come verbatim from `explain_similarity`), and the
   "Common contract for every tool" and market-data-provenance sections
 - `backend/domain/models/pattern.py`, `backend/domain/models/instance.py` —

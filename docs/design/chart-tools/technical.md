@@ -2,7 +2,7 @@
 
 Contracts introduced by EPIC-1011. Field names below are the **wire**
 names used in tool payloads (`snake_case`, following
-`.dev/design/tool-spec.md`); TypeScript identifiers are `camelCase` per
+`docs/reference/tool-spec.md`); TypeScript identifiers are `camelCase` per
 project convention. EPIC-1006 is authoritative on the casing question —
 see the spec's Open Questions.
 

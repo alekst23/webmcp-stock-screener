@@ -63,7 +63,7 @@ without hand-searching the universe.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the `find_similar_setups` row, the common
+- `docs/reference/tool-spec.md` — the `find_similar_setups` row, the common
   mutation contract, and the market-data provenance rule
 - `docs/plan/EPIC-1012/T-1012-3-similarity-api.md` — the HTTP contract
   this tool calls

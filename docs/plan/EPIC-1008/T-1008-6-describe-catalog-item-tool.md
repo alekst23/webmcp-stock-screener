@@ -63,7 +63,7 @@ its constraints through rejected calls.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — `describe_catalog_item`'s stated purpose:
+- `docs/reference/tool-spec.md` — `describe_catalog_item`'s stated purpose:
   "parameters, units, valid ranges, defaults, outputs, and data
   availability".
 - `docs/design/discovery-and-catalog/spec.md` — the "Describe a catalog

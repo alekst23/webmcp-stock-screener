@@ -56,7 +56,7 @@ so that the tool layer carries no analytical logic of its own.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — market-data provenance requirements that
+- `docs/reference/tool-spec.md` — market-data provenance requirements that
   every response must satisfy
 - `backend/api/routes/research.py` and `backend/api/schemas/research.py` —
   the existing route and schema layering, error mapping, and naming style

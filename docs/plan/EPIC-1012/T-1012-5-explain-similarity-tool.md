@@ -57,7 +57,7 @@ rather than on trust.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the `explain_similarity` row (the six
+- `docs/reference/tool-spec.md` — the `explain_similarity` row (the six
   feature families are named there) and `explain_result`, the screener-side
   transparency tool this parallels
 - `docs/plan/EPIC-1012/T-1012-1-similarity-contract.md` — the explanation

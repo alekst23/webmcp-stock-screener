@@ -53,7 +53,7 @@ response I never see.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — `add_panel`'s `similar_opportunities` panel
+- `docs/reference/tool-spec.md` — `add_panel`'s `similar_opportunities` panel
   kind, and the market-data provenance rule
 - `docs/plan/EPIC-1012/T-1012-1-similarity-contract.md` — the candidate,
   run, normalization, and provenance shapes this renders

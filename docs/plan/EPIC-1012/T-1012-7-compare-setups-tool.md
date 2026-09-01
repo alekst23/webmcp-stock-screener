@@ -62,7 +62,7 @@ claims is really there.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the `compare_setups` row (the three forms
+- `docs/reference/tool-spec.md` — the `compare_setups` row (the three forms
   are named there), the common mutation contract, and the provenance rule
 - `docs/plan/EPIC-1012/T-1012-6-similar-opportunities-panel.md` — the panel
   these views render into

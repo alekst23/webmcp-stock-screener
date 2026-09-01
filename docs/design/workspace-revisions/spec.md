@@ -1,7 +1,7 @@
 # Workspace, Revisions & the Common Tool Contract — Behavioral Spec
 
 **Epic**: EPIC-1006
-**Source of truth**: `.dev/design/tool-spec.md`
+**Source of truth**: `docs/reference/tool-spec.md`
 **Status**: Derived from the program design doc, not from an intent
 interview. Points the design doc does not settle are listed under
 "Open questions" in `docs/plan/EPIC-1006/_epic.md` with a stated working

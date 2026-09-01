@@ -62,7 +62,7 @@ disambiguate when several listings match.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — `search_instruments`' stated purpose; the
+- `docs/reference/tool-spec.md` — `search_instruments`' stated purpose; the
   stable-ID rule; the provenance requirement.
 - `docs/design/discovery-and-catalog/spec.md` — the "Resolve an instrument"
   scenarios.

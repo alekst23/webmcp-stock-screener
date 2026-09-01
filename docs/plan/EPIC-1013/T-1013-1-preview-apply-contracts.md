@@ -54,7 +54,7 @@ single payload shape to serialize.
   must be able to express, and the scenario tables they must cover
 - `docs/design/safety-preview-apply/technical.md` — "Diff shape" and the
   layering table
-- `.dev/design/tool-spec.md` — the common mutation contract these types
+- `docs/reference/tool-spec.md` — the common mutation contract these types
   interoperate with
 - `src/lib/webmcp/types.ts` — the project's existing convention for
   declaring a tool surface's data contracts

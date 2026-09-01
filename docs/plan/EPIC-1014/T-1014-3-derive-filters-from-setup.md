@@ -61,7 +61,7 @@ black box that overwrites my work.
 
 - `docs/design/screener-followup-tools/spec.md` — "Derive filters from a
   setup" scenario table.
-- `.dev/design/tool-spec.md` — `derive_filters_from_setup` ("convert an
+- `docs/reference/tool-spec.md` — `derive_filters_from_setup` ("convert an
   example chart into an editable draft filter tree"); the eight
   `edit_filter_tree` condition types the draft must be expressed in.
 - `docs/plan/EPIC-1011/_epic.md` — `capture_chart_setup`'s contract: what

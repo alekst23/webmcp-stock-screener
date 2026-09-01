@@ -6,7 +6,7 @@
 
 ## Description
 
-The new WebMCP surface described in `.dev/design/tool-spec.md` treats the
+The new WebMCP surface described in `docs/reference/tool-spec.md` treats the
 workbench as a workspace of panels an agent can compose: add a filter
 builder next to a chart, wire the results table's selection into that
 chart, collapse the study library, take the alerts panel away. Today the
@@ -108,7 +108,7 @@ T-1007-3 ──┘
 - `docs/design/panel-system/technical.md` — the registry surface sibling
   epics plug into, the grid and link contracts, and what is consumed from
   EPIC-1006 rather than built here
-- `.dev/design/tool-spec.md` — program-level source of truth for the
+- `docs/reference/tool-spec.md` — program-level source of truth for the
   ~33-tool surface and the common mutation contract
 - `docs/plan/EPIC-1006/_epic.md` — the workspace/revision model, stable
   IDs, mutation envelope, `expected_revision`, `idempotency_key`, undo

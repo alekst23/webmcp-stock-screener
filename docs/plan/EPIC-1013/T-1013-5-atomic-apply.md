@@ -68,7 +68,7 @@ state neither of us expected.
   preview"
 - `docs/plan/EPIC-1013/_epic.md` — "What this epic needs from EPIC-1006"
   (compare-and-swap commit, idempotency store, undo issuance)
-- `.dev/design/tool-spec.md` — the exact envelope field names
+- `docs/reference/tool-spec.md` — the exact envelope field names
 
 ## Technical Considerations
 

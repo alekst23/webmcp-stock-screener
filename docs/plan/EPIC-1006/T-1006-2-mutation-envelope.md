@@ -50,7 +50,7 @@ token without special-casing each tool.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — "Common contract for every tool" gives the
+- `docs/reference/tool-spec.md` — "Common contract for every tool" gives the
   literal JSON envelope this ticket must reproduce.
 - `docs/design/workspace-revisions/technical.md` — "T-1006-2" section and
   the "Casing: internal vs. wire" rule.

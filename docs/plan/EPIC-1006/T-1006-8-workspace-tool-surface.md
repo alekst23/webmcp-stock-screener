@@ -55,7 +55,7 @@ anything on my behalf.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the Context, Workspace and Persistence rows
+- `docs/reference/tool-spec.md` — the Context, Workspace and Persistence rows
   name and describe each of the seven tools.
 - `docs/design/workspace-revisions/spec.md` — the "Reading the situation"
   and "Naming a state worth keeping" scenarios.

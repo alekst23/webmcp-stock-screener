@@ -66,7 +66,7 @@ page's memory stay finite.
   chart" scenarios, including every refusal case
 - `docs/design/chart-tools/technical.md` — bounded-read request and
   response contracts
-- `.dev/design/tool-spec.md` — the `get_chart_data` row ("Read a bounded
+- `docs/reference/tool-spec.md` — the `get_chart_data` row ("Read a bounded
   range…") and the market-data provenance requirement
 
 ## Technical Considerations

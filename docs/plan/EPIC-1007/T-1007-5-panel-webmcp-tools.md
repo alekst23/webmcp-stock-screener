@@ -62,7 +62,7 @@ loop.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the five tools' purposes and the common
+- `docs/reference/tool-spec.md` — the five tools' purposes and the common
   contract every tool returns
 - `docs/design/panel-system/spec.md` — the failure scenarios each error
   message must serve

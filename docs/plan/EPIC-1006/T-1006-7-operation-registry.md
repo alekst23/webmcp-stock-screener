@@ -58,7 +58,7 @@ common contract.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the Safety rows (`preview_workspace_changes`
+- `docs/reference/tool-spec.md` — the Safety rows (`preview_workspace_changes`
   and `apply_previewed_changes`) describe the behavior this engine
   provides to EPIC-1013.
 - `docs/design/workspace-revisions/spec.md` — the "Growing the surface"

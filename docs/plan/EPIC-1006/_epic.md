@@ -7,7 +7,7 @@
 
 ## Description
 
-`.dev/design/tool-spec.md` specifies a ~33-tool WebMCP surface for a stock
+`docs/reference/tool-spec.md` specifies a ~33-tool WebMCP surface for a stock
 screener / research workbench, and states one contract every tool in it must
 obey: stable IDs for every resource, `expected_revision` and
 `idempotency_key` on every mutation, a fixed mutation-result envelope, and
@@ -100,7 +100,7 @@ T-1006-3 ───────────────────────�
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the program's source of truth; its
+- `docs/reference/tool-spec.md` — the program's source of truth; its
   "Common contract for every tool" section defines this epic's envelope,
   stable-ID rule and market-data provenance requirements, and the
   Context / Workspace / Persistence rows define its seven tools.

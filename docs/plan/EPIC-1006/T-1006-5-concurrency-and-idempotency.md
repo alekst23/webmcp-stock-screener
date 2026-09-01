@@ -55,7 +55,7 @@ so that I never silently clobber the human's change or duplicate my own.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — "Common contract for every tool" states the
+- `docs/reference/tool-spec.md` — "Common contract for every tool" states the
   `expected_revision` / `idempotency_key` requirement this implements.
 - `docs/design/workspace-revisions/spec.md` — the "Changing things safely"
   scenarios are the behavior under test here.

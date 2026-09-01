@@ -62,7 +62,7 @@ hand-tuning weights I do not have intuitions about.
 
 - `docs/design/screener-followup-tools/spec.md` — "Refine a similarity
   search" scenario table.
-- `.dev/design/tool-spec.md` — `refine_similarity_search` ("adjust
+- `docs/reference/tool-spec.md` — `refine_similarity_search` ("adjust
   feature weights from accepted and rejected matches"); the feature
   dimensions `explain_similarity` reports (price shape, volume,
   volatility, relative strength, studies, pattern structure), which are

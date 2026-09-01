@@ -74,7 +74,7 @@ instead of hard-coded string lists scattered across tools.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the eight catalog kinds `search_catalog`
+- `docs/reference/tool-spec.md` — the eight catalog kinds `search_catalog`
   must cover; the eight `edit_filter_tree` condition types the operator
   entries must span; the study examples (MA, RSI, MACD, Bollinger Bands,
   VWAP, ATR) `edit_chart_studies` names; the `set_screener_universe`

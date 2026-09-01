@@ -75,7 +75,7 @@ loop.
   types" scenario table; each AC above traces to a row.
 - `docs/design/screener-core/technical.md` — the `Condition` union and
   what each variant carries.
-- `.dev/design/tool-spec.md` — the eight condition types and the explicit
+- `docs/reference/tool-spec.md` — the eight condition types and the explicit
   exclusion of raw SQL/JavaScript execution.
 - `src/lib/webmcp/tools.ts` — the existing self-correcting error
   convention (an error that returns the valid options back to the agent).

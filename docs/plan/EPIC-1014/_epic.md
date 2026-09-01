@@ -10,7 +10,7 @@ EPIC-1011, EPIC-1012
 
 The core epics (EPIC-1006 through EPIC-1012) give an agent a screener it
 can build, run, read, chart, and search for lookalikes. This epic adds
-the 13 follow-up tools from `.dev/design/tool-spec.md`'s "High-value
+the 13 follow-up tools from `docs/reference/tool-spec.md`'s "High-value
 follow-up tools" section — the ones that turn a one-off screen into
 durable research: refining a similarity search from feedback, authoring
 computed fields and custom studies through a typed expression model,
@@ -105,7 +105,7 @@ T-1014-10 ──────────────┘
 
 ## Acceptance Criteria
 
-1. All 13 follow-up tools named in `.dev/design/tool-spec.md` are
+1. All 13 follow-up tools named in `docs/reference/tool-spec.md` are
    registered on the new WebMCP surface, discoverable with descriptions
    and input schemas, and callable end to end.
 2. Every mutating tool in this epic accepts `expected_revision` and
@@ -145,7 +145,7 @@ T-1014-10 ──────────────┘
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the program's source of truth; the
+- `docs/reference/tool-spec.md` — the program's source of truth; the
   "High-value follow-up tools" list, the common contract, the
   market-data provenance requirement, and the explicit exclusions this
   epic honors.
@@ -176,7 +176,7 @@ T-1014-10 ──────────────┘
 
 ## Open Questions
 
-Recorded rather than resolved — `.dev/design/tool-spec.md` does not
+Recorded rather than resolved — `docs/reference/tool-spec.md` does not
 answer these. Each carries a stated working assumption so no ticket
 blocks on an answer.
 

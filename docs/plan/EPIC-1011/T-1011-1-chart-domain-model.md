@@ -67,7 +67,7 @@ inventing its own shape.
   behavioral sections
 - `docs/design/chart-tools/technical.md` — the `CapturedChartSetup`
   contract table; this ticket is its source of truth
-- `.dev/design/tool-spec.md` — "Common contract for every tool" (stable
+- `docs/reference/tool-spec.md` — "Common contract for every tool" (stable
   IDs, never a bare ticker)
 - `src/lib/workspace/store.ts` — the existing normalize-on-read
   resilience pattern to follow for state that will be persisted

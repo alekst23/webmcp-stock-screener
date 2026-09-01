@@ -46,7 +46,7 @@ so that I do not act on a stale or incomparable figure.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the final paragraph of "Common contract for
+- `docs/reference/tool-spec.md` — the final paragraph of "Common contract for
   every tool" enumerates every field required here.
 - `docs/design/workspace-revisions/technical.md` — "T-1006-3" section.
 - `docs/reference/data-provider.md` — the existing provider notes, for the

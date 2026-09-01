@@ -56,7 +56,7 @@ from a paragraph of dates and prices.
 
 - `docs/design/chart-tools/spec.md` — "Annotate the chart" scenarios
 - `docs/design/chart-tools/technical.md` — annotation contract
-- `.dev/design/tool-spec.md` — the `add_chart_annotation` row
+- `docs/reference/tool-spec.md` — the `add_chart_annotation` row
 
 ## Technical Considerations
 

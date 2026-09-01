@@ -60,7 +60,7 @@ so that approving deletion is an informed decision rather than a leap.
   progressive-availability behavior, which is itself a capability.
 - The design docs of EPIC-1006 through EPIC-1014 — the new-surface side
   of the mapping.
-- `.dev/design/tool-spec.md` — states intent, not what shipped. Use it to
+- `docs/reference/tool-spec.md` — states intent, not what shipped. Use it to
   find the intended equivalent, then verify against code.
 
 ## Technical Considerations

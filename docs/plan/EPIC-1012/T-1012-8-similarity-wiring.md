@@ -59,7 +59,7 @@ of compared, explained matches without leaving the session.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the Similarity area this epic completes,
+- `docs/reference/tool-spec.md` — the Similarity area this epic completes,
   and the common-contract and provenance rules verified here
 - `docs/design/similarity-search/spec.md` — the behavioral scenarios this
   ticket verifies end to end

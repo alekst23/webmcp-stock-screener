@@ -56,7 +56,7 @@ verdict without trial and error.
 
 - `docs/design/results-and-explain/spec.md` — the behavioral spec the
   end-to-end test traces.
-- `.dev/design/tool-spec.md` — exact tool names, purposes, and the common
+- `docs/reference/tool-spec.md` — exact tool names, purposes, and the common
   contract.
 - `src/lib/webmcp/register.ts` and `src/lib/webmcp/tools.ts` — the
   existing registration and `ToolSpec` conventions (`inputSchema`,

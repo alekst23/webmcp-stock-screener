@@ -55,7 +55,7 @@ before I trade on it.
 - `docs/design/chart-tools/spec.md` — "Read a bounded slice of the
   chart", provenance scenarios
 - `docs/design/chart-tools/technical.md` — provenance envelope fields
-- `.dev/design/tool-spec.md` — "Market-data results should always state
+- `docs/reference/tool-spec.md` — "Market-data results should always state
   `as_of`, source, live/delayed status, timezone, currency,
   adjusted/unadjusted prices, fundamentals reporting period, and
   calculation-engine version"

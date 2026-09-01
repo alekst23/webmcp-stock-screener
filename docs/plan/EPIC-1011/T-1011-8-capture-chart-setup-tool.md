@@ -62,7 +62,7 @@ without rebuilding the chart from memory.
   scenarios
 - `docs/design/chart-tools/technical.md` — the `CapturedChartSetup`
   contract table, which this ticket must keep accurate
-- `.dev/design/tool-spec.md` — the `capture_chart_setup` and
+- `docs/reference/tool-spec.md` — the `capture_chart_setup` and
   `find_similar_setups` rows; the latter is the consumer
 
 ## Technical Considerations

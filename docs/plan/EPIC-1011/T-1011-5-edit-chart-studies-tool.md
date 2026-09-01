@@ -61,7 +61,7 @@ period or read its values.
 
 - `docs/design/chart-tools/spec.md` — "Manage studies" scenarios
 - `docs/design/chart-tools/technical.md` — study instance contract
-- `.dev/design/tool-spec.md` — the `edit_chart_studies` and
+- `docs/reference/tool-spec.md` — the `edit_chart_studies` and
   `describe_catalog_item` rows
 - `src/lib/webmcp/tools.ts` — the existing convention of returning the
   available catalog on a resolution failure so a bad call becomes a

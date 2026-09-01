@@ -64,7 +64,7 @@ so that I decide what gets to page me — and can tell before deciding.
 
 - `docs/design/screener-followup-tools/spec.md` — "Draft and preview an
   alert" scenario table, and the state list in "Arm and disarm an alert".
-- `.dev/design/tool-spec.md` — `create_alert_draft` and `preview_alert`;
+- `docs/reference/tool-spec.md` — `create_alert_draft` and `preview_alert`;
   the requirement to "keep alert activation behind an explicit native
   review step"; the `alerts` panel kind in `add_panel`.
 - `docs/plan/EPIC-1007/_epic.md` — the `alerts` panel kind this binds to.

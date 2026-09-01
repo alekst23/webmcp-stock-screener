@@ -64,7 +64,7 @@ drop into the discovery tools without either side changing.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — `search_instruments`' purpose ("resolve
+- `docs/reference/tool-spec.md` — `search_instruments`' purpose ("resolve
   ticker/company text to canonical instrument IDs, exchanges, and asset
   types") and the stable-ID rule.
 - `docs/design/discovery-and-catalog/technical.md` — the port contract and

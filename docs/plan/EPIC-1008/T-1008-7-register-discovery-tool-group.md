@@ -69,7 +69,7 @@ merge negotiation between epics.
   pattern to follow.
 - `docs/design/discovery-and-catalog/technical.md` — the group's dependency
   list.
-- `.dev/design/tool-spec.md` — the canonical tool names.
+- `docs/reference/tool-spec.md` — the canonical tool names.
 
 ## Technical Considerations
 

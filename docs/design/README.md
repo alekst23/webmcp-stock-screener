@@ -14,7 +14,7 @@ feature spec may be touched by multiple epics as it evolves.
 
 ## New WebMCP Surface (full replacement, in progress)
 
-Specs for the tool surface described in `.dev/design/tool-spec.md`, built
+Specs for the tool surface described in `docs/reference/tool-spec.md`, built
 alongside the Core Product surface above and cut over at the end.
 
 - [Workspace & Revisions](workspace-revisions/spec.md) — the workspace

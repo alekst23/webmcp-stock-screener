@@ -158,7 +158,7 @@ carrying the provenance that says what data produced it.
 - The catalog registry itself, and the workspace/revision/undo machinery
   itself — consumed from EPIC-1008 and EPIC-1006.
 - Raw SQL, JavaScript, or any free-form expression as a filter condition.
-  Deliberately excluded by `.dev/design/tool-spec.md`: conditions are a
+  Deliberately excluded by `docs/reference/tool-spec.md`: conditions are a
   typed model.
 - Backtesting a screener, saving results to a watchlist, exporting a run,
   or alerting on one — separate follow-up surfaces.
@@ -169,7 +169,7 @@ carrying the provenance that says what data produced it.
 
 1. **Run retention.** How long a completed run's stored results are kept,
    and how many runs a workspace retains, is not stated in
-   `.dev/design/tool-spec.md`. *Assumption:* runs are retained for the
+   `docs/reference/tool-spec.md`. *Assumption:* runs are retained for the
    life of the workspace session, and asking for a page of an evicted run
    returns an explicit "run no longer available" rather than silently
    re-running. To be confirmed with EPIC-1010.

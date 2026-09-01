@@ -59,7 +59,7 @@ outside the workspace that made them.
 
 - `docs/design/screener-followup-tools/spec.md` — "Export results"
   scenario table.
-- `.dev/design/tool-spec.md` — `export_results` ("export the pinned run,
+- `docs/reference/tool-spec.md` — `export_results` ("export the pinned run,
   filters, timestamp, and provenance"); the market-data provenance
   requirement listing every field an export must state.
 - `docs/plan/EPIC-1010/_epic.md` — pinned `run_id` semantics, the

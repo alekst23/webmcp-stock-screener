@@ -69,7 +69,7 @@ approved.
 - `docs/design/screener-followup-tools/spec.md` — "Arm and disarm an
   alert" scenario table, especially the "Agent cannot arm" and "No
   sequence arms it" rows.
-- `.dev/design/tool-spec.md` — `enable_alert` and `disable_alert`, and
+- `docs/reference/tool-spec.md` — `enable_alert` and `disable_alert`, and
   the requirement to "keep alert activation behind an explicit native
   review step"; the analogous "draft → review → submit" shape the spec
   requires for anything consequential.

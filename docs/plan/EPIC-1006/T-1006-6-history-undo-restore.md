@@ -56,7 +56,7 @@ so that experimenting with the agent is cheap instead of frightening.
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the `undo_change` Persistence row and the
+- `docs/reference/tool-spec.md` — the `undo_change` Persistence row and the
   `get_change_history` / `restore_workspace_revision` follow-up tools.
 - `docs/design/workspace-revisions/spec.md` — the "Backing out" scenarios.
 - `docs/design/workspace-revisions/technical.md` — "T-1006-6" section for

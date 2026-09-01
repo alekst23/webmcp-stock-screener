@@ -69,7 +69,7 @@ tell what screen these names came off.
 
 - `docs/design/screener-followup-tools/spec.md` — "Maintain watchlists"
   scenario table.
-- `.dev/design/tool-spec.md` — `upsert_watchlist` and
+- `docs/reference/tool-spec.md` — `upsert_watchlist` and
   `save_results_to_watchlist` ("create dynamic or static watchlists from
   results"); the `watchlist` panel kind in `add_panel`; watchlists as a
   universe input to `set_screener_universe`.

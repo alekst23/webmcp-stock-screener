@@ -11,7 +11,7 @@ The new WebMCP surface lets a researcher capture a chart setup they like
 — a symbol, a historical window, its studies, and its normalization
 settings. This epic answers the obvious next question: *where else has
 this happened?* It delivers the Similarity area of
-`.dev/design/tool-spec.md` — `find_similar_setups` to search other
+`docs/reference/tool-spec.md` — `find_similar_setups` to search other
 symbols and other historical windows for setups resembling a captured
 one, `explain_similarity` to break any match down into feature-by-feature
 contributions, and `compare_setups` to put candidates side by side as
@@ -112,7 +112,7 @@ T-1012-1 ──┬──> T-1012-2 ──> T-1012-3 ──┬──> T-1012-4 �
 
 ## Design References
 
-- `.dev/design/tool-spec.md` — the program's tool surface; this epic
+- `docs/reference/tool-spec.md` — the program's tool surface; this epic
   implements its "Similarity" rows and the common-contract and
   market-data-provenance rules that apply to them
 - `docs/design/similarity-search/spec.md` — the behavioral spec for this
@@ -127,7 +127,7 @@ T-1012-1 ──┬──> T-1012-2 ──> T-1012-3 ──┬──> T-1012-4 �
 
 ## Open Questions
 
-These are not answered by `.dev/design/tool-spec.md`. Each carries the
+These are not answered by `docs/reference/tool-spec.md`. Each carries the
 assumption the tickets are written against; revisit if the program
 decides otherwise.
 
