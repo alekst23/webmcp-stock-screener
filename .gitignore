@@ -48,3 +48,5 @@ vite.config.ts.timestamp-*
 
 # Claude working files
 .claude/scheduled_tasks.lock
+# Agent worktrees (isolation: worktree)
+.claude/worktrees/
