@@ -35,18 +35,29 @@ data "aws_kms_alias" "ssm" {
 # Least-privilege read (AC4): the app role may read exactly this one
 # parameter and decrypt it with exactly the key it's encrypted under --
 # nothing else in Parameter Store or KMS.
+#
+# T-0016-6: App Runner resolves `runtime_environment_secrets` on the
+# INSTANCE role (not the access role) before the container ever starts, and
+# it does so via the batch `ssm:GetParameters` (plural) API plus
+# `kms:DescribeKey` -- not just the singular `ssm:GetParameter` a manual
+# `aws ssm get-parameter` call uses. Confirmed empirically with `aws iam
+# simulate-principal-policy` against this exact role: GetParameter alone
+# left GetParameters/DescribeKey as implicitDeny, and the App Runner
+# deployment failed silently (image pulled, then "Failed to deploy your
+# application image" with zero application logs -- the container was never
+# launched because secret resolution failed first).
 data "aws_iam_policy_document" "app_read_eodhd_api_key" {
   statement {
     sid       = "EodhdApiKeyRead"
     effect    = "Allow"
-    actions   = ["ssm:GetParameter"]
+    actions   = ["ssm:GetParameter", "ssm:GetParameters"]
     resources = [aws_ssm_parameter.eodhd_api_key.arn]
   }
 
   statement {
     sid       = "EodhdApiKeyDecrypt"
     effect    = "Allow"
-    actions   = ["kms:Decrypt"]
+    actions   = ["kms:Decrypt", "kms:DescribeKey"]
     resources = [data.aws_kms_alias.ssm.target_key_arn]
   }
 }

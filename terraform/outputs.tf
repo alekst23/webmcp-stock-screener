@@ -53,3 +53,12 @@ output "eodhd_api_key_parameter_name" {
 output "eodhd_api_key_parameter_arn" {
   value = module.secrets.eodhd_api_key_parameter_arn
 }
+
+output "apprunner_service_url" {
+  description = "T-0016-6 AC11: the service's stable hostname. Reachable at https://<this value>; T-0016-10 consumes this."
+  value       = module.apprunner_service.service_url
+}
+
+output "apprunner_service_arn" {
+  value = module.apprunner_service.service_arn
+}

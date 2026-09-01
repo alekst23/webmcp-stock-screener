@@ -66,3 +66,36 @@ module "secrets" {
   app_role_name = module.iam.app_role_name
   tags          = local.common_tags
 }
+
+module "apprunner_service" {
+  source = "./modules/apprunner_service"
+
+  environment = var.environment
+  region      = var.region
+  account_id  = data.aws_caller_identity.current.account_id
+
+  image_identifier = "${module.registry.repository_url}:${var.apprunner_image_tag}"
+  port             = var.apprunner_port
+  cpu              = var.apprunner_cpu
+  memory           = var.apprunner_memory
+
+  access_role_arn   = module.iam.pull_log_role_arn
+  instance_role_arn = module.iam.app_role_arn
+
+  # Every environment value the Render web service carried (AC5). No
+  # OBJECT_STORE_ACCESS_KEY_ID/SECRET_ACCESS_KEY: the app role's default
+  # credential chain replaces static keys entirely (decision 5).
+  environment_variables = {
+    CORS_ALLOWED_ORIGINS = var.cors_allowed_origins
+    RATE_LIMIT_DEFAULT   = var.rate_limit_default
+    REQUIRE_REAL_PANEL   = var.require_real_panel ? "true" : "false"
+    OBJECT_STORE_BUCKET  = module.panel_bucket.bucket_name
+    OBJECT_STORE_REGION  = var.region
+  }
+
+  environment_secrets = {
+    EODHD_API_KEY = module.secrets.eodhd_api_key_parameter_arn
+  }
+
+  tags = local.common_tags
+}
