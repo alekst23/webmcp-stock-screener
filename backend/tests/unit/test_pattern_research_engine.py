@@ -38,7 +38,12 @@ def _bar(ticker: str, day: date, close: float, volume: int = 1_000_000) -> Price
     """A simple bar with a fixed +/-1 high/low band around `close` — enough
     for tests whose conditions only reference open/close/volume directly."""
     return PriceBar(
-        ticker=ticker, date=day, open=close, high=close + 1, low=close - 1, close=close,
+        ticker=ticker,
+        date=day,
+        open=close,
+        high=close + 1,
+        low=close - 1,
+        close=close,
         volume=volume,
     )
 
@@ -68,9 +73,9 @@ class TestStudyDefinition:
         study = engine.define_study("rel_vol", "volume / sma(volume, 3)")
 
         assert study.name == "rel_vol", f"expected study name 'rel_vol', got {study.name}"
-        assert study.expression == "volume / sma(volume, 3)", (
-            f"expected the stored expression to match verbatim, got {study.expression}"
-        )
+        assert (
+            study.expression == "volume / sma(volume, 3)"
+        ), f"expected the stored expression to match verbatim, got {study.expression}"
         assert study.id, "expected define_study to assign a non-empty id"
 
         # Referenceable by name in a setup's condition (AC1).
@@ -118,9 +123,9 @@ class TestSetupDefinition:
 
         # "becomes searchable via instance search" (spec.md) — this must not raise.
         result = engine.find_instances(setup)
-        assert result.setup_id == setup.id, (
-            f"expected the result to reference {setup.id}, got {result.setup_id}"
-        )
+        assert (
+            result.setup_id == setup.id
+        ), f"expected the result to reference {setup.id}, got {result.setup_id}"
 
     def test_find_instances_sustained_step_requires_condition_every_day_of_window(self) -> None:
         # SUS_A: volume stays >500_000 on every day of the (1,3) window ->
@@ -131,8 +136,13 @@ class TestSetupDefinition:
         bars += [_bar("SUS_A", date(2024, 1, 1), 101)]
         bars += [
             PriceBar(
-                ticker="SUS_A", date=date(2024, 1, 1) + timedelta(days=i),
-                open=50, high=51, low=49, close=50, volume=600_000,
+                ticker="SUS_A",
+                date=date(2024, 1, 1) + timedelta(days=i),
+                open=50,
+                high=51,
+                low=49,
+                close=50,
+                volume=600_000,
             )
             for i in (1, 2, 3)
         ]
@@ -140,8 +150,13 @@ class TestSetupDefinition:
         for i, vol in zip((1, 2, 3), (600_000, 300_000, 600_000)):
             bars.append(
                 PriceBar(
-                    ticker="SUS_B", date=date(2024, 1, 1) + timedelta(days=i),
-                    open=50, high=51, low=49, close=50, volume=vol,
+                    ticker="SUS_B",
+                    date=date(2024, 1, 1) + timedelta(days=i),
+                    open=50,
+                    high=51,
+                    low=49,
+                    close=50,
+                    volume=vol,
                 )
             )
         engine = PandasPatternResearchEngine.from_price_bars(bars)
@@ -179,9 +194,9 @@ class TestInstanceSearch:
             f"expected the reported range to start at the panel's first date, "
             f"got {result.from_date}"
         )
-        assert result.to_date == date(2025, 12, 31), (
-            f"expected the reported range to end at the panel's last date, got {result.to_date}"
-        )
+        assert result.to_date == date(
+            2025, 12, 31
+        ), f"expected the reported range to end at the panel's last date, got {result.to_date}"
 
     def test_find_instances_matches_exactly_the_known_fixture_instances_no_more_no_less(
         self,
@@ -227,9 +242,9 @@ class TestInstanceSearch:
 
         result = engine.find_instances(setup)
 
-        assert result.complete_count == 2, (
-            f"expected 2 completed matches, got {result.complete_count}: {result.instances}"
-        )
+        assert (
+            result.complete_count == 2
+        ), f"expected 2 completed matches, got {result.complete_count}: {result.instances}"
         assert result.partial_count == 1, (
             f"expected 1 partial match surfaced (fallback triggers below 5 completed), "
             f"got {result.partial_count}: {result.instances}"
@@ -238,12 +253,12 @@ class TestInstanceSearch:
         assert len(partials) == 1, f"expected exactly 1 partial instance, got {partials}"
         partial = partials[0]
         assert partial.ticker == "PARTIAL_1", f"expected PARTIAL_1 to be the partial, got {partial}"
-        assert partial.completeness == pytest.approx(0.5), (
-            f"expected completeness 1/2 (1 of 2 steps satisfied), got {partial.completeness}"
-        )
-        assert "FAILS" not in {inst.ticker for inst in result.instances}, (
-            "a decisive failure must never be reported as a partial match"
-        )
+        assert partial.completeness == pytest.approx(
+            0.5
+        ), f"expected completeness 1/2 (1 of 2 steps satisfied), got {partial.completeness}"
+        assert "FAILS" not in {
+            inst.ticker for inst in result.instances
+        }, "a decisive failure must never be reported as a partial match"
 
     def test_find_instances_counts_repeated_occurrences_as_separate_instances(self) -> None:
         # Anchor threshold (close > 200) fires twice for this ticker, each
@@ -274,9 +289,10 @@ class TestInstanceSearch:
             f"expected 2 separate instances (repeated occurrences are not deduplicated), "
             f"got {len(repeat_instances)}: {repeat_instances}"
         )
-        assert [inst.date for inst in repeat_instances] == [date(2024, 1, 2), date(2024, 1, 5)], (
-            f"expected the two independent completions on 1/2 and 1/5, got {repeat_instances}"
-        )
+        assert [inst.date for inst in repeat_instances] == [
+            date(2024, 1, 2),
+            date(2024, 1, 5),
+        ], f"expected the two independent completions on 1/2 and 1/5, got {repeat_instances}"
 
     def test_find_instances_counts_earliest_valid_completion_only_for_one_start(self) -> None:
         # The window (1,3) after the anchor has THREE days that could each
@@ -304,9 +320,9 @@ class TestInstanceSearch:
             f"expected exactly 1 instance for this single start (not 3), "
             f"got {len(redundant_instances)}: {redundant_instances}"
         )
-        assert redundant_instances[0].date == date(2024, 1, 2), (
-            f"expected the earliest valid completion (1/2), got {redundant_instances[0].date}"
-        )
+        assert redundant_instances[0].date == date(
+            2024, 1, 2
+        ), f"expected the earliest valid completion (1/2), got {redundant_instances[0].date}"
 
     def test_find_instances_respects_date_range_and_universe_filters(self) -> None:
         anchor_day = date(2024, 6, 1)
@@ -331,14 +347,14 @@ class TestInstanceSearch:
         setup = engine.define_setup("single_step", [SetupStep(condition="close > 100")])
 
         by_cap = engine.find_instances(setup, min_market_cap=1_000_000_000)
-        assert {inst.ticker for inst in by_cap.instances} == {"BIGCAP"}, (
-            f"expected only BIGCAP to survive the market cap filter, got {by_cap.instances}"
-        )
+        assert {inst.ticker for inst in by_cap.instances} == {
+            "BIGCAP"
+        }, f"expected only BIGCAP to survive the market cap filter, got {by_cap.instances}"
 
         by_sector = engine.find_instances(setup, sectors=["Energy"])
-        assert {inst.ticker for inst in by_sector.instances} == {"SMALLCAP"}, (
-            f"expected only SMALLCAP to survive the sector filter, got {by_sector.instances}"
-        )
+        assert {inst.ticker for inst in by_sector.instances} == {
+            "SMALLCAP"
+        }, f"expected only SMALLCAP to survive the sector filter, got {by_sector.instances}"
 
         out_of_range = engine.find_instances(setup, from_date=anchor_day + timedelta(days=1))
         assert out_of_range.complete_count == 0, (
@@ -346,6 +362,7 @@ class TestInstanceSearch:
             f"got {out_of_range.instances}"
         )
         in_range = engine.find_instances(setup, from_date=anchor_day, to_date=anchor_day)
-        assert {inst.ticker for inst in in_range.instances} == {"BIGCAP", "SMALLCAP"}, (
-            f"expected both tickers within the exact anchor-day range, got {in_range.instances}"
-        )
+        assert {inst.ticker for inst in in_range.instances} == {
+            "BIGCAP",
+            "SMALLCAP",
+        }, f"expected both tickers within the exact anchor-day range, got {in_range.instances}"

@@ -1,0 +1,7 @@
+# Mirrors the project's Python standard (Black line-length 100).
+# E203/W503 conflict with Black's own formatting and are the usual
+# Black-compatible exclusions.
+[flake8]
+max-line-length = 100
+extend-ignore = E203, W503
+exclude = .venv, __pycache__

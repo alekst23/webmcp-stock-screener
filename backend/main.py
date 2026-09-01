@@ -15,7 +15,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Awaitable, Callable
 
-import pandas as pd
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -27,7 +26,9 @@ from starlette.types import ASGIApp
 
 from api.routes.research import router as research_router
 from api.routes.spike import router as spike_router
-from domain.models.price import PriceBar
+from application.load_panel import load_panel
+from domain.models.panel import PanelStatus
+from infra.object_store import S3PanelStore, config_from_env
 from infra.pandas_engine import PandasPatternResearchEngine
 
 PANEL_PATH = Path(__file__).resolve().parent / "data" / "mock" / "panel.parquet"
@@ -42,22 +43,34 @@ def _allowed_origins() -> list[str]:
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
-def _load_engine() -> PandasPatternResearchEngine | None:
-    """Load the mock panel into memory once at startup (docs/plan.md: 'loaded
-    into memory at startup for low-latency reads'). Returns None when the
-    panel hasn't been generated yet -- api/routes/research.py's dependency
-    then surfaces a clear 503 instead of crashing app startup, mirroring the
-    spike endpoint's own guard."""
-    if not PANEL_PATH.exists():
-        return None
-    frame = pd.read_parquet(PANEL_PATH)
-    bars = [PriceBar(**row) for row in frame.to_dict("records")]
-    return PandasPatternResearchEngine.from_price_bars(bars)
+def _panel_store() -> S3PanelStore | None:
+    """The R2/S3 panel store, or None when its config isn't set.
+
+    None is a supported state, not a misconfiguration: local checkouts and
+    test runs have no object-store credentials and fall back to the mock
+    panel below (see application/load_panel.py)."""
+    config = config_from_env()
+    return S3PanelStore(config) if config else None
+
+
+def _load_engine() -> tuple[PandasPatternResearchEngine | None, PanelStatus | None]:
+    """Load the panel into memory once at startup (docs/plan.md: 'loaded into
+    memory at startup for low-latency reads'), preferring the real
+    object-store panel over T-1001-1's mock one.
+
+    Returns (None, None) when no panel exists anywhere -- api/routes/
+    research.py's dependency then surfaces a clear 503 instead of crashing
+    app startup, mirroring the spike endpoint's own guard."""
+    loaded = load_panel(_panel_store(), PANEL_PATH)
+    if loaded is None:
+        return None, None
+    engine = PandasPatternResearchEngine.from_price_bars(loaded.bars, loaded.universe)
+    return engine, loaded.status
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    app.state.engine = _load_engine()
+    app.state.engine, app.state.panel_status = _load_engine()
     yield
 
 

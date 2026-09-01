@@ -5,15 +5,22 @@
 # docs/plan/EPIC-1001/T-1001-8-deployment-runbook.md (connect the repo in
 # the Render dashboard, "New +" -> "Blueprint", point it at this file).
 #
-# Serves the mock dataset only (T-1001-1's synthetic panel) -- the real
-# EODHD-backed panel and its nightly refresh belong to T-1001-9 and will
-# extend this service's build/cron config, not replace it.
+# Serves the real EODHD-backed panel from Cloudflare R2 when the R2_*
+# variables are set, and falls back to the mock dataset (T-1001-1's synthetic
+# panel, regenerated at build time) when they are not -- see
+# backend/application/load_panel.py.
 #
-# No persistent disk: Render's free tier doesn't support disks at all, and
-# a paid tier just to persist a mock panel that regenerates deterministically
-# in seconds isn't worth it (discovered live during T-1001-8 deployment).
-# T-1001-9's real, non-regenerable backfilled data will persist in object
-# storage (R2/S3) instead of a Render disk -- see that ticket for why.
+# No persistent disk: Render's free tier doesn't support disks at all, and a
+# paid tier just to attach one costs far more than storing ~60-90MB of
+# Parquet in object storage (discovered live during T-1001-8 deployment).
+# T-1001-9's real, non-regenerable backfilled data lives in R2 instead --
+# see docs/reference/data-provider.md.
+#
+# MEMORY: the free plan caps the web service at 512 MB, and the panel is held
+# in memory at ~26 bytes per ticker-day (backend/infra/panel_frame.py). That
+# is the constraint on universe size x history length; check it with
+# `scripts/backfill_panel.py --dry-run` before committing to a scope, and
+# raise `plan` here if the chosen scope needs more.
 
 services:
   - type: "web"
@@ -58,3 +65,49 @@ services:
       # `_rate_limit_default` for the "<count>/<period>" syntax (AC4).
       - key: "RATE_LIMIT_DEFAULT"
         value: "60/minute"
+      # T-1001-9: the R2 bucket holding the real panel. With any of these
+      # unset the service still boots, serving the mock panel instead of
+      # failing -- so a half-configured deploy degrades visibly (the UI
+      # labels synthetic data) rather than 500ing.
+      - key: "R2_BUCKET_NAME"
+        sync: false
+      - key: "R2_ENDPOINT_URL"
+        sync: false
+      - key: "R2_ACCESS_KEY_ID"
+        sync: false
+      - key: "R2_SECRET_ACCESS_KEY"
+        sync: false
+
+  # T-1001-9 AC2: appends the latest trading day to the stored panel, so the
+  # dataset stays current with no manual step. One bulk-by-exchange EODHD
+  # call per run (~100 quota units against a 100,000/day cap), NOT one call
+  # per ticker -- the backfill's endpoint choice inverted, see
+  # docs/reference/data-provider.md.
+  #
+  # Idempotent by (ticker, date): a retried run, or a manual catch-up over a
+  # long weekend, replaces rows rather than duplicating them. On a market
+  # holiday the provider returns no rows and the job leaves the panel
+  # untouched, so no holiday calendar is needed here.
+  - type: "cron"
+    name: "webmcp-panel-nightly-delta"
+    runtime: "python"
+    plan: "starter"
+    region: "oregon"
+    rootDir: "backend"
+    # 06:30 UTC = 02:30 ET, comfortably after the US close and after EODHD
+    # publishes the day. The job asks for the most recent weekday, so a run
+    # scheduled in UTC still targets the right session.
+    schedule: "30 6 * * *"
+    buildCommand: "pip install uv && uv sync --frozen"
+    startCommand: "uv run python scripts/nightly_delta.py"
+    envVars:
+      - key: "EODHD_API_KEY"
+        sync: false
+      - key: "R2_BUCKET_NAME"
+        sync: false
+      - key: "R2_ENDPOINT_URL"
+        sync: false
+      - key: "R2_ACCESS_KEY_ID"
+        sync: false
+      - key: "R2_SECRET_ACCESS_KEY"
+        sync: false
