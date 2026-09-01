@@ -25,3 +25,8 @@ feature spec may be touched by multiple epics as it evolves.
 - [Screener Core](screener-core/spec.md) — create a screener, set its
   universe, build a nested filter tree from typed conditions, rank and
   validate it, and execute one revision into a pinned `run_id`.
+- [Results & Explain](results-and-explain/spec.md) — the Results area of
+  the new WebMCP surface: a configurable results table, bounded paging
+  over a pinned screener run with no silent rerun, selection that
+  propagates to linked panels, and a per-instrument explanation of every
+  filter and ranking contribution.
