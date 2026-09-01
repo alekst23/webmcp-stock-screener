@@ -160,9 +160,9 @@ feature #10's progressive availability. Computed synchronously in
 (dropped by hotfix/webmcp-tools-always-visible; `connectWebmcp()` still
 runs, for real WebMCP registration, it just no longer gates the header).
 
-| Field       | Type       | Description                                                                                                   |
-| ----------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
-| `toolCount` | `number`   | `buildTools(engine).length`                                                                                     |
+| Field       | Type       | Description                                                                                                      |
+| ----------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| `toolCount` | `number`   | `buildTools(engine).length`                                                                                      |
 | `toolNames` | `string[]` | new (hotfix/workbench-ui-refactor) — `buildTools(engine).map(t => t.name)`, same order `buildTools` returns them |
 
 `formatWebmcpStatus(status: WebmcpStatus) -> string` — always
@@ -171,9 +171,11 @@ connection state. Unchanged by the `toolNames` addition — the name list
 renders as its own element in `+page.svelte`, not folded into this
 string, so the existing exact-match tests stay valid.
 
-`buildWebmcpStatus(tools: ToolSpec[]) -> WebmcpStatus` — new pure helper
-(hotfix/workbench-ui-refactor) so the count/name-list pairing is computed
-and tested in one place instead of inline in `+page.svelte`.
+`buildWebmcpStatus(tools: { name: string }[]) -> WebmcpStatus` — new pure
+helper (hotfix/workbench-ui-refactor) so the count/name-list pairing is
+computed and tested in one place instead of inline in `+page.svelte`.
+Takes the minimal shape it needs (structurally compatible with
+`ToolSpec[]`) rather than depending on the full `ToolSpec` type.
 `+page.svelte` calls it as `buildWebmcpStatus(buildTools(engine))`.
 
 ### `clearActivity` — manual full-log clear (hotfix/workbench-ui-refactor)
@@ -182,9 +184,9 @@ and tested in one place instead of inline in `+page.svelte`.
 being the sole append-only mutator (see the amended Non-Goal in
 `spec.md`) — a whole-log wipe, not a per-entry edit/delete.
 
-| Signature                                                        | Description                                                                                                                                                                                                                                                    |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `clearActivity(activity: Writable<AgentActivityEvent[]>): void`    | `activity.set([])`. The existing `subscribe`-based persistence writes the cleared (empty) array to `localStorage` automatically — no separate storage call needed. `nextActivityId` is intentionally left unreset, so IDs after a clear keep incrementing rather than restart at 1; avoids any theoretical key collision with entries rendered before the clear. |
+| Signature                                                       | Description                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clearActivity(activity: Writable<AgentActivityEvent[]>): void` | `activity.set([])`. The existing `subscribe`-based persistence writes the cleared (empty) array to `localStorage` automatically — no separate storage call needed. `nextActivityId` is intentionally left unreset, so IDs after a clear keep incrementing rather than restart at 1; avoids any theoretical key collision with entries rendered before the clear. |
 
 `ActivityFeed.svelte` gains an `onclear?: () => void` callback prop,
 mirroring the `ChartToolbar`/`SnapshotPicker` convention, wired in

@@ -2,11 +2,11 @@
 	import { onMount } from 'svelte';
 	import { env } from '$env/dynamic/public';
 	import { workspaceStore } from '$lib/workspace/store';
-	import { activityStore } from '$lib/workspace/activity';
+	import { activityStore, clearActivity } from '$lib/workspace/activity';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
 	import { connectWebmcp } from '$lib/webmcp/register';
 	import { buildTools } from '$lib/webmcp/tools';
-	import { formatWebmcpStatus, type WebmcpStatus } from '$lib/webmcp/status';
+	import { buildWebmcpStatus, formatWebmcpStatus, type WebmcpStatus } from '$lib/webmcp/status';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
@@ -31,7 +31,7 @@
 	let webmcpStatus = $state<WebmcpStatus | null>(null);
 
 	onMount(() => {
-		webmcpStatus = { toolCount: buildTools(engine).length };
+		webmcpStatus = buildWebmcpStatus(buildTools(engine));
 		void connectWebmcp(engine, activityStore);
 	});
 </script>
@@ -40,14 +40,17 @@
 	<h1>WebMCP Pattern Research Workbench</h1>
 	{#if webmcpStatus}
 		<p class="webmcp-status">{formatWebmcpStatus(webmcpStatus)}</p>
+		<ul class="webmcp-tool-names">
+			{#each webmcpStatus.toolNames as toolName (toolName)}
+				<li>{toolName}</li>
+			{/each}
+		</ul>
 	{/if}
 	<p>
 		This is the shared research session — the same workspace state an agent reads and writes through
 		WebMCP tools. It persists in this browser across reloads.
 		<a href="/dev">Dev control surface →</a>
 	</p>
-
-	<ActivityFeed events={$activityStore} />
 
 	<SnapshotPicker store={workspaceStore} onload={() => (focusedView = null)} />
 
@@ -68,6 +71,8 @@
 	{#if focusedView && $workspaceStore.focus?.selected.length}
 		<FocusChart view={focusedView} />
 	{/if}
+
+	<ActivityFeed events={$activityStore} onclear={() => clearActivity(activityStore)} />
 </main>
 
 <style>
@@ -81,5 +86,24 @@
 	.webmcp-status {
 		font-size: 0.9rem;
 		color: #555;
+		margin-bottom: 0.25rem;
+	}
+
+	.webmcp-tool-names {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		list-style: none;
+		margin: 0 0 0.75rem;
+		padding: 0;
+		font-size: 0.75rem;
+		color: #555;
+	}
+
+	.webmcp-tool-names li {
+		padding: 0.1rem 0.4rem;
+		border: 1px solid #ddd;
+		border-radius: 3px;
+		background: #f6f6f6;
 	}
 </style>

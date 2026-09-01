@@ -10,10 +10,7 @@
 	} from './snapshots';
 	import { hasUnsavedChanges } from './snapshotGuard';
 
-	let {
-		store,
-		onload
-	}: { store: Writable<WorkspaceState>; onload?: () => void } = $props();
+	let { store, onload }: { store: Writable<WorkspaceState>; onload?: () => void } = $props();
 
 	let name = $state('');
 	let snapshots = $state<SnapshotSummary[]>(listSnapshots());
@@ -119,20 +116,20 @@
 <style>
 	.snapshot-picker {
 		display: grid;
-		gap: 0.75rem;
-		margin: 1rem 0 1.5rem;
-		padding: 0.75rem 0;
+		gap: 0.4rem;
+		margin: 0.5rem 0 0.75rem;
+		padding: 0.4rem 0;
 		border-top: 1px solid #ddd;
 		border-bottom: 1px solid #ddd;
 	}
 	.save-row {
 		display: flex;
-		gap: 0.5rem;
+		gap: 0.4rem;
 		align-items: end;
 	}
 	label {
 		display: grid;
-		gap: 0.25rem;
+		gap: 0.15rem;
 		font-size: 0.8rem;
 		color: #555;
 		flex: 1;
@@ -142,14 +139,14 @@
 		width: 100%;
 		border: 1px solid #bbb;
 		border-radius: 4px;
-		padding: 0.45rem 0.55rem;
+		padding: 0.3rem 0.45rem;
 		font: inherit;
 		color: #111;
 	}
 	button {
 		border: 1px solid #999;
 		border-radius: 4px;
-		padding: 0.45rem 0.65rem;
+		padding: 0.3rem 0.55rem;
 		background: #fff;
 		color: #111;
 		font: inherit;
@@ -161,12 +158,12 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		gap: 0.4rem;
+		gap: 0.2rem;
 	}
 	li {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.4rem;
 	}
 	.load {
 		flex: 1;

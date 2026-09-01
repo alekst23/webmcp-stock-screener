@@ -92,6 +92,6 @@ describe('clearActivity', () => {
 
 		const events = get(activity);
 		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
-		expect(events[0].toolName).toBe('defineStudy');
+		expect(events[0]!.toolName).toBe('defineStudy');
 	});
 });
