@@ -1,12 +1,9 @@
 export interface WebmcpStatus {
-	connected: boolean;
 	toolCount: number;
 }
 
-// Renders WebmcpStatus into the header string an AC1/AC2 relies on.
+// Renders WebmcpStatus into the header string. Always shows the tool
+// count -- no connection-state branching (hotfix/webmcp-tools-always-visible).
 export function formatWebmcpStatus(status: WebmcpStatus): string {
-	if (!status.connected) {
-		return "WebMCP isn't available in this browser";
-	}
-	return `WebMCP connected · ${status.toolCount} tools available`;
+	throw new Error('not implemented');
 }

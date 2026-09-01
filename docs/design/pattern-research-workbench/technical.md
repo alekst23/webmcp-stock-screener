@@ -147,23 +147,24 @@ writes to `activityStore` any other way. It reuses the existing
 `ok`/`fail` `ToolResult` builders are exported so `ChartToolbar.svelte`
 can build the same result shape without re-implementing it.
 
-### `WebmcpStatus` / `formatWebmcpStatus` — header status contract (T-1004-1)
+### `WebmcpStatus` / `formatWebmcpStatus` — header status contract (T-1004-1, hotfix/webmcp-tools-always-visible)
 
 `src/lib/webmcp/status.ts`. Pure formatter backing the header's "WebMCP
-status visible" / "Not WebMCP-capable" scenarios. `connected` is
-`connectWebmcp()`'s resolved value being non-null (i.e.
-`document.modelContext` was present); `toolCount` is
+tool count always visible" scenario. `toolCount` is
 `buildTools(engine).length` — the full defined tool surface, unaffected by
-feature #10's progressive availability.
+feature #10's progressive availability. Computed synchronously in
+`+page.svelte`'s `onMount`, independent of `connectWebmcp()`'s resolution
+— the header no longer waits on or reflects actual connection state
+(dropped by hotfix/webmcp-tools-always-visible; `connectWebmcp()` still
+runs, for real WebMCP registration, it just no longer gates the header).
 
 | Field | Type | Description |
 |----------------|------|-------------|
-| `connected` | `boolean` | whether `connectWebmcp()` returned a non-null connection |
 | `toolCount` | `number` | `buildTools(engine).length` |
 
-`formatWebmcpStatus(status: WebmcpStatus) -> string` — "WebMCP connected ·
-N tools available" when connected, otherwise a message stating WebMCP
-isn't available in this browser.
+`formatWebmcpStatus(status: WebmcpStatus) -> string` — always
+`"<toolCount> tools available"`, regardless of browser support or
+connection state.
 
 ### `TickerMetadata` — universe classification (T-1001-9)
 
