@@ -30,3 +30,6 @@ feature spec may be touched by multiple epics as it evolves.
   over a pinned screener run with no silent rerun, selection that
   propagates to linked panels, and a per-instrument explanation of every
   filter and ranking contribution.
+- [Chart Tools](chart-tools/spec.md) — the agent-drivable chart:
+  configure what it shows, manage studies, read a bounded slice of the
+  underlying numbers, annotate it, and capture a reference setup.
