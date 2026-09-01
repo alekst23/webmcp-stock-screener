@@ -1,7 +1,7 @@
 # T-1016-2: Delta-proportional, idempotent panel append
 
 **Epic**: EPIC-1016 (Market Data Storage)
-**Status**: Open
+**Status**: Complete
 **Depends on**: T-1016-1
 **Blocks**: T-1016-4
 **Issue**: #13
@@ -40,3 +40,76 @@ so that keeping the panel current does not get more expensive every night.
 ## Out of Scope
 
 Scheduling and cron wiring (already in `render.yaml` from T-1001-9).
+
+## Implementation Plan
+
+`infra/panel_append.merge_panel_parquet()` replaces `merge_bars`. The panel is
+already sorted by `(ticker, date)` and so is the delta, so the two are merged
+in one streaming pass: read the panel a batch at a time, binary-search each
+batch for the delta rows that belong in it, splice them in (replacing on a
+collision, inserting otherwise), write the batch straight back out. The only
+index is the delta itself.
+
+Three decisions worth arguing with:
+
+* **Fixed-size output row groups.** Without them a re-applied session
+  produces a panel that is equal but not byte-identical, because the second
+  pass sees different batch boundaries than the first. AC2 asks for
+  byte-identity, and byte-identity is also what makes "did the nightly job
+  change anything?" answerable.
+* **The summary is accumulated while streaming.** Describing the merged panel
+  by reading it back would undo the point.
+* **`io.BytesIO` rather than `pa.BufferOutputStream`** for the sink --
+  measured at ~60 MB less peak on a 1.2M-row panel, because CPython's buffer
+  often grows in place where arrow's copies.
+
+`application/append_daily_delta.py` gains `append_sessions` (several sessions,
+one rewrite) and `catch_up_sessions` (resume from the panel's own as-of date),
+with `--catch-up` on `scripts/nightly_delta.py`. `append_daily_delta` keeps
+its signature and is now a one-session call into the same path.
+
+## Measurements (AC1)
+
+`scripts/measure_panel_append.py`, peak RSS of a fresh process appending one
+session (one bar per ticker) to a stored panel. `copy` is the same code path
+with an empty session -- the floor `PanelStore.put_object(bytes)` imposes on
+any single-object store:
+
+| panel | mode | peak RSS | seconds |
+|---|---|---|---|
+| 120k rows / 4.9 MB | merge | 63.3 MB | 0.07 |
+| 120k rows / 4.9 MB | copy | 54.1 MB | 0.06 |
+| 120k rows / 4.9 MB | rows (old) | 260.1 MB | 0.51 |
+| 1.2M rows / 40.8 MB | merge | 170.8 MB | 0.62 |
+| 1.2M rows / 40.8 MB | copy | 163.7 MB | 0.58 |
+| 1.2M rows / 40.8 MB | rows (old) | 2,143.7 MB | 6.38 |
+
+Two readings across the 10x panel step:
+
+* The session's own cost -- merge minus copy -- is **9.2 MB and 7.1 MB**: flat
+  while the panel grew 10x and the session grew 10x with it.
+* Peak per byte of stored panel, at the margin, is **2.4x** against **51.6x**
+  for the row-object merge. Wall time is 10x lower.
+
+**Known limit, deliberately not hidden by the metric.** The rewrite itself is
+still O(panel): `PanelStore.put_object` takes `bytes`, so the whole panel is
+re-serialized whatever the merge does. That is the `copy` row above, and at
+the ~5M-row target it is the term that matters. Removing it needs either
+per-partition writes (T-1016-3) or a streaming upload through the store
+contract -- neither is this ticket. What this ticket removes is the ~50x
+constant on top of it.
+
+## Verification
+
+- `tests/functional/test_panel_append.py` — AC2 (byte-identity across a panel
+  sized past both the 64k merge batch and the 100k row group, plus
+  replacement and within-delta deduplication), AC3 (ordered catch-up in one
+  rewrite; resume from the panel's as-of date), AC4 (an unknown ticker lands
+  in sorted position), AC5 (the panel stays sorted and `PanelFrame` still
+  finds the spliced rows).
+- `tests/performance/test_panel_append_memory.py` — AC1.
+
+Mutation-checked: reverting to the dict merge fails both performance tests;
+emitting variable-size row groups fails byte-identity; skipping the collision
+drop, the delta deduplication, the session ordering, or the as-of-based
+resume each fails exactly the test that targets it.

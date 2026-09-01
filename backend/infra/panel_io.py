@@ -42,7 +42,7 @@ _PRICE_COLUMNS = ("open", "high", "low", "close")
 # Parquet's date32 counts days from the Unix epoch; the compact frame counts
 # proleptic Gregorian ordinals (see infra/panel_frame.py). One constant
 # converts between them, vectorized, with no per-row date objects.
-_EPOCH_ORDINAL = date(1970, 1, 1).toordinal()
+EPOCH_ORDINAL = date(1970, 1, 1).toordinal()
 
 # Rows of wire data held at once while filling the compact columns. Large
 # enough that per-batch overhead disappears, small enough that the transient
@@ -93,7 +93,7 @@ def bars_to_table(ordered: Sequence[PriceBar]) -> pa.Table:
         pa.array([bar.ticker for bar in ordered], type=pa.string()),
         pa.array(
             np.fromiter(
-                (bar.date.toordinal() - _EPOCH_ORDINAL for bar in ordered),
+                (bar.date.toordinal() - EPOCH_ORDINAL for bar in ordered),
                 dtype=np.int32,
                 count=count,
             )
@@ -138,7 +138,7 @@ def parquet_bytes_to_panel(data: bytes) -> pd.DataFrame:
     for batch in reader.iter_batches(batch_size=_READ_BATCH_ROWS, columns=PANEL_COLUMNS):
         stop = start + batch.num_rows
         codes[start:stop] = _batch_codes(batch.column("ticker"), catalog)
-        dates[start:stop] = _to_numpy(batch.column("date").cast(pa.int32())) + _EPOCH_ORDINAL
+        dates[start:stop] = _to_numpy(batch.column("date").cast(pa.int32())) + EPOCH_ORDINAL
         for name in _PRICE_COLUMNS:
             prices[name][start:stop] = _to_numpy(batch.column(name))
         volume[start:stop] = _to_numpy(batch.column("volume"))
@@ -229,17 +229,35 @@ def _categorical(codes: np.ndarray, catalog: dict[str, int]) -> pd.Categorical:
     return pd.Categorical.from_codes(ranks[codes], categories=list(categories[order]))
 
 
-def merge_bars(existing: list[PriceBar], incoming: list[PriceBar]) -> list[PriceBar]:
-    """Append a delta to a panel, with `incoming` winning on a collision.
+def panel_status_from_parquet(data: bytes, source: str) -> PanelStatus:
+    """Summarize a stored panel without unpacking it.
 
-    Re-running a nightly delta (a retried cron job, a manual catch-up over a
-    long weekend) must be idempotent: the same day appended twice has to
-    leave one row per (ticker, date), not two, or every rolling window in the
-    engine silently shifts.
+    Reads two columns a batch at a time, so describing a panel costs a scan
+    rather than a copy -- which is what lets the nightly job answer "nothing
+    to do" without ever holding the panel it declined to change.
     """
-    by_key = {(bar.ticker, bar.date): bar for bar in existing}
-    by_key.update({(bar.ticker, bar.date): bar for bar in incoming})
-    return sorted(by_key.values(), key=lambda bar: (bar.ticker, bar.date))
+    reader = pq.ParquetFile(pa.BufferReader(pa.py_buffer(data)))
+    validate_wire_schema(reader.schema_arrow)
+    tickers: set[str] = set()
+    rows, first, last = 0, None, None
+    for batch in reader.iter_batches(batch_size=_READ_BATCH_ROWS, columns=["ticker", "date"]):
+        dates = _to_numpy(batch.column("date").cast(pa.int32()))
+        if not len(dates):
+            continue
+        rows += len(dates)
+        tickers.update(np.unique(_to_numpy(batch.column("ticker"))).tolist())
+        low, high = int(dates.min()), int(dates.max())
+        first = low if first is None else min(first, low)
+        last = high if last is None else max(last, high)
+    if first is None or last is None:
+        raise ValueError("Cannot summarize an empty panel")
+    return PanelStatus(
+        as_of=date.fromordinal(last + EPOCH_ORDINAL),
+        first_date=date.fromordinal(first + EPOCH_ORDINAL),
+        ticker_count=len(tickers),
+        row_count=rows,
+        source=source,
+    )
 
 
 def panel_status(bars: list[PriceBar], source: str) -> PanelStatus:
