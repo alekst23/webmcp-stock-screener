@@ -28,16 +28,16 @@ fan out behind it.
 
 | Item | Type | Status | Branch | Notes |
 |------|------|--------|--------|-------|
-| EPIC-1006: Workspace, revisions & common tool contract | epic | creating | — | Foundation: envelope, revisions, idempotency, undo, operation registry |
-| EPIC-1007: Panel system | epic | creating | — | 5 tools; owns panel-kind registry |
-| EPIC-1008: Discovery & catalog | epic | creating | — | 3 read-only tools; owns catalog registry + live-data ports |
-| EPIC-1009: Screener core | epic | creating | — | 6 tools; 8 filter-condition types |
-| EPIC-1010: Results & explain | epic | creating | — | 4 tools; no-silent-rerun guarantee |
-| EPIC-1011: Chart tools | epic | creating | — | 5 tools; owns captured-setup contract |
-| EPIC-1012: Similarity search | epic | creating | — | 3 tools |
-| EPIC-1013: Safety layer (preview & apply) | epic | creating | — | 2 tools; atomic apply over the operation registry |
-| EPIC-1014: High-value follow-up tools | epic | creating | — | backtest, watchlists, alerts, computed fields, export |
-| EPIC-1015: Legacy surface cutover | epic | creating | — | Gated on user approval; runs last |
+| EPIC-1006: Workspace, revisions & common tool contract | epic | specced | `epic/EPIC-1006-…` merged to main | 8 tickets. Foundation: envelope, revisions, idempotency, undo, operation registry |
+| EPIC-1007: Panel system | epic | specced | `epic/EPIC-1007-…` merged to main | 6 tickets. 5 tools; owns panel-kind registry |
+| EPIC-1008: Discovery & catalog | epic | specced | `epic/EPIC-1008-…` merged to main | 7 tickets. 3 read-only tools; owns catalog registry + live-data ports |
+| EPIC-1009: Screener core | epic | specced | `epic/EPIC-1009-…` merged to main | 10 tickets. 6 tools; 8 filter-condition types |
+| EPIC-1010: Results & explain | epic | specced | `epic/EPIC-1010-…` merged to main | 8 tickets. 4 tools; no-silent-rerun guarantee |
+| EPIC-1011: Chart tools | epic | specced | `epic/EPIC-1011-…` merged to main | 9 tickets. 5 tools; owns captured-setup contract |
+| EPIC-1012: Similarity search | epic | specced | `epic/EPIC-1012-…` merged to main | 8 tickets. 3 tools |
+| EPIC-1013: Safety layer (preview & apply) | epic | specced | `epic/EPIC-1013-…` merged to main | 6 tickets. 2 tools; atomic apply over the operation registry |
+| EPIC-1014: High-value follow-up tools | epic | specced | `epic/EPIC-1014-…` merged to main | 11 tickets. backtest, watchlists, alerts, computed fields, export |
+| EPIC-1015: Legacy surface cutover | epic | specced | `epic/EPIC-1015-…` merged to main | 8 tickets. Gated on user approval; runs last |
 | EPIC-1001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-1001-pattern-research-workbench` | 8/10 tickets done; T-1001-2 blocked, T-1001-9/10 deprioritized |
 
 ## Implementation wave order
@@ -68,8 +68,28 @@ Dependencies only — everything within a wave runs in parallel.
 | Blocker | Affects | Since | Action needed |
 |---------|---------|-------|----------------|
 | Live reference/fundamental market data (sectors, industries, indexes, exchanges, countries, fundamentals, earnings calendars) is being set up in a separate thread | EPIC-1008, EPIC-1009, EPIC-1014 | 2026-09-01 | Epics define domain ports and code against them; the parallel workstream supplies the implementation. Not blocking epic work — only end-to-end verification. |
+| `render.yaml:47` health-checks `/api/spike/ping`, a route EPIC-1015 plans to retire | EPIC-1015 | 2026-09-01 | Repoint the health check before deleting the spike stack, or the Render backend deploy fails. Verified against `backend/api/routes/spike.py:24`. |
+| `measure` and `splitInstances` have no equivalent in the spec's core tool list | EPIC-1015 | 2026-09-01 | User sign-off needed at T-1015-2 on whether these are deliberate capability drops. Nearest equivalent is follow-up `backtest_screener`. |
+| Multi-step temporal setup matching may be only partially covered by the new filter tree | EPIC-1015 | 2026-09-01 | User sign-off needed at T-1015-2 on partial parity. |
 | T-1001-2 unverified | T-1001-2 | 2026-08-30 | Human + real WebMCP browser + real AI agent must complete `T-1001-2-live-verification-runbook.md`. Deprioritized. |
 | EODHD paid tier / R2/S3 bucket | T-1001-9 | 2026-08-31 | Deprioritized along with T-1001-9. |
+
+## Cross-epic reconciliations pending
+
+_Surfaced by Wave 0. Each needs one decision before the owning epic is
+implemented; none can be settled by a single epic alone._
+
+| # | Question | Raised by | Owner | Working assumption |
+|---|----------|-----------|-------|--------------------|
+| 1 | Is `expected_revision` optional-and-warn, or required-and-reject, on mutations touching existing resources? | EPIC-1006 | EPIC-1006 | Optional, warns. Weakens the concurrency guarantee — recommend required-and-reject. |
+| 2 | Must operation-registry handlers be pure `(state, op) → {state, affectedIds, warnings}`? | EPIC-1013 | EPIC-1006 | Not yet specified. EPIC-1013 needs purity or it falls back to defensive cloning; cheap now, expensive to retrofit. |
+| 3 | Pinned-run retention/expiry policy | EPIC-1009 + EPIC-1010 | EPIC-1009 | Eviction is an explicit error, TTL unset. Both epics flagged it; needs one number. |
+| 4 | Who owns the OHLCV bars port — discovery or charts? | EPIC-1011 | EPIC-1008 | A narrow port in EPIC-1011, aliasable to EPIC-1008's later. |
+
+_Resolved during Wave 0: `explain_result`'s contribution data (EPIC-1009
+stores per-node evaluated value + pass/fail per match, so explain is a
+lookup); wire casing (snake_case wire / camelCase internals, EPIC-1006
+authoritative)._
 
 ## Decisions Log
 
