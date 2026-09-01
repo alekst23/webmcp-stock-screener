@@ -1,10 +1,11 @@
 from datetime import date
 
+from domain.models.price import PriceBar
 from scripts.generate_mock_panel import TICKERS, generate_panel
 from scripts.known_pattern_instances import KNOWN_PATTERN_INSTANCES
 
 
-def _bars_by_date(bars, ticker: str) -> dict[date, object]:
+def _bars_by_date(bars: list[PriceBar], ticker: str) -> dict[date, PriceBar]:
     return {bar.date: bar for bar in bars if bar.ticker == ticker}
 
 

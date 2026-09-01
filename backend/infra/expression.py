@@ -21,12 +21,13 @@ here for whoever next touches it.
 from __future__ import annotations
 
 import ast
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
 
 from domain.errors import ExpressionError
+from infra.panel_frame import float_column
 
 FUNCTION_CATALOG: list[str] = ["sma", "ema", "atr", "highest", "lowest", "days_since"]
 BASE_FIELDS: frozenset[str] = frozenset({"open", "high", "low", "close", "volume"})
@@ -48,7 +49,7 @@ _ALLOWED_CMPOPS: tuple[type[ast.cmpop], ...] = (
 _ALLOWED_BOOLOPS: tuple[type[ast.boolop], ...] = (ast.And, ast.Or)
 _ALLOWED_UNARYOPS: tuple[type[ast.unaryop], ...] = (ast.UAdd, ast.USub, ast.Not)
 
-_COMPARE_FUNCS: dict[type[ast.cmpop], Callable[[object, object], object]] = {
+_COMPARE_FUNCS: dict[type[ast.cmpop], Callable[[Any, Any], Any]] = {
     ast.Gt: lambda a, b: a > b,
     ast.Lt: lambda a, b: a < b,
     ast.GtE: lambda a, b: a >= b,
@@ -56,7 +57,7 @@ _COMPARE_FUNCS: dict[type[ast.cmpop], Callable[[object, object], object]] = {
     ast.Eq: lambda a, b: a == b,
     ast.NotEq: lambda a, b: a != b,
 }
-_BINOP_FUNCS: dict[type[ast.operator], Callable[[object, object], object]] = {
+_BINOP_FUNCS: dict[type[ast.operator], Callable[[Any, Any], Any]] = {
     ast.Add: lambda a, b: a + b,
     ast.Sub: lambda a, b: a - b,
     ast.Mult: lambda a, b: a * b,
@@ -162,6 +163,7 @@ class ExpressionEvaluator:
 
     def _eval_node(self, node: ast.expr, stack: tuple[str, ...]) -> pd.Series | float:
         if isinstance(node, ast.Constant):
+            assert isinstance(node.value, (int, float)), "validated at parse: numbers only"
             return float(node.value)
         if isinstance(node, ast.Name):
             return self._resolve_name(node.id, stack)
@@ -183,7 +185,11 @@ class ExpressionEvaluator:
 
     def _resolve_name(self, name: str, stack: tuple[str, ...]) -> pd.Series:
         if name in BASE_FIELDS:
-            return self._panel[name].astype(float)
+            # Widened here and only here: the stored panel keeps its compact
+            # float32/uint32 columns (infra/panel_frame.py), and only the
+            # fields an expression actually names are ever materialized as
+            # float64.
+            return float_column(self._panel, name)
         if name in stack:
             raise ExpressionError(
                 f'study "{name}" is defined in terms of itself', list(FUNCTION_CATALOG)
@@ -225,9 +231,7 @@ class ExpressionEvaluator:
         if name == "sma":
             series = self._eval_node(node.args[0], stack)
             n = _int_literal(node.args[1])
-            return self._grouped(series).transform(
-                lambda s: s.rolling(n, min_periods=n).mean()
-            )
+            return self._grouped(series).transform(lambda s: s.rolling(n, min_periods=n).mean())
         if name == "ema":
             series = self._eval_node(node.args[0], stack)
             n = _int_literal(node.args[1])
@@ -246,7 +250,10 @@ class ExpressionEvaluator:
         raise ExpressionError(f'uses unsupported function "{name}"', list(FUNCTION_CATALOG))
 
     def _grouped(self, series: pd.Series) -> "pd.core.groupby.generic.SeriesGroupBy":
-        return series.groupby(self._by_ticker)
+        # observed=True: `ticker` is a categorical carrying the whole
+        # universe's categories, so a universe-filtered panel would otherwise
+        # produce a group per absent ticker.
+        return series.groupby(self._by_ticker, observed=True)
 
     def _lookback(self, series: pd.Series, n_node: ast.expr, how: str) -> pd.Series:
         n = _int_literal(n_node)
@@ -256,7 +263,9 @@ class ExpressionEvaluator:
         return grouped.transform(lambda s: s.shift(1).rolling(n, min_periods=n).min())
 
     def _atr(self, n: int) -> pd.Series:
-        high, low, close = self._panel["high"], self._panel["low"], self._panel["close"]
+        high = float_column(self._panel, "high")
+        low = float_column(self._panel, "low")
+        close = float_column(self._panel, "close")
         prev_close = self._grouped(close).transform(lambda s: s.shift(1))
         true_range = pd.concat(
             [high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1

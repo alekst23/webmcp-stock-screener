@@ -27,6 +27,7 @@ from api.schemas.research import (
 from domain.errors import ExpressionError
 from domain.models.instance import Instance, InstanceSet
 from domain.models.measurement import InstanceWindow, MeasureResult
+from domain.models.panel import PanelStatus
 from domain.models.pattern import Study
 from infra.pandas_engine import PandasPatternResearchEngine
 
@@ -47,6 +48,28 @@ def get_engine(request: Request) -> PandasPatternResearchEngine:
             ),
         )
     return engine
+
+
+@router.get("/panel", response_model=PanelStatus)
+def panel(request: Request) -> PanelStatus:
+    """The loaded panel's provenance (T-1001-9 AC4).
+
+    A GET rather than a field on getWorkspace: getWorkspace runs purely
+    client-side and never touches the network (docs/plan.md's "Sessions"
+    section), so it has nothing to report about server-side data. The
+    frontend fetches this and renders the as-of date, so a result is never
+    presented as more current than the panel behind it.
+    """
+    status = getattr(request.app.state, "panel_status", None)
+    if not isinstance(status, PanelStatus):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No price panel loaded. From backend/, run "
+                "`uv run python scripts/generate_mock_panel.py` first."
+            ),
+        )
+    return status
 
 
 def _register_studies(engine: PandasPatternResearchEngine, studies: list[Study]) -> None:

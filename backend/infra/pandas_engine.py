@@ -27,6 +27,7 @@ from domain.models.pattern import Setup, SetupStep, Study
 from domain.models.price import PriceBar
 from domain.models.universe import TickerMetadata
 from infra.expression import BASE_FIELDS, ExpressionEvaluator, parse_expression
+from infra.panel_frame import PanelFrame
 
 # Sparse-completed-matches fallback threshold (spec.md "Instance search").
 _PARTIAL_FALLBACK_THRESHOLD = 5
@@ -45,14 +46,17 @@ class _StepOutcome:
     position: int | None  # resolved day_idx, only set when status == "resolved"
 
 
-def bars_to_panel(bars: list[PriceBar]) -> pd.DataFrame:
-    """Build the sorted, ticker-grouped DataFrame the engine operates on."""
-    frame = pd.DataFrame([bar.model_dump() for bar in bars])
-    frame["date"] = frame["date"].apply(
-        lambda d: d if isinstance(d, date) else pd.Timestamp(d).date()
-    )
-    frame = frame.sort_values(["ticker", "date"]).reset_index(drop=True)
-    return frame
+def _min_date(frame: pd.DataFrame) -> date:
+    """Earliest date in a (possibly universe-filtered) view of the panel.
+
+    The `date` column holds ordinals, not date objects -- see
+    infra/panel_frame.py for why.
+    """
+    return date.fromordinal(int(frame["date"].min()))
+
+
+def _max_date(frame: pd.DataFrame) -> date:
+    return date.fromordinal(int(frame["date"].max()))
 
 
 class PandasPatternResearchEngine:
@@ -60,23 +64,19 @@ class PandasPatternResearchEngine:
     EODHD-backed later — same contract either way, per PatternResearchEngine)."""
 
     def __init__(
-        self, panel: pd.DataFrame, universe: dict[str, TickerMetadata] | None = None
+        self, panel: PanelFrame, universe: dict[str, TickerMetadata] | None = None
     ) -> None:
         self._panel = panel
         self._universe = universe or {}
         self._studies: dict[str, Study] = {}  # keyed by name — "referenceable by name"
         self._setups: dict[str, Setup] = {}
         self._next_id = 1
-        # Lazily built, cached on first use (panel is immutable after init).
-        self._ticker_frames_cache: dict[str, pd.DataFrame] | None = None
-        self._date_positions_cache: dict[str, dict[date, int]] | None = None
-        self._full_index_cache: dict[tuple[str, date], int] | None = None
 
     @classmethod
     def from_price_bars(
         cls, bars: list[PriceBar], universe: dict[str, TickerMetadata] | None = None
     ) -> "PandasPatternResearchEngine":
-        return cls(bars_to_panel(bars), universe)
+        return cls(PanelFrame.from_bars(bars), universe)
 
     def _new_id(self, prefix: str) -> str:
         value = f"{prefix}_{self._next_id}"
@@ -115,8 +115,8 @@ class PandasPatternResearchEngine:
         sectors: list[str] | None = None,
     ) -> InstanceSet:
         panel = self._filter_universe(min_market_cap, sectors)
-        search_from = from_date or panel["date"].min()
-        search_to = to_date or panel["date"].max()
+        search_from = from_date or _min_date(panel)
+        search_to = to_date or _max_date(panel)
 
         study_expressions = {s.name: s.expression for s in self._studies.values()}
         evaluator = ExpressionEvaluator(panel, study_expressions)
@@ -142,15 +142,16 @@ class PandasPatternResearchEngine:
     def _filter_universe(
         self, min_market_cap: float | None, sectors: list[str] | None
     ) -> pd.DataFrame:
+        frame = self._panel.frame
         if min_market_cap is None and sectors is None:
-            return self._panel
+            return frame
         allowed = {
             ticker
             for ticker, meta in self._universe.items()
             if (min_market_cap is None or (meta.market_cap or 0) >= min_market_cap)
             and (sectors is None or meta.sector in sectors)
         }
-        return self._panel[self._panel["ticker"].isin(allowed)]
+        return frame[frame["ticker"].isin(allowed)]
 
     def _search_all_tickers(
         self,
@@ -162,38 +163,46 @@ class PandasPatternResearchEngine:
     ) -> tuple[list[Instance], list[Instance]]:
         complete: list[Instance] = []
         partial: list[Instance] = []
-        for ticker, ticker_panel in panel.groupby("ticker", sort=False):
+        from_code, to_code = search_from.toordinal(), search_to.toordinal()
+        # observed=True: `ticker` is a categorical over the whole universe, so
+        # a universe-filtered panel would otherwise yield an empty group per
+        # excluded ticker.
+        for ticker, ticker_panel in panel.groupby("ticker", sort=False, observed=True):
             positions = ticker_panel.index
-            dates = ticker_panel["date"].to_numpy()
+            # Date ordinals, compared as integers and decoded only for the
+            # handful of rows that actually become instances -- decoding every
+            # row would allocate one date object per ticker-day.
+            date_codes = ticker_panel["date"].to_numpy()
             local_conditions = [series.loc[positions].to_numpy() for series in conditions]
             anchors = np.flatnonzero(local_conditions[0])
             for anchor in anchors:
-                if not (search_from <= dates[anchor] <= search_to):
+                if not (from_code <= date_codes[anchor] <= to_code):
                     continue
                 self._record_anchor(
-                    str(ticker), dates, local_conditions, steps, int(anchor), complete, partial
+                    str(ticker), date_codes, local_conditions, steps, int(anchor), complete, partial
                 )
         return complete, partial
 
     def _record_anchor(
         self,
         ticker: str,
-        dates: np.ndarray,
+        date_codes: np.ndarray,
         conditions: list[np.ndarray],
         steps: list[SetupStep],
         anchor: int,
         complete: list[Instance],
         partial: list[Instance],
     ) -> None:
-        outcome = self._walk_anchor(conditions, steps, anchor, len(dates))
+        outcome = self._walk_anchor(conditions, steps, anchor, len(date_codes))
         if outcome is None:
             return
         status, position, steps_resolved = outcome
+        on_date = date.fromordinal(int(date_codes[position]))
         if status == "resolved":
-            complete.append(Instance(ticker=ticker, date=dates[position], completeness=1.0))
+            complete.append(Instance(ticker=ticker, date=on_date, completeness=1.0))
         else:
             fraction = steps_resolved / len(steps)
-            partial.append(Instance(ticker=ticker, date=dates[position], completeness=fraction))
+            partial.append(Instance(ticker=ticker, date=on_date, completeness=fraction))
 
     def _walk_anchor(
         self, conditions: list[np.ndarray], steps: list[SetupStep], anchor: int, length: int
@@ -332,11 +341,7 @@ class PandasPatternResearchEngine:
         """A broad, unbiased sample of (ticker, date) anchor points from the
         whole panel over the same period — NOT filtered to the setup's own
         instances, so it represents the base rate (AC3)."""
-        mask = (self._panel["date"] >= from_date) & (self._panel["date"] <= to_date)
-        candidates = list(zip(self._panel.loc[mask, "ticker"], self._panel.loc[mask, "date"]))
-        if len(candidates) > _BASE_RATE_SAMPLE_SIZE:
-            candidates = random.sample(candidates, _BASE_RATE_SAMPLE_SIZE)
-        return candidates
+        return self._panel.anchor_sample(from_date, to_date, _BASE_RATE_SAMPLE_SIZE)
 
     def _forward_returns(self, pairs: list[tuple[str, date]], horizon_days: int) -> list[float]:
         returns = []
@@ -355,20 +360,19 @@ class PandasPatternResearchEngine:
     def _forward_return(self, ticker: str, on_date: date, horizon_days: int) -> float | None:
         """(close[i + horizon_days] - close[i]) / close[i], where i is
         `on_date`'s row position within `ticker`'s own sorted rows. None if
-        `on_date` isn't found or the horizon runs past the panel's edge."""
-        frame = self._ticker_frames().get(ticker)
-        positions = self._date_positions().get(ticker)
-        if frame is None or positions is None or on_date not in positions:
+        `on_date` isn't found or the horizon runs past that ticker's edge."""
+        bounds = self._panel.bounds(ticker)
+        anchor = self._panel.row_position(ticker, on_date)
+        if bounds is None or anchor is None:
             return None
-        i = positions[on_date]
-        j = i + horizon_days
-        if j < 0 or j >= len(frame):
+        start, stop = bounds
+        target = anchor + horizon_days
+        if target < start or target >= stop:
             return None
-        close0 = float(frame.at[i, "close"])
-        closej = float(frame.at[j, "close"])
+        close0 = self._panel.close_at(anchor)
         if close0 == 0:
             return None
-        return (closej - close0) / close0
+        return (self._panel.close_at(target) - close0) / close0
 
     # ---- Instance splitting (AC4) ----
 
@@ -409,7 +413,7 @@ class PandasPatternResearchEngine:
 
     def _split_by_condition(self, instance_set: InstanceSet, expression: str) -> list[InstanceSet]:
         study_expressions = {s.name: s.expression for s in self._studies.values()}
-        evaluator = ExpressionEvaluator(self._panel, study_expressions)
+        evaluator = ExpressionEvaluator(self._panel.frame, study_expressions)
         condition = evaluator.evaluate_condition(expression)
         true_group: list[Instance] = []
         false_group: list[Instance] = []
@@ -422,10 +426,10 @@ class PandasPatternResearchEngine:
         ]
 
     def _condition_at(self, condition: pd.Series, ticker: str, on_date: date) -> bool:
-        position = self._full_index().get((ticker, on_date))
+        position = self._panel.row_position(ticker, on_date)
         if position is None:
             return False
-        return bool(condition.loc[position])
+        return bool(condition.iloc[position])
 
     def _child_set(self, parent: InstanceSet, instances: list[Instance], label: str) -> InstanceSet:
         return InstanceSet(
@@ -453,54 +457,14 @@ class PandasPatternResearchEngine:
         return [self._instance_window(inst, window) for inst in sampled]
 
     def _instance_window(self, instance: Instance, window: tuple[int, int]) -> InstanceWindow:
-        frame = self._ticker_frames().get(instance.ticker)
-        positions = self._date_positions().get(instance.ticker)
-        if frame is None or positions is None or instance.date not in positions:
+        bounds = self._panel.bounds(instance.ticker)
+        anchor = self._panel.row_position(instance.ticker, instance.date)
+        if bounds is None or anchor is None:
             return InstanceWindow(ticker=instance.ticker, bars=[])
-        anchor = positions[instance.date]
-        # Clip to the panel's edge rather than erroring — a shorter window
-        # for one edge instance shouldn't fail the whole grid.
-        start = max(0, anchor + window[0])
-        end = min(len(frame) - 1, anchor + window[1])
-        bars = [self._row_to_bar(frame.iloc[pos]) for pos in range(start, end + 1)]
+        ticker_start, ticker_stop = bounds
+        # Clip to this ticker's own edges rather than erroring — a shorter
+        # window for one edge instance shouldn't fail the whole grid.
+        start = max(ticker_start, anchor + window[0])
+        end = min(ticker_stop - 1, anchor + window[1])
+        bars = [self._panel.bar_at(position) for position in range(start, end + 1)]
         return InstanceWindow(ticker=instance.ticker, bars=bars)
-
-    def _row_to_bar(self, row: pd.Series) -> PriceBar:
-        return PriceBar(
-            ticker=row["ticker"],
-            date=row["date"],
-            open=float(row["open"]),
-            high=float(row["high"]),
-            low=float(row["low"]),
-            close=float(row["close"]),
-            volume=int(row["volume"]),
-        )
-
-    # ---- Cached lookup structures (built lazily; panel is immutable) ----
-
-    def _ticker_frames(self) -> dict[str, pd.DataFrame]:
-        if self._ticker_frames_cache is None:
-            self._ticker_frames_cache = {
-                str(ticker): frame.reset_index(drop=True)
-                for ticker, frame in self._panel.groupby("ticker", sort=False)
-            }
-        return self._ticker_frames_cache
-
-    def _date_positions(self) -> dict[str, dict[date, int]]:
-        """ticker -> {date: row position within that ticker's own rows}."""
-        if self._date_positions_cache is None:
-            self._date_positions_cache = {
-                ticker: {d: i for i, d in enumerate(frame["date"])}
-                for ticker, frame in self._ticker_frames().items()
-            }
-        return self._date_positions_cache
-
-    def _full_index(self) -> dict[tuple[str, date], int]:
-        """(ticker, date) -> row label in `self._panel` — for aligning with a
-        condition Series computed over the full panel (unlike the per-ticker
-        positions above, used for row-offset windowing/forward-return math)."""
-        if self._full_index_cache is None:
-            self._full_index_cache = dict(
-                zip(zip(self._panel["ticker"], self._panel["date"]), self._panel.index)
-            )
-        return self._full_index_cache

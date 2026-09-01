@@ -24,7 +24,10 @@ class TestSpikePingEndpoint:
         sample = body["sample"]
         for field in ("ticker", "date", "open", "high", "low", "close", "volume"):
             assert field in sample, f"expected sample to include {field!r}, got {sample}"
-        assert sample["low"] <= min(sample["open"], sample["close"]) <= max(
-            sample["open"], sample["close"]
-        ) <= sample["high"], f"expected valid OHLC ordering, got {sample}"
+        assert (
+            sample["low"]
+            <= min(sample["open"], sample["close"])
+            <= max(sample["open"], sample["close"])
+            <= sample["high"]
+        ), f"expected valid OHLC ordering, got {sample}"
         assert sample["volume"] > 0, f"expected positive volume, got {sample['volume']}"

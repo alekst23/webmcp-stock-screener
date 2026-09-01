@@ -4,6 +4,12 @@
 	import { workspaceStore } from '$lib/workspace/store';
 	import { activityStore, clearActivity } from '$lib/workspace/activity';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
+	import {
+		fetchPanelStatus,
+		formatPanelStatus,
+		isMockPanel,
+		type PanelStatus
+	} from '$lib/workspace/panelStatus';
 	import { startBridgeSession } from '$lib/webmcp/session';
 	import { buildTools } from '$lib/webmcp/tools';
 	import {
@@ -44,8 +50,17 @@
 	let bridgeState = $state<WebmcpBridgeState>('connecting');
 	let availableNames = $state<string[]>([]);
 
+	// How current the backend's price panel is (T-1001-9 AC4). Null while it
+	// is being fetched, and left null when the backend has no panel at all --
+	// claiming an unknown as-of date would be worse than showing none.
+	let panelStatus = $state<PanelStatus | null>(null);
+
 	onMount(() => {
 		webmcpStatus = buildWebmcpStatus(buildTools(engine));
+
+		fetchPanelStatus(apiConfig)
+			.then((status) => (panelStatus = status))
+			.catch(() => (panelStatus = null));
 
 		// The bridge state machine lives in session.ts so it is testable without
 		// mounting this component (hotfix/webmcp-bridge-status).
@@ -90,6 +105,11 @@
 			</span>
 		</div>
 		{@html `<!-- ${formatAgentToolsContext(webmcpStatus, bridgeState)} -->`}
+	{/if}
+	{#if panelStatus}
+		<p class="panel-status" class:synthetic={isMockPanel(panelStatus)}>
+			{formatPanelStatus(panelStatus)}
+		</p>
 	{/if}
 	<p>
 		WebMCP Pattern Research Workbench lets a trader or researcher and an AI agent turn a vague chart
@@ -153,6 +173,21 @@
 	.webmcp-status .empty {
 		margin: 0.25rem 0 0;
 		font-style: italic;
+	}
+
+	.panel-status {
+		margin: 0.5rem 0 0;
+		font-size: 0.9rem;
+		color: #555;
+	}
+
+	/* Synthetic data must not read like real market data at a glance -- the
+	   whole point of showing this line (T-1001-9 AC4). */
+	.panel-status.synthetic {
+		color: #7a5c00;
+		background: #fdf8e6;
+		border-radius: 0.2rem;
+		padding: 0.2rem 0.35rem;
 	}
 
 	/* A degraded bridge must not read like a working one at a glance -- the
