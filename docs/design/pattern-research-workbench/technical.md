@@ -149,7 +149,7 @@ writes to `activityStore` any other way. It reuses the existing
 `ok`/`fail` `ToolResult` builders are exported so `ChartToolbar.svelte`
 can build the same result shape without re-implementing it.
 
-### `WebmcpStatus` / `formatWebmcpStatus` — header status contract (T-1004-1, hotfix/webmcp-tools-always-visible)
+### `WebmcpStatus` / `formatWebmcpStatus` / `buildWebmcpStatus` — header status contract (T-1004-1, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor)
 
 `src/lib/webmcp/status.ts`. Pure formatter backing the header's "WebMCP
 tool count always visible" scenario. `toolCount` is
@@ -160,13 +160,51 @@ feature #10's progressive availability. Computed synchronously in
 (dropped by hotfix/webmcp-tools-always-visible; `connectWebmcp()` still
 runs, for real WebMCP registration, it just no longer gates the header).
 
-| Field       | Type     | Description                 |
-| ----------- | -------- | --------------------------- |
-| `toolCount` | `number` | `buildTools(engine).length` |
+| Field       | Type       | Description                                                                                                   |
+| ----------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
+| `toolCount` | `number`   | `buildTools(engine).length`                                                                                     |
+| `toolNames` | `string[]` | new (hotfix/workbench-ui-refactor) — `buildTools(engine).map(t => t.name)`, same order `buildTools` returns them |
 
 `formatWebmcpStatus(status: WebmcpStatus) -> string` — always
 `"<toolCount> tools available"`, regardless of browser support or
-connection state.
+connection state. Unchanged by the `toolNames` addition — the name list
+renders as its own element in `+page.svelte`, not folded into this
+string, so the existing exact-match tests stay valid.
+
+`buildWebmcpStatus(tools: ToolSpec[]) -> WebmcpStatus` — new pure helper
+(hotfix/workbench-ui-refactor) so the count/name-list pairing is computed
+and tested in one place instead of inline in `+page.svelte`.
+`+page.svelte` calls it as `buildWebmcpStatus(buildTools(engine))`.
+
+### `clearActivity` — manual full-log clear (hotfix/workbench-ui-refactor)
+
+`src/lib/workspace/activity.ts`. The one exception to `recordAction`
+being the sole append-only mutator (see the amended Non-Goal in
+`spec.md`) — a whole-log wipe, not a per-entry edit/delete.
+
+| Signature                                                        | Description                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clearActivity(activity: Writable<AgentActivityEvent[]>): void`    | `activity.set([])`. The existing `subscribe`-based persistence writes the cleared (empty) array to `localStorage` automatically — no separate storage call needed. `nextActivityId` is intentionally left unreset, so IDs after a clear keep incrementing rather than restart at 1; avoids any theoretical key collision with entries rendered before the clear. |
+
+`ActivityFeed.svelte` gains an `onclear?: () => void` callback prop,
+mirroring the `ChartToolbar`/`SnapshotPicker` convention, wired in
+`+page.svelte` as `onclear={() => clearActivity(activityStore)}`.
+
+### Page layout — activity log position and snapshot picker density (hotfix/workbench-ui-refactor)
+
+`src/routes/+page.svelte` moves `<ActivityFeed>` from directly after the
+intro paragraph to after `<FocusChart>` (last element in `<main>`),
+matching the new "Log is positioned at the bottom" scenario. No prop or
+store wiring changes from the move itself. `ActivityFeed.svelte` adopts
+the same `border-top`/`border-bottom` section-divider convention already
+shared by `ChartToolbar.svelte` and `SnapshotPicker.svelte`, for visual
+consistency now that it sits as a peer section rather than an
+intro-adjacent block.
+
+`SnapshotPicker.svelte`'s layout change is CSS-only (reduced `gap`,
+`padding`, and `margin` in its existing `<style>` block) — no markup,
+prop, or behavioral change, so `workspace-snapshots/spec.md` and
+`technical.md` are unaffected.
 
 ### `TickerMetadata` — universe classification (T-1001-9)
 
