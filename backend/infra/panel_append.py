@@ -31,16 +31,13 @@ from domain.models.price import PriceBar
 from infra.panel_io import (
     EPOCH_ORDINAL,
     PANEL_COLUMNS,
+    PANEL_ROW_GROUP_ROWS,
     bars_to_table,
     validate_wire_schema,
 )
 
 # Rows of the stored panel held at once while merging.
 _MERGE_BATCH_ROWS = 64_000
-
-# Rows per output row group. Fixed, so the same content always serializes to
-# the same bytes whatever batch boundaries the input happened to have.
-_ROW_GROUP_ROWS = 100_000
 
 _Columns = dict[str, np.ndarray]
 
@@ -214,9 +211,11 @@ class _Emitter:
             return
         self._tally.add(columns)
         self._buffered = columns if self._buffered is None else _concat(self._buffered, columns)
-        while len(self._buffered["date"]) >= _ROW_GROUP_ROWS:
-            self._write(_slice(self._buffered, 0, _ROW_GROUP_ROWS))
-            self._buffered = _slice(self._buffered, _ROW_GROUP_ROWS, len(self._buffered["date"]))
+        while len(self._buffered["date"]) >= PANEL_ROW_GROUP_ROWS:
+            self._write(_slice(self._buffered, 0, PANEL_ROW_GROUP_ROWS))
+            self._buffered = _slice(
+                self._buffered, PANEL_ROW_GROUP_ROWS, len(self._buffered["date"])
+            )
 
     def close(self) -> None:
         if self._buffered is not None and len(self._buffered["date"]):

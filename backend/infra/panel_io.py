@@ -49,6 +49,15 @@ EPOCH_ORDINAL = date(1970, 1, 1).toordinal()
 # stays a rounding error against the panel it is filling.
 _READ_BATCH_ROWS = 64_000
 
+# Rows per row group, and so the granularity at which a ticker-filtered read
+# can skip. The panel is sorted by ticker, so 25,000 rows is about ten
+# tickers' worth of ten-year daily history: a single-ticker read decodes
+# roughly ten tickers rather than the whole file, while the file itself is
+# within half a percent of any choice between 10k and 100k rows (measured;
+# see T-1016-3). Fixed rather than tuned per panel, so the same content
+# always serializes to the same bytes.
+PANEL_ROW_GROUP_ROWS = 25_000
+
 _TypeGate = Callable[[pa.DataType], bool]
 
 
@@ -77,8 +86,17 @@ _COLUMN_TYPES: dict[str, tuple[_TypeGate, str]] = {
 def bars_to_parquet_bytes(bars: list[PriceBar]) -> bytes:
     """Serialize a panel, sorted by (ticker, date) as the engine expects."""
     ordered = sorted(bars, key=lambda bar: (bar.ticker, bar.date))
+    return table_to_parquet_bytes(bars_to_table(ordered))
+
+
+def table_to_parquet_bytes(table: pa.Table) -> bytes:
+    """Serialize a wire table with the panel's row-group sizing.
+
+    One place, so a panel written by the backfill, by the nightly append, or
+    by a test all prune the same way when read back.
+    """
     buffer = io.BytesIO()
-    pq.write_table(bars_to_table(ordered), buffer)
+    pq.write_table(table, buffer, row_group_size=PANEL_ROW_GROUP_ROWS)
     return buffer.getvalue()
 
 
@@ -137,14 +155,14 @@ def parquet_bytes_to_panel(data: bytes) -> pd.DataFrame:
     start = 0
     for batch in reader.iter_batches(batch_size=_READ_BATCH_ROWS, columns=PANEL_COLUMNS):
         stop = start + batch.num_rows
-        codes[start:stop] = _batch_codes(batch.column("ticker"), catalog)
+        codes[start:stop] = batch_codes(batch.column("ticker"), catalog)
         dates[start:stop] = _to_numpy(batch.column("date").cast(pa.int32())) + EPOCH_ORDINAL
         for name in _PRICE_COLUMNS:
             prices[name][start:stop] = _to_numpy(batch.column(name))
         volume[start:stop] = _to_numpy(batch.column("volume"))
         start = stop
 
-    columns: dict[str, object] = {"ticker": _categorical(codes, catalog), "date": dates}
+    columns: dict[str, object] = {"ticker": categorical(codes, catalog), "date": dates}
     columns.update(prices)
     columns["volume"] = volume
     return pd.DataFrame(
@@ -196,7 +214,7 @@ def _to_numpy(array: pa.Array) -> np.ndarray:
     return np.asarray(array.to_numpy(zero_copy_only=False))
 
 
-def _batch_codes(column: pa.Array, catalog: dict[str, int]) -> np.ndarray:
+def batch_codes(column: pa.Array, catalog: dict[str, int]) -> np.ndarray:
     """One batch's tickers as codes into a catalog shared across batches.
 
     Arrow's dictionary encoding does the deduplication per batch; only each
@@ -213,7 +231,7 @@ def _batch_codes(column: pa.Array, catalog: dict[str, int]) -> np.ndarray:
     return mapping[_to_numpy(encoded.indices).astype(np.int32, copy=False)]
 
 
-def _categorical(codes: np.ndarray, catalog: dict[str, int]) -> pd.Categorical:
+def categorical(codes: np.ndarray, catalog: dict[str, int]) -> pd.Categorical:
     """Codes plus a first-appearance catalog -> a pandas Categorical.
 
     The catalog is ordered by first appearance; pandas orders categories

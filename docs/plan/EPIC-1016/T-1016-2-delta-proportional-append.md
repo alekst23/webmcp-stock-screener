@@ -77,18 +77,22 @@ any single-object store:
 
 | panel | mode | peak RSS | seconds |
 |---|---|---|---|
-| 120k rows / 4.9 MB | merge | 63.3 MB | 0.07 |
-| 120k rows / 4.9 MB | copy | 54.1 MB | 0.06 |
-| 120k rows / 4.9 MB | rows (old) | 260.1 MB | 0.51 |
-| 1.2M rows / 40.8 MB | merge | 170.8 MB | 0.62 |
-| 1.2M rows / 40.8 MB | copy | 163.7 MB | 0.58 |
-| 1.2M rows / 40.8 MB | rows (old) | 2,143.7 MB | 6.38 |
+| 120k rows / 4.9 MB | merge | 49.8 MB | 0.06 |
+| 120k rows / 4.9 MB | copy | 40.9 MB | 0.06 |
+| 120k rows / 4.9 MB | rows (old) | 253.8 MB | 0.46 |
+| 1.2M rows / 40.8 MB | merge | 132.1 MB | 0.56 |
+| 1.2M rows / 40.8 MB | copy | 133.2 MB | 0.52 |
+| 1.2M rows / 40.8 MB | rows (old) | 2,252.1 MB | 5.58 |
+
+(Re-measured after T-1016-3 settled the row-group size at 25,000 rows, which
+also cost the merge ~40 MB less peak on the larger panel.)
 
 Two readings across the 10x panel step:
 
-* The session's own cost -- merge minus copy -- is **9.2 MB and 7.1 MB**: flat
-  while the panel grew 10x and the session grew 10x with it.
-* Peak per byte of stored panel, at the margin, is **2.4x** against **51.6x**
+* The session's own cost -- merge minus copy -- is **8.9 MB and ~0 MB**: flat
+  while the panel grew 10x and the session grew 10x with it. (The larger
+  panel's difference falls inside measurement noise, which is the point.)
+* Peak per byte of stored panel, at the margin, is **1.9x** against **~51x**
   for the row-object merge. Wall time is 10x lower.
 
 **Known limit, deliberately not hidden by the metric.** The rewrite itself is
