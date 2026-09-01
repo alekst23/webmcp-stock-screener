@@ -14,31 +14,37 @@ feature spec may be touched by multiple epics as it evolves.
 
 ## New WebMCP Surface (full replacement, in progress)
 
-- [Panel System](panel-system/spec.md) — the agent-driven panel
-  container: add, update, lay out on a logical grid, link, and remove
-  panels, plus the typed panel-kind registry other features plug into.
+Specs for the tool surface described in `.dev/design/tool-spec.md`, built
+alongside the Core Product surface above and cut over at the end.
+
+- [Workspace & Revisions](workspace-revisions/spec.md) — the workspace
+  document, stable IDs, revisions, the mutation envelope, idempotency,
+  undo, and the operation registry every other feature here builds on.
 - [Discovery & Catalog](discovery-and-catalog/spec.md) — resolve free text
   to canonical instrument IDs, and search/describe the typed catalog of
   fields, operators, studies, indicators, patterns, intervals, universes,
   and templates. Owns the catalog registry the filter-tree and chart-study
-  epics validate against.
-- [Screener Core](screener-core/spec.md) — create a screener, set its
-  universe, build a nested filter tree from typed conditions, rank and
-  validate it, and execute one revision into a pinned `run_id`.
-- [Results & Explain](results-and-explain/spec.md) — the Results area of
-  the new WebMCP surface: a configurable results table, bounded paging
-  over a pinned screener run with no silent rerun, selection that
-  propagates to linked panels, and a per-instrument explanation of every
-  filter and ranking contribution.
-- [Chart Tools](chart-tools/spec.md) — the agent-drivable chart:
-  configure what it shows, manage studies, read a bounded slice of the
-  underlying numbers, annotate it, and capture a reference setup.
-- [Similarity Search](similarity-search/spec.md) — from a captured chart
-  setup, find resembling symbols and historical windows, explain every
-  match feature by feature, and compare candidates visually.
-## Program
-
-- [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — retiring the
-  original 11-tool pattern-research surface once its ~33-tool replacement
-  is in place: inventory, capability-parity check, migration, deletion,
-  and live-deployment verification.
+  features validate against.
+- [Panel System](panel-system/spec.md) — the agent-driven panel container:
+  add, update, lay out on a logical grid, link, and remove panels, plus the
+  typed panel-kind registry other features plug into.
+- [Chart Tools](chart-tools/spec.md) — configure charts, edit studies, read
+  bounded OHLCV and study output, annotate, and capture a reference setup.
+- [Screener Core](screener-core/spec.md) — screener definition, universe,
+  the typed filter tree with all eight condition types, ranking,
+  validation, and pinned runs.
+- [Results & Explain](results-and-explain/spec.md) — the results table,
+  bounded reads from a pinned run that never silently rerun, selection, and
+  per-filter pass/fail with ranking contributions.
+- [Similarity Search](similarity-search/spec.md) — find historical windows
+  resembling a captured setup, explain a match feature by feature, and
+  compare candidates as overlays or small multiples.
+- [Safety: Preview & Apply](safety-preview-apply/spec.md) — validate a
+  typed batch of proposed operations, return the exact diff, then apply it
+  atomically. Preview honesty and atomicity are structural.
+- [Screener Follow-up Tools](screener-followup-tools/spec.md) — computed
+  fields, custom studies, derived filters, similarity refinement,
+  backtesting, watchlists, the alert draft/review/enable gate, and export.
+- [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — retire the
+  original 11-tool surface once the above reaches capability parity,
+  keeping the WebMCP transport layer.
