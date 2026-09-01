@@ -40,13 +40,13 @@ available yet".
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1008-1 | Discovery result envelope, provenance, and stable-ID scheme | — | Open |
-| 2 | T-1008-2 | Catalog registry: typed item model and seeded inventory | T-1008-1 | Open |
-| 3 | T-1008-3 | Instrument directory port and reference-data seam | T-1008-1 | Open |
-| 4 | T-1008-4 | `search_instruments` tool | T-1008-1, T-1008-3 | Open |
-| 5 | T-1008-5 | `search_catalog` tool | T-1008-2 | Open |
-| 6 | T-1008-6 | `describe_catalog_item` tool | T-1008-2 | Open |
-| 7 | T-1008-7 | Register the discovery tool group on the new surface | T-1008-4, T-1008-5, T-1008-6 | Open |
+| 1 | T-1008-1 | Discovery result envelope, provenance, and stable-ID scheme | — | Done |
+| 2 | T-1008-2 | Catalog registry: typed item model and seeded inventory | T-1008-1 | Done |
+| 3 | T-1008-3 | Instrument directory port and reference-data seam | T-1008-1 | Done |
+| 4 | T-1008-4 | `search_instruments` tool | T-1008-1, T-1008-3 | Done |
+| 5 | T-1008-5 | `search_catalog` tool | T-1008-2 | Done |
+| 6 | T-1008-6 | `describe_catalog_item` tool | T-1008-2 | Done |
+| 7 | T-1008-7 | Register the discovery tool group on the new surface | T-1008-4, T-1008-5, T-1008-6 | Done |
 
 ## Dependency Graph
 

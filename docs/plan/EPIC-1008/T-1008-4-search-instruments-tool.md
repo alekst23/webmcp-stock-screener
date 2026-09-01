@@ -2,9 +2,39 @@
 
 **Epic**: EPIC-1008 (Discovery & Catalog)
 **Design**: docs/design/discovery-and-catalog/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1008-1, T-1008-3
 **Blocks**: T-1008-7
+
+## Solution Approach
+
+`src/lib/webmcp/discovery/searchInstruments.ts` —
+`createSearchInstrumentsTool(directory)` returns one `ToolSpec` over the
+T-1008-3 port. Shared `ok`/`fail` shaping and argument readers live in
+`./results.ts` (mirroring `webmcp/tools.ts` rather than importing it, since
+this epic must not touch the surface EPIC-1015 retires).
+
+- The declared schema requires `query`, but the handler re-checks it and
+  returns an error **before** consulting the directory — a bridge is not
+  obliged to enforce `inputSchema`, and a lookup on an empty string is a
+  wasted round trip an agent then has to interpret.
+- The result carries an `outcome` discriminant: `matches` / `no_matches` /
+  `source_unavailable`. The third is detected from the envelope's
+  `sourceId` being the unconfigured adapter's, and its `note` tells the
+  agent plainly that instrument-scoped work cannot proceed and rephrasing
+  will not help — the single most valuable thing this tool can say today,
+  given no reference-data source exists.
+- Currency is stated per candidate, never on the envelope: a multi-venue
+  result spans currencies and one global figure would be wrong for most
+  rows.
+- A source rejection becomes an error result naming what failed; an empty
+  match stays a success naming the query.
+- Ambiguity is never resolved silently: with several candidates the note
+  says they are "ranked, not resolved".
+
+Tests: `searchInstruments.test.ts`, driven through the T-1008-3 test double.
+Mutation-checked — forcing the unconfigured-source detection to `false`
+turns the unavailability test red.
 
 ## Description
 

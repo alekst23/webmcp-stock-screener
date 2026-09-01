@@ -209,3 +209,25 @@ function sharedPrefixLength(a: string, b: string): number {
 	}
 	return i;
 }
+
+// The query surface as an injectable handle. The tools take one of these as a
+// parameter rather than importing the module functions directly, so a test can
+// drive a tool against a small fixed inventory and a later epic can layer
+// contributed availability records over the built-in one.
+export interface CatalogRegistry {
+	getCatalogItem(id: string): CatalogItem | undefined;
+	listCatalogItems(kind?: CatalogKind): readonly CatalogItem[];
+	searchCatalogItems(query: CatalogQuery): CatalogMatch[];
+	isOperatorValidForField(operatorId: string, fieldId: string): OperatorFieldCheck;
+	resolveStudy(studyId: string): StudyItem | undefined;
+	suggestCatalogIds(unknownId: string, max?: number): string[];
+}
+
+export const builtinCatalogRegistry: CatalogRegistry = {
+	getCatalogItem,
+	listCatalogItems,
+	searchCatalogItems,
+	isOperatorValidForField,
+	resolveStudy,
+	suggestCatalogIds
+};

@@ -2,9 +2,33 @@
 
 **Epic**: EPIC-1008 (Discovery & Catalog)
 **Design**: docs/design/discovery-and-catalog/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1008-4, T-1008-5, T-1008-6
 **Blocks**: —
+
+## Solution Approach
+
+`src/lib/webmcp/discovery/group.ts` — `buildDiscoveryTools(deps)` takes
+`{ directory: InstrumentDirectory; registry?: CatalogRegistry }` and returns
+the three specs in the `ToolSpec` shape `register.ts` already consumes, so
+hosting them needs no change to the registration mechanism. `registry`
+defaults to `builtinCatalogRegistry`; there is no module-level singleton
+source, so a real reference-data adapter is supplied here as a parameter
+without editing this module or its callers' internals.
+`DISCOVERY_TOOL_NAMES` is exported so a composition root — and the
+collision test — can name the set without instantiating it.
+
+Per AC10, nothing is wired into the running app: `register.ts`,
+`session.ts`, `tools.ts` and `+page.svelte` are untouched, so the header's
+tool count and the activity log are identical whether or not the group is
+composed in, and `main` stays deployable. Registration is the new surface's
+composition root's decision, which this epic does not own — so there is no
+flag to add either, because there is no behaviour change to gate.
+
+Tests: `group.test.ts` — exact exposed name set; no collision with the
+existing 11-tool surface's names; all three always `available`; all three
+returning well-formed provenance-carrying results through the T-1008-3 test
+double; and the search-then-describe round trip.
 
 ## Description
 

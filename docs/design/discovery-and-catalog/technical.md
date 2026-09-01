@@ -255,8 +255,36 @@ It lives beside the tests, never in the shipped default path.
 ToolSpec[]` — returns the three specs, in the existing `ToolSpec` shape
 `register.ts` already consumes. Dependencies are parameters, not
 module-level singletons, so a real directory replaces the default without
-editing consumers. All three tools are always `available`: discovery
-precedes state.
+editing consumers. `registry` defaults to `builtinCatalogRegistry`. All
+three tools are always `available`: discovery precedes state.
+`DISCOVERY_TOOL_NAMES` is exported alongside it so a composition root — and
+the collision test against the existing 11-tool surface — can name the set
+without instantiating it.
+
+Whether the group is registered on the live page is the new surface's
+composition root's decision. This epic wires nothing into the running app:
+`register.ts`, `session.ts`, `tools.ts` and `+page.svelte` are untouched, so
+the current tool count and activity log are identical whether or not the
+group is composed in, and `main` stays deployable.
+
+### Result shaping (`src/lib/webmcp/discovery/results.ts`)
+
+`ok` / `fail` mirror `webmcp/tools.ts`'s shapes rather than importing them:
+this epic ships the replacement surface alongside the one EPIC-1015 retires
+and must not touch it, and a two-line JSON wrapper is a cheaper duplication
+than a coupling between the two. Also here: `catalogProvenance()` (source
+`src.catalog.builtin`, `delivery: 'static'`, no currency or reporting period
+because a catalog entry has no monetary content) and the argument readers
+each tool uses to re-check its inputs — a bridge is not obliged to enforce a
+declared `inputSchema`, so the handlers validate rather than trust it.
+
+Each tool's result carries an `outcome` discriminant so the difference an
+agent most needs is machine-readable rather than buried in prose:
+`search_instruments` reports `matches` / `no_matches` / `source_unavailable`,
+and `search_catalog` reports `matches` / `no_matches` / `enumeration`. An
+unknown ID passed to `describe_catalog_item` is an error result carrying the
+ID and the nearest real IDs — the same one-turn self-correction the existing
+surface gives on a bad expression — not an empty success.
 
 ## Data flow
 

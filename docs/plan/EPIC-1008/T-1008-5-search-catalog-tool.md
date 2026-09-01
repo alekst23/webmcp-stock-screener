@@ -2,9 +2,34 @@
 
 **Epic**: EPIC-1008 (Discovery & Catalog)
 **Design**: docs/design/discovery-and-catalog/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1008-2
 **Blocks**: T-1008-7
+
+## Solution Approach
+
+`src/lib/webmcp/discovery/searchCatalog.ts` —
+`createSearchCatalogTool(registry)` wraps `searchCatalogItems`. The ranking
+and matching stay in the registry's query surface where EPIC-1009 and
+EPIC-1011 can reuse them; this ticket delivers the schema, the input
+handling and the result shaping only.
+
+- The schema's `kinds` enum is generated from `CATALOG_KINDS`, so the
+  declared kinds cannot drift from the registry's; a test asserts the two
+  match.
+- Rows stay summary-sized (id, kind, label, description, availability,
+  score, matchedOn) — full detail is `describe_catalog_item`'s job.
+- Unavailable items are included by default and carry their availability
+  reason, because "exists but has no data here" is different information
+  from "does not exist"; `includeUnavailable: false` opts out.
+- An empty query is enumeration rather than match-everything, reported as
+  `outcome: 'enumeration'`, so an agent can see what exists without having
+  to guess a search term.
+- Provenance identifies the catalog as `src.catalog.builtin` with
+  `delivery: 'static'` — a shipped inventory is not a feed.
+
+Tests: `searchCatalog.test.ts`. Mutation-checked — flipping the
+`includeUnavailable` default turns three tests red.
 
 ## Description
 
