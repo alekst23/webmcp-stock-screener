@@ -1,6 +1,6 @@
 # DuckDB Query Engine — Technical Design
 
-> Product spec not yet written. Run `/at-epic-design EPIC-1017` to produce
+> Product spec not yet written. Run `/at-epic-design EPIC-0015` to produce
 > `spec.md`. This document records the technical decisions and the open
 > questions that were found rather than invented, so the epic's tickets have
 > something to argue with.
@@ -14,7 +14,7 @@ headroom."* That rung was described in prose and never given a ticket, a
 contract, or an estimate. Nothing anywhere addressed how multi-step temporal
 matching becomes SQL, which is the hard part.
 
-EPIC-1017 makes rung 2 real. This document records what measurement changed
+EPIC-0015 makes rung 2 real. This document records what measurement changed
 about the plan.
 
 ## The trigger fired for a different reason than it was written
@@ -53,7 +53,7 @@ why trimming the universe — T-1016-6's option 1 — is a fix with a short
 half-life: it buys headroom against row count while leaving the actual
 gradient untouched, and the next expressive pattern spends it.
 
-**The design doc's trigger wording is wrong and EPIC-1017 supersedes it.**
+**The design doc's trigger wording is wrong and EPIC-0015 supersedes it.**
 The condition it was a proxy for — the instance budget being exceeded at the
 target universe — did occur. The proxy did not.
 
@@ -138,7 +138,7 @@ include it.
 
 `ema` is `ewm(span=n, adjust=False)`, the linear recurrence
 `y_t = a*x_t + (1-a)*y_(t-1)` with `a = 2/(n+1)`. Each output depends on the
-previous *output*, so no bounded frame computes it. T-1017-3 owns the
+previous *output*, so no bounded frame computes it. T-0015-3 owns the
 mechanism choice.
 
 **Rejected once, with a reason: the closed-form expansion.** `y_t` expands
@@ -177,7 +177,7 @@ of loaded history". Only comparing `previous + max` against the ticker's
 last ordinal separates a decisive failure from a trailing-edge partial.
 Getting this wrong turns every trailing-edge candidate into a silent
 failure, invisible until partial counts are compared — which is exactly what
-T-1017-7 compares.
+T-0015-7 compares.
 
 ### Replacing a working component requires differential evidence
 
@@ -185,7 +185,7 @@ T-1017-7 compares.
 not evidence that a replacement is correct — they check what their author
 thought to check.
 
-T-1017-7 runs both engines over the same panel across a corpus and compares
+T-0015-7 runs both engines over the same panel across a corpus and compares
 field by field. It is the safety net that makes the port defensible, and it
 is the reason the pandas engine is explicitly **not** deleted by this epic.
 
@@ -203,7 +203,7 @@ after the panel is built and subtracts it from every reading. Its figures are
 therefore *growth*, not footprint, and understate what Render sees by roughly
 the 90-100 MB of interpreter and library residency measured above.
 
-EPIC-1017 measures **absolute peak RSS for the whole process** at every
+EPIC-0015 measures **absolute peak RSS for the whole process** at every
 lifecycle stage, and varies **expression complexity** as well as row count —
 because complexity is the variable that produced the +65% and a row-scaling
 measurement would miss a regression of the same kind entirely.
@@ -232,10 +232,10 @@ the alphabet touch 100 of 120 row groups and read 83%. Column projection
 pays unconditionally; ticker pruning pays only for narrow or contiguous
 selections. Scattered reads are exactly the access pattern
 `get_instance_windows` and the base-rate sample generate, which is why
-T-1017-6 measures them separately rather than inheriting T-1016-3's table.
+T-0015-6 measures them separately rather than inheriting T-1016-3's table.
 
 **Caching versus re-fetch** is deliberately a ticket-level decision
-(T-1017-1) with an explicit requirement to *record* the behavior rather than
+(T-0015-1) with an explicit requirement to *record* the behavior rather than
 inherit whatever the defaults are. An interactive research session issues
 many queries against the same panel; re-fetching per query trades the memory
 win for a latency loss, and caching the whole file locally trades it back for
@@ -245,10 +245,10 @@ the residency this epic exists to remove.
 
 **T-1016-3 (ticker-partitioned Parquet) is implemented but unmerged**, on
 `epic/EPIC-1016-market-data-storage`. This epic reads the layout it produces.
-Until that branch lands on `main`, EPIC-1017's pushdown measurements have no
+Until that branch lands on `main`, EPIC-0015's pushdown measurements have no
 real layout to measure against.
 
-EPIC-1017 does not modify, merge, or rebase that branch.
+EPIC-0015 does not modify, merge, or rebase that branch.
 
 ## Open questions
 
@@ -260,7 +260,7 @@ can proceed without waiting, and so a different choice has to be argued for.
    recursive CTE, measured; fall back to a UDF only with its residency cost
    recorded, because a UDF puts Python back on the hot path and partially
    defeats the epic's purpose. Precomputation cannot serve `ema` of an
-   arbitrary study and is at best a partial answer. Owned by T-1017-3.
+   arbitrary study and is at best a partial answer. Owned by T-0015-3.
 
 2. **Does the whole temporal walk run in SQL, or does SQL compute the
    conditions and a small Python loop walk the anchors?** *Recommended
@@ -268,7 +268,7 @@ can proceed without waiting, and so a different choice has to be argued for.
    above — the Python walk is cause 2 in disguise, since it needs every step's
    condition array resident. Fallback if that measures badly: keep the walk in
    Python but stream anchors per ticker rather than materializing panel-wide,
-   and record the residency cost. Owned by T-1017-4.
+   and record the residency cost. Owned by T-0015-4.
 
 3. **Are `within` bounds validated anywhere?** They are not.
    `SetupStep.within` is a plain `tuple[int, int]`; nothing rejects a negative
@@ -297,9 +297,9 @@ can proceed without waiting, and so a different choice has to be argued for.
    its memory by spilling, which needs writable disk with room. Render's free
    plan has no persistent disk (`render.yaml` records this) and the ephemeral
    filesystem's capacity has not been checked. *Recommended default:* set an
-   explicit memory limit and a verified temp directory in T-1017-1, and
+   explicit memory limit and a verified temp directory in T-0015-1, and
    treat "no usable spill location" as a deployment blocker surfaced by
-   T-1017-8 rather than discovered in production.
+   T-0015-8 rather than discovered in production.
 
 7. **Float precision and equivalence tolerance.** The panel is stored
    float32; SQL arithmetic will likely run in double precision. *Recommended
@@ -312,7 +312,7 @@ can proceed without waiting, and so a different choice has to be argued for.
    pandas, or refuse to start?** *Recommended default:* fall back with a
    loud, observable reason, consistent with the codebase's existing
    serve-and-disclose posture. Whichever is chosen must be a stated decision
-   (T-1017-9 AC8), because silently serving from a different engine than the
+   (T-0015-9 AC8), because silently serving from a different engine than the
    operator selected is worse than either.
 
 9. **Sequencing against T-1016-4.** Unresolved by design — see below.
@@ -338,23 +338,23 @@ existing loop instead of materializing whole-panel Series before it. It adds
 no query planner, no statistics, no storage format — the three things that
 make a hand-rolled scanner a liability. Roughly a day's work against a
 week-plus for the SQL port, it unblocks the POC immediately, and it is
-deleted in a single commit when EPIC-1017 lands.
+deleted in a single commit when EPIC-0015 lands.
 
 What this design does commit to: if T-1016-4 is taken first, it is a bridge
 with a scheduled demolition date, and it becomes a third implementation in
-T-1017-7's differential harness — which is why that harness must not assume
+T-0015-7's differential harness — which is why that harness must not assume
 exactly two engines.
 
 ## What would falsify this epic's premise
 
 Stated in advance so a bad result is recognised rather than rationalised:
 
-- If T-1017-8 finds peak RSS still growing materially with expression
+- If T-0015-8 finds peak RSS still growing materially with expression
   complexity, the diagnosis was wrong and the epic bought nothing.
 - If bounding memory requires spilling that the target instance cannot
   provide, or costs latency that makes interactive research unusable, then
   rung 2 does not fit this deployment and the honest answer is rung 3 or a
   smaller universe.
 - If `httpfs` re-fetches the panel per query over the network, the memory
-  win is paid for in latency and the caching question (T-1017-1) becomes the
+  win is paid for in latency and the caching question (T-0015-1) becomes the
   epic's real risk rather than a detail.

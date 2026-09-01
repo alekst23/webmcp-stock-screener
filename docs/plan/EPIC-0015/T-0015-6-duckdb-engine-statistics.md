@@ -1,9 +1,9 @@
-# T-1017-6: DuckDB engine — sampling, measurement, splits, and windows
+# T-0015-6: DuckDB engine — sampling, measurement, splits, and windows
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
-**Depends on**: T-1017-5
-**Blocks**: T-1017-7, T-1017-8
+**Depends on**: T-0015-5
+**Blocks**: T-0015-7, T-0015-8
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
 
@@ -18,7 +18,7 @@ instance. Both are scattered reads, which is precisely the access pattern
 T-1016-3 recorded as the case where ticker pruning does *not* help.
 
 `split_instances` in condition mode re-evaluates an arbitrary expression at
-each instance's bar, so it inherits everything from T-1017-2 and must not
+each instance's bar, so it inherits everything from T-0015-2 and must not
 re-run a whole-panel evaluation to answer a question about a few hundred
 rows.
 
@@ -57,7 +57,7 @@ so that swapping the engine does not change my conclusions.
    engine's, including truncation at a ticker's history boundaries.
 9. Peak absolute process RSS across all four methods over a panel at the
    target universe shape is measured and recorded, and no single method
-   dominates the search peak T-1017-8 measures.
+   dominates the search peak T-0015-8 measures.
 10. A scattered read across many tickers — which is what these methods
     generate — is measured for bytes read and latency, and the figure is
     recorded next to T-1016-3's pruning table so the two are comparable.
@@ -85,15 +85,15 @@ so that swapping the engine does not change my conclusions.
   engines without fixing a shared seed and a shared draw order, which would
   couple them.
 - Forward returns need a bar `horizon_days` ahead *in trading bars for that
-  ticker*, which is the same per-ticker ordinal arithmetic T-1017-4
+  ticker*, which is the same per-ticker ordinal arithmetic T-0015-4
   establishes. Reuse it rather than inventing a second convention.
 - These methods are called repeatedly in an interactive session against the
-  same instance set. Whatever caching T-1017-1 settled on is what makes that
-  bearable; if it turns out not to be, that is a finding for T-1017-9's
+  same instance set. Whatever caching T-0015-1 settled on is what makes that
+  bearable; if it turns out not to be, that is a finding for T-0015-9's
   wiring decision.
 
 ## Out of Scope
 
 Any change to the statistics themselves. Differential verification
-(T-1017-7) — this ticket asserts equality on cases it chooses; T-1017-7
+(T-0015-7) — this ticket asserts equality on cases it chooses; T-0015-7
 asserts it on a corpus.

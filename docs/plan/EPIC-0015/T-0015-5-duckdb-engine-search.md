@@ -1,9 +1,9 @@
-# T-1017-5: DuckDB engine — study/setup definition and instance search
+# T-0015-5: DuckDB engine — study/setup definition and instance search
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
-**Depends on**: T-1017-1, T-1017-3, T-1017-4
-**Blocks**: T-1017-6
+**Depends on**: T-0015-1, T-0015-3, T-0015-4
+**Blocks**: T-0015-6
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
 
@@ -83,7 +83,7 @@ so that swapping the engine is a wiring decision rather than a rewrite.
   filtering results afterwards is not, because it defeats AC5.
 - Identifier generation (`study_1`, `setup_2`, `set_3`) is per-engine-instance
   state in the current implementation. Two engines in one process would
-  collide; that only matters for the differential harness (T-1017-7), which
+  collide; that only matters for the differential harness (T-0015-7), which
   must not compare identifiers across engines.
 - Structured logging at the storage boundary — operation, ticker count,
   bytes read, duration — is what makes AC5 and AC9 diagnosable in
@@ -92,5 +92,5 @@ so that swapping the engine is a wiring decision rather than a rewrite.
 ## Out of Scope
 
 `sample_instances`, `measure`, `split_instances`, `get_instance_windows`
-(T-1017-6). Selecting this engine at startup (T-1017-9) — until then it is
+(T-0015-6). Selecting this engine at startup (T-0015-9) — until then it is
 new code in new files, wired to nothing.

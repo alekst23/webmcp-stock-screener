@@ -1,9 +1,9 @@
-# T-1017-4: Multi-step temporal matching in SQL
+# T-0015-4: Multi-step temporal matching in SQL
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
-**Depends on**: T-1017-2
-**Blocks**: T-1017-5
+**Depends on**: T-0015-2
+**Blocks**: T-0015-5
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
 
@@ -122,4 +122,4 @@ frame will not. See the epic's open questions.
 
 Changing any matching semantics, including the anchor-only date-range check
 (AC8) — this ticket reproduces behavior, it does not improve it. Instance
-statistics and sampling (T-1017-6).
+statistics and sampling (T-0015-6).

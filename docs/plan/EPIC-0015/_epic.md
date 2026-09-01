@@ -1,4 +1,4 @@
-# EPIC-1017: DuckDB Query Engine
+# EPIC-0015: DuckDB Query Engine
 
 **Depends on**: T-1016-3 (ticker-partitioned Parquet — branch
 `epic/EPIC-1016-market-data-storage`, **unmerged**) — supplies the sorted,
@@ -6,7 +6,7 @@ row-group-pruned Parquet layout this engine reads. Nothing here can be
 measured against a real layout until that branch lands on `main`.
 **Blocks**: —
 **Design**: `docs/design/duckdb-query-engine/technical.md`
-(`spec.md` not written — run `/at-epic-design EPIC-1017`)
+(`spec.md` not written — run `/at-epic-design EPIC-0015`)
 **Issue**: #15
 
 > **Epic number deviates from the derivation rule.** Issue #15 derives
@@ -82,41 +82,41 @@ design doc's wording is wrong and this epic supersedes it — see
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1017-1 | DuckDB session over R2 Parquet — credentials, pushdown, caching | — | Open |
-| 2 | T-1017-2 | Compile validated expressions to SQL, with each study evaluated once | — | Open |
-| 3 | T-1017-3 | Recursive `ema` in SQL | T-1017-2 | Open |
-| 4 | T-1017-4 | Multi-step temporal matching in SQL | T-1017-2 | Open |
-| 5 | T-1017-5 | DuckDB engine — study/setup definition and instance search | T-1017-1, T-1017-3, T-1017-4 | Open |
-| 6 | T-1017-6 | DuckDB engine — sampling, measurement, splits, and windows | T-1017-5 | Open |
-| 7 | T-1017-7 | Differential equivalence against the pandas engine | T-1017-6 | Open |
-| 8 | T-1017-8 | Absolute-RSS memory verification against expression complexity | T-1017-6 | Open |
-| 9 | T-1017-9 | Select and wire the engine at the composition root | T-1017-7, T-1017-8 | Open |
+| 1 | T-0015-1 | DuckDB session over R2 Parquet — credentials, pushdown, caching | — | Open |
+| 2 | T-0015-2 | Compile validated expressions to SQL, with each study evaluated once | — | Open |
+| 3 | T-0015-3 | Recursive `ema` in SQL | T-0015-2 | Open |
+| 4 | T-0015-4 | Multi-step temporal matching in SQL | T-0015-2 | Open |
+| 5 | T-0015-5 | DuckDB engine — study/setup definition and instance search | T-0015-1, T-0015-3, T-0015-4 | Open |
+| 6 | T-0015-6 | DuckDB engine — sampling, measurement, splits, and windows | T-0015-5 | Open |
+| 7 | T-0015-7 | Differential equivalence against the pandas engine | T-0015-6 | Open |
+| 8 | T-0015-8 | Absolute-RSS memory verification against expression complexity | T-0015-6 | Open |
+| 9 | T-0015-9 | Select and wire the engine at the composition root | T-0015-7, T-0015-8 | Open |
 
 ## Dependency Graph
 
 ```
-T-1017-1 ────────────────────────┐
+T-0015-1 ────────────────────────┐
                                  │
-                                 ├──> T-1017-5 ──> T-1017-6 ──┬──> T-1017-7 ──┐
-T-1017-2 ──┬──> T-1017-3 ────────┤                            │               ├──> T-1017-9
-           │                     │                            └──> T-1017-8 ──┘
-           └──> T-1017-4 ────────┘
+                                 ├──> T-0015-5 ──> T-0015-6 ──┬──> T-0015-7 ──┐
+T-0015-2 ──┬──> T-0015-3 ────────┤                            │               ├──> T-0015-9
+           │                     │                            └──> T-0015-8 ──┘
+           └──> T-0015-4 ────────┘
 ```
 
 ## Wave Plan
 
-- **Wave 1** (parallel): T-1017-1, T-1017-2 — no dependencies. T-1017-2 is
+- **Wave 1** (parallel): T-0015-1, T-0015-2 — no dependencies. T-0015-2 is
   developed against a local Parquet file and needs no R2 access at all.
-- **Wave 2** (parallel): T-1017-3, T-1017-4 — both extend the compiler.
-- **Wave 3**: T-1017-5 — the adapter that assembles the pieces.
-- **Wave 4**: T-1017-6 — the remaining four Protocol methods.
-- **Wave 5** (parallel): T-1017-7, T-1017-8 — the two proofs. Neither
+- **Wave 2** (parallel): T-0015-3, T-0015-4 — both extend the compiler.
+- **Wave 3**: T-0015-5 — the adapter that assembles the pieces.
+- **Wave 4**: T-0015-6 — the remaining four Protocol methods.
+- **Wave 5** (parallel): T-0015-7, T-0015-8 — the two proofs. Neither
   changes behavior; both must pass before the engine is selectable.
-- **Wave 6**: T-1017-9 — wiring.
+- **Wave 6**: T-0015-9 — wiring.
 
-The two proofs are deliberately last and deliberately separate. T-1017-7 is
+The two proofs are deliberately last and deliberately separate. T-0015-7 is
 what makes replacing a working, well-tested component defensible at all;
-T-1017-8 is the only evidence that the replacement bought what it was
+T-0015-8 is the only evidence that the replacement bought what it was
 supposed to buy. Either one failing invalidates the epic, and neither can
 run before the engine is complete.
 
@@ -154,7 +154,7 @@ run before the engine is complete.
 - `docs/plan/EPIC-1016/T-1016-3-ticker-partitioned-parquet.md` (same branch)
   — the partition layout, row-group sizing, and measured pruning fractions
   this engine reads against. Its "where pruning does not help" section is
-  load-bearing for T-1017-1.
+  load-bearing for T-0015-1.
 - `docs/plan/EPIC-1016/T-1016-6-verify-full-universe-scale.md` (same branch)
   — records the trigger as already fired, and the two options.
 - `docs/plan/EPIC-1016/T-1016-4-streaming-universe-evaluation.md` (same
@@ -173,14 +173,14 @@ Full reasoning in `docs/design/duckdb-query-engine/technical.md`.
 
 | # | Question | Recommended default | Owner |
 |---|----------|---------------------|-------|
-| 1 | How is `ema`'s recurrence evaluated — recursive CTE, Python UDF, or precomputation at ingest? | Recursive CTE, measured. A UDF only with its residency cost recorded; precomputation cannot serve `ema` of an arbitrary study. | T-1017-3 |
-| 2 | Does the whole temporal walk run in SQL, or does SQL compute conditions and a Python loop walk anchors? | All in SQL. A Python walk is cause 2 in disguise — it needs every step's condition array resident. | T-1017-4 |
-| 3 | Are `within` bounds validated anywhere? **They are not** — nothing rejects a negative `min` or a `max` below `min`. Pandas yields an empty window; a SQL frame will not. | Reject at setup definition in **both** engines so they do not diverge. Note it is a small behavior change. | T-1017-4 |
-| 4 | Only the *anchor* is checked against the search date range, so an instance can be dated after `to_date`. Preserve or correct? | Preserve exactly, as an inherited quirk. Correcting it silently changes results for every saved setup. | T-1017-4 |
-| 5 | Where does the DuckDB engine get ticker metadata for `min_market_cap` / `sectors`? It is a Python dict beside the panel today. | Register it as a queryable relation so narrowing pushes into the scan. Filtering afterwards makes a narrow universe cost the same as a wide one. | T-1017-5 |
-| 6 | Does the target instance have a usable spill location? DuckDB bounds memory by spilling; the free plan has no persistent disk and the ephemeral filesystem has not been checked. | Set an explicit memory limit and a verified temp directory; treat "no usable spill location" as a deployment blocker. | T-1017-1, T-1017-8 |
-| 7 | Float precision and equivalence tolerance — panel is float32, SQL will likely compute in double. | Compare instance sets exactly; explain each disagreement individually rather than widening a tolerance. Numeric statistics get a per-field justified tolerance. | T-1017-7 |
-| 8 | If DuckDB fails to initialise at startup — fall back to pandas, or refuse to start? | Fall back with a loud, observable reason. Either choice must be stated, because silently serving from a different engine than selected is worse than both. | T-1017-9 |
+| 1 | How is `ema`'s recurrence evaluated — recursive CTE, Python UDF, or precomputation at ingest? | Recursive CTE, measured. A UDF only with its residency cost recorded; precomputation cannot serve `ema` of an arbitrary study. | T-0015-3 |
+| 2 | Does the whole temporal walk run in SQL, or does SQL compute conditions and a Python loop walk anchors? | All in SQL. A Python walk is cause 2 in disguise — it needs every step's condition array resident. | T-0015-4 |
+| 3 | Are `within` bounds validated anywhere? **They are not** — nothing rejects a negative `min` or a `max` below `min`. Pandas yields an empty window; a SQL frame will not. | Reject at setup definition in **both** engines so they do not diverge. Note it is a small behavior change. | T-0015-4 |
+| 4 | Only the *anchor* is checked against the search date range, so an instance can be dated after `to_date`. Preserve or correct? | Preserve exactly, as an inherited quirk. Correcting it silently changes results for every saved setup. | T-0015-4 |
+| 5 | Where does the DuckDB engine get ticker metadata for `min_market_cap` / `sectors`? It is a Python dict beside the panel today. | Register it as a queryable relation so narrowing pushes into the scan. Filtering afterwards makes a narrow universe cost the same as a wide one. | T-0015-5 |
+| 6 | Does the target instance have a usable spill location? DuckDB bounds memory by spilling; the free plan has no persistent disk and the ephemeral filesystem has not been checked. | Set an explicit memory limit and a verified temp directory; treat "no usable spill location" as a deployment blocker. | T-0015-1, T-0015-8 |
+| 7 | Float precision and equivalence tolerance — panel is float32, SQL will likely compute in double. | Compare instance sets exactly; explain each disagreement individually rather than widening a tolerance. Numeric statistics get a per-field justified tolerance. | T-0015-7 |
+| 8 | If DuckDB fails to initialise at startup — fall back to pandas, or refuse to start? | Fall back with a loud, observable reason. Either choice must be stated, because silently serving from a different engine than selected is worse than both. | T-0015-9 |
 | 9 | Sequencing against T-1016-4. | **Unresolved by design** — see below. | user |
 
 ## Relationship to T-1016-4 — recorded, not resolved
@@ -209,7 +209,7 @@ deleted in a single commit when this epic lands.
 
 Neither position is adopted here. What this epic does commit to: if T-1016-4
 is taken first, it is a bridge with a scheduled demolition date, and
-T-1017-7's differential harness gains a third engine to check rather than
+T-0015-7's differential harness gains a third engine to check rather than
 changing shape.
 
 ## Out of Scope
@@ -218,7 +218,7 @@ changing shape.
   needs the contract widened, that is a finding to report, not a change to
   make.
 - Removing `PandasPatternResearchEngine`. It stays as the reference
-  implementation that T-1017-7 checks against, and as the mock-panel path.
+  implementation that T-0015-7 checks against, and as the mock-panel path.
   Retiring it is a later decision that needs the measurements this epic
   produces.
 - Deciding the T-1016-4 sequencing (above).

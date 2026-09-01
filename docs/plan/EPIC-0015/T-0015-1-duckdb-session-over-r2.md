@@ -1,9 +1,9 @@
-# T-1017-1: DuckDB session over R2 Parquet — credentials, pushdown, caching
+# T-0015-1: DuckDB session over R2 Parquet — credentials, pushdown, caching
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
 **Depends on**: — (blocked in practice on T-1016-3 landing on `main`)
-**Blocks**: T-1017-5
+**Blocks**: T-0015-5
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
 
@@ -84,6 +84,6 @@ size.
 
 ## Out of Scope
 
-Expression compilation (T-1017-2), pattern matching (T-1017-4), and any
+Expression compilation (T-0015-2), pattern matching (T-0015-4), and any
 change to how the panel is *written* — this ticket reads T-1016-3's layout
 as it stands.

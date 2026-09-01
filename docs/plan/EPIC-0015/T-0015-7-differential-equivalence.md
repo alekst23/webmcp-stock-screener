@@ -1,9 +1,9 @@
-# T-1017-7: Differential equivalence against the pandas engine
+# T-0015-7: Differential equivalence against the pandas engine
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
-**Depends on**: T-1017-6
-**Blocks**: T-1017-9
+**Depends on**: T-0015-6
+**Blocks**: T-0015-9
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
 
@@ -91,4 +91,4 @@ so that "we ported it" is a demonstration rather than an assertion.
 
 ## Out of Scope
 
-Performance comparison (T-1017-8). Deciding which engine ships (T-1017-9).
+Performance comparison (T-0015-8). Deciding which engine ships (T-0015-9).

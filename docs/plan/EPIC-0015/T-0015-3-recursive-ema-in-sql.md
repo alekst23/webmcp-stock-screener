@@ -1,9 +1,9 @@
-# T-1017-3: Recursive `ema` in SQL
+# T-0015-3: Recursive `ema` in SQL
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
-**Depends on**: T-1017-2
-**Blocks**: T-1017-5
+**Depends on**: T-0015-2
+**Blocks**: T-0015-5
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
 
@@ -21,7 +21,7 @@ Each output depends on the previous *output*, not on a bounded slice of the
 input, so no `ROWS BETWEEN` frame computes it. Getting this wrong is the
 epic's most dangerous failure mode, because a subtly wrong `ema` produces
 plausible-looking numbers and quietly different instance sets — which is
-exactly what T-1017-7's differential harness exists to catch, but only if it
+exactly what T-0015-7's differential harness exists to catch, but only if it
 is caught rather than tolerated.
 
 This ticket picks a mechanism, states its cost, and proves the values match.

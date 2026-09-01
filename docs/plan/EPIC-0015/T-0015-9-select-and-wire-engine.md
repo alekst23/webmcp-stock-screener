@@ -1,8 +1,8 @@
-# T-1017-9: Select and wire the engine at the composition root
+# T-0015-9: Select and wire the engine at the composition root
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
-**Depends on**: T-1017-7, T-1017-8
+**Depends on**: T-0015-7, T-0015-8
 **Blocks**: —
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
@@ -91,11 +91,11 @@ it misbehaves.
 - The flag exists so the switch is reversible under load, not because the
   work is unfinished. Once the DuckDB engine has run in production long
   enough to be trusted, removing the flag and the pandas path is a separate
-  decision that needs T-1017-8's deployed figures first.
+  decision that needs T-0015-8's deployed figures first.
 
 ## Out of Scope
 
 Removing `PandasPatternResearchEngine` — it remains the reference
-implementation T-1017-7 compares against. Changing the API surface or any
+implementation T-0015-7 compares against. Changing the API surface or any
 route's response shape. The deployed-instance measurements, which remain
 T-1016-6's outstanding acceptance criteria.

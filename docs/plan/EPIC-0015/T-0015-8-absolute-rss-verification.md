@@ -1,9 +1,9 @@
-# T-1017-8: Absolute-RSS memory verification against expression complexity
+# T-0015-8: Absolute-RSS memory verification against expression complexity
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
-**Depends on**: T-1017-6
-**Blocks**: T-1017-9
+**Depends on**: T-0015-6
+**Blocks**: T-0015-9
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
 
@@ -96,7 +96,7 @@ projection from the wrong one.
 
 ## Out of Scope
 
-Correctness (T-1017-7). The deployed-instance measurements and the real paid
+Correctness (T-0015-7). The deployed-instance measurements and the real paid
 backfill, which remain T-1016-6's outstanding acceptance criteria — this
 ticket measures locally on a synthetic panel of the target shape, which is
 what the memory question actually depends on.

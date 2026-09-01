@@ -1,9 +1,9 @@
-# T-1017-2: Compile validated expressions to SQL, with each study evaluated once
+# T-0015-2: Compile validated expressions to SQL, with each study evaluated once
 
-**Epic**: EPIC-1017 (DuckDB Query Engine)
+**Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
 **Depends on**: —
-**Blocks**: T-1017-3, T-1017-4
+**Blocks**: T-0015-3, T-0015-4
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
 
@@ -18,7 +18,7 @@ the planner folds rather than N fully-materialized operand Series
 (`expression.py:210`); and rolling functions become window functions rather
 than a per-group `transform` that builds and concatenates a result per ticker.
 
-`ema` is deliberately excluded and handled in T-1017-3 — it is a linear
+`ema` is deliberately excluded and handled in T-0015-3 — it is a linear
 recurrence, not a window aggregate, and pretending otherwise would produce
 silently wrong numbers.
 
@@ -96,5 +96,5 @@ so that expressing a pattern more clearly does not make it more expensive.
 
 ## Out of Scope
 
-`ema` (T-1017-3). Multi-step temporal matching (T-1017-4). Any change to the
+`ema` (T-0015-3). Multi-step temporal matching (T-0015-4). Any change to the
 expression language itself — same catalog, same syntax, same errors.
