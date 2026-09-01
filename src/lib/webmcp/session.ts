@@ -11,9 +11,12 @@ import type { ResearchEngine } from './types';
 // unrelated child components, to test four lines of promise plumbing that
 // decide whether the page tells an agent the truth about callability.
 //
-// The mapping is the contract: `null` -> unavailable (no bridge in this
-// browser), a connection -> connected, a rejection -> failed (a bridge is
-// there, registration threw), and `connecting` until one of those lands.
+// The mapping is the contract: a connection -> connected, a rejection ->
+// failed (registration threw), and `connecting` until one of those lands.
+// There is no browser-capability state, by design: connectWebmcp always has
+// a bridge to register against, so the only thing left to report is whether
+// registering on it worked -- an observed outcome, never a prediction about
+// what this browser supports.
 //
 // Returns the disposer for the caller's `onMount` cleanup.
 export function startBridgeSession(
@@ -36,10 +39,10 @@ export function startBridgeSession(
 	})
 		.then((connection) => {
 			if (disposed) {
-				void connection?.dispose().catch(() => {});
+				void connection.dispose().catch(() => {});
 				return null;
 			}
-			onState(connection ? 'connected' : 'unavailable');
+			onState('connected');
 			return connection;
 		})
 		.catch((error: unknown) => {

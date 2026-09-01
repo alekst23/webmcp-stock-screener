@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startBridgeSession } from './session';
-import { fakeBridge } from './testSupport';
+import { clearModelContext, fakeBridge } from './testSupport';
 import { createApiEngine } from '../workspace/apiEngine';
 import { createWorkspaceStore } from '../workspace/store';
 import { memoryStorage } from '../workspace/testSupport';
@@ -33,7 +33,7 @@ function recorder(): Recorder {
 // it lived inside +page.svelte's onMount.
 describe('startBridgeSession bridge state mapping', () => {
 	afterEach(() => {
-		document.modelContext = undefined;
+		clearModelContext();
 		vi.restoreAllMocks();
 	});
 
@@ -56,8 +56,11 @@ describe('startBridgeSession bridge state mapping', () => {
 		).toEqual(['connecting']);
 	});
 
-	it('reports unavailable when the browser has no bridge', async () => {
-		document.modelContext = undefined;
+	// The page installs its own bridge when the browser has none, so there is
+	// no browser-capability state left to report. A session that went looking
+	// for one and settled on "unavailable" is the regression this replaces.
+	it('reports connected on a browser that supplies no bridge of its own', async () => {
+		clearModelContext();
 		const seen = recorder();
 
 		startBridgeSession(
@@ -70,8 +73,12 @@ describe('startBridgeSession bridge state mapping', () => {
 
 		expect(
 			seen.states,
-			`a missing document.modelContext is "unavailable", got: ${seen.states.join(' -> ')}`
-		).toEqual(['connecting', 'unavailable']);
+			`no browser may be reported as unsupported, got: ${seen.states.join(' -> ')}`
+		).toEqual(['connecting', 'connected']);
+		expect(
+			seen.tools.at(-1)?.length ?? 0,
+			'connected must mean tools actually landed on the page-installed bridge'
+		).toBeGreaterThan(0);
 	});
 
 	it('reports connected and the registered names when a bridge accepts the tools', async () => {
@@ -131,7 +138,7 @@ describe('startBridgeSession bridge state mapping', () => {
 
 describe('startBridgeSession teardown', () => {
 	afterEach(() => {
-		document.modelContext = undefined;
+		clearModelContext();
 		vi.restoreAllMocks();
 	});
 

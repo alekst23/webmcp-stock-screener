@@ -82,10 +82,7 @@
 					<p class="empty">No tools are registered for an agent to call right now.</p>
 				{/if}
 			</details>
-			<span
-				class="bridge"
-				class:degraded={bridgeState === 'unavailable' || bridgeState === 'failed'}
-			>
+			<span class="bridge" class:degraded={bridgeState === 'failed'}>
 				{formatBridgeStatus(bridgeState)}
 			</span>
 		</div>

@@ -58,21 +58,27 @@ describe('formatBridgeStatus', () => {
 		expect(result).toContain('connected');
 	});
 
-	it('distinguishes an unsupported browser and names the browser as the cause', () => {
-		const result = formatBridgeStatus('unavailable').toLowerCase();
-		expect(result).toContain('unavailable');
-		expect(result, `expected the browser named as the cause, got: ${result}`).toContain('browser');
+	it('reports a failed connection', () => {
+		const failed = formatBridgeStatus('failed').toLowerCase();
+		expect(failed).toContain('fail');
 	});
 
-	it('reports a failed connection distinctly from an unsupported browser', () => {
-		const failed = formatBridgeStatus('failed').toLowerCase();
-		const unavailable = formatBridgeStatus('unavailable').toLowerCase();
+	// The regression: the header blamed the browser for a capability the page
+	// now supplies itself, and a working tool surface was suppressed behind
+	// that guess. No state may name the browser as a cause again.
+	it('never blames the browser in any state', () => {
+		const states = ['connecting', 'connected', 'failed'] as const;
 
-		expect(failed).toContain('fail');
-		expect(
-			failed,
-			'failed and unavailable both mean 0 callable tools but have different causes and must not share wording'
-		).not.toBe(unavailable);
+		for (const state of states) {
+			const result = formatBridgeStatus(state).toLowerCase();
+			expect(
+				result,
+				`state "${state}" must not attribute anything to the browser, got: ${result}`
+			).not.toContain('browser');
+			expect(result, `state "${state}" must not report unavailability`).not.toContain(
+				'unavailable'
+			);
+		}
 	});
 
 	// The precise failure this change exists to prevent: claiming a live
@@ -86,13 +92,13 @@ describe('formatBridgeStatus', () => {
 	});
 
 	it('returns a distinct string for every state', () => {
-		const states = ['connecting', 'connected', 'unavailable', 'failed'] as const;
+		const states = ['connecting', 'connected', 'failed'] as const;
 		const rendered = states.map((s) => formatBridgeStatus(s));
 
 		expect(
 			new Set(rendered).size,
-			`expected 4 distinct strings, got: ${rendered.join(' | ')}`
-		).toBe(4);
+			`expected 3 distinct strings, got: ${rendered.join(' | ')}`
+		).toBe(3);
 	});
 });
 
@@ -150,33 +156,39 @@ describe('formatAgentToolsContext', () => {
 		expect(result).toContain('authoritative');
 	});
 
-	// hotfix/webmcp-bridge-status: the half the previous text lacked. A real
-	// agent read this comment, found no bridge, and had to work out the UI
-	// fallback unaided -- nothing on the page told it one existed.
-	it('states the tools are not callable and names the UI fallback when no bridge exists', () => {
+	// The page supplies its own document.modelContext, so a client with no
+	// native WebMCP support can still drive the surface -- but only if the
+	// comment says how. Without this the reader is back to diagnosing an
+	// apparently dead tool list unaided.
+	it('tells a connected reader how to call the tools directly', () => {
 		const result = formatAgentToolsContext(
 			{ toolCount: 2, toolNames: ['defineStudy', 'showTickerCharts'] },
-			'unavailable'
+			'connected'
 		);
+		const lower = result.toLowerCase();
 
-		expect(result.toLowerCase()).toContain('not callable');
-		expect(result.toLowerCase(), `expected the UI fallback named, got: ${result}`).toContain('ui');
+		expect(lower, `expected executeTool named, got: ${result}`).toContain(
+			'document.modelcontext.executetool'
+		);
+		expect(lower, `expected getTools named, got: ${result}`).toContain(
+			'document.modelcontext.gettools'
+		);
 	});
 
-	it('does not claim to register tools when no bridge exists', () => {
-		const result = formatAgentToolsContext({ toolCount: 2, toolNames: ['a', 'b'] }, 'unavailable');
+	// No state may tell a reader its browser is the problem: that claim sent a
+	// real agent to the UI fallback while a callable surface sat on
+	// document.modelContext.
+	it('never tells the reader the browser lacks a bridge', () => {
+		const states = ['connecting', 'connected', 'failed'] as const;
+		const status = { toolCount: 2, toolNames: ['defineStudy', 'showTickerCharts'] };
 
-		expect(result.toLowerCase()).not.toContain('this page registers');
-	});
-
-	it('still lists every tool name when no bridge exists', () => {
-		const result = formatAgentToolsContext(
-			{ toolCount: 2, toolNames: ['defineStudy', 'showTickerCharts'] },
-			'unavailable'
-		);
-
-		expect(result).toContain('defineStudy');
-		expect(result).toContain('showTickerCharts');
+		for (const state of states) {
+			const lower = formatAgentToolsContext(status, state).toLowerCase();
+			expect(lower, `state "${state}" must not claim the bridge is absent`).not.toContain(
+				'is not connected here'
+			);
+			expect(lower, `state "${state}" must not blame the browser`).not.toContain('in this browser');
+		}
 	});
 
 	// hotfix/webmcp-bridge-status: the connected branch used to label the full
@@ -234,7 +246,7 @@ describe('formatAgentToolsContext', () => {
 	});
 
 	it('gives every bridge state its own wording', () => {
-		const states = ['connecting', 'connected', 'unavailable', 'failed'] as const;
+		const states = ['connecting', 'connected', 'failed'] as const;
 		const status = { toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] };
 
 		const rendered = states.map((state) => formatAgentToolsContext(status, state));
@@ -242,13 +254,13 @@ describe('formatAgentToolsContext', () => {
 		expect(
 			new Set(rendered).size,
 			'collapsing any pair asserts something untrue about callability for one of them'
-		).toBe(4);
+		).toBe(3);
 	});
 
 	// The caller wraps this in <!-- -->; a literal "--" would truncate the
 	// comment early and could expose the tail as rendered page text.
 	it('never emits a double hyphen in any bridge state', () => {
-		const states = ['connecting', 'connected', 'unavailable', 'failed'] as const;
+		const states = ['connecting', 'connected', 'failed'] as const;
 
 		for (const state of states) {
 			const result = formatAgentToolsContext(
