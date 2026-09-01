@@ -106,6 +106,14 @@ per `docs/plan.md`'s risk mitigation — no custom implementation needed.
   this project's SvelteKit/Vite version wires it, already noted in a
   pre-existing comment in `vite.config.ts` pointing at this ticket.
 
+## Outcome (2026-08-31)
+
+Deployed and mostly verified — see `docs/reference/deployment.md` for the
+live URLs and the full verification table. AC1/AC3/AC4 pass. AC2/AC5 are
+blocked on one remaining step: `CORS_ALLOWED_ORIGINS` on Render needs to
+be set to the real frontend origin and redeployed. Status stays `Blocked`
+until that's done and AC2/AC5 are re-verified.
+
 ## Out of Scope
 
 The nightly automated data-refresh job — wiring that requires the real
