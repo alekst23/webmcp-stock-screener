@@ -138,7 +138,10 @@ at every step.
 | Human actions are visible        | a human triggers an action through a UI control (not the `/dev` testing harness)                         | the action completes                       | it appears in the same log as agent actions, in true chronological order relative to them                                                                                                             |
 | Failed actions are visible       | an action (human or agent) fails                                                                         | the failure occurs                         | the log shows the failure with a readable reason, not silently dropped                                                                                                                                |
 | Log persists across reloads      | a session with existing logged actions                                                                   | the page is reloaded in the same browser   | the full log is restored, matching how the rest of workspace state already persists                                                                                                                   |
+| Log is positioned at the bottom  | the page renders any amount of workspace content (panels, charts, controls)                              | the researcher looks for the activity log  | it appears at the bottom of the page, below all panels and the focus chart, rather than above the research controls                                                                                   |
+| Manual full-log clear            | a session with one or more logged actions                                                                | the researcher uses the "Clear log" control | every entry is removed from the log at once and the cleared state persists across reloads; this does not affect studies, setups, result sets, or panels                                              |
 | WebMCP tool count always visible | the page loads                                                                                           | the researcher looks at the page header    | it shows the total number of tools the app defines (e.g. "11 tools available"), regardless of whether the current browser can connect via WebMCP or how many are currently unlocked by workflow state |
+| WebMCP tool names visible        | the page loads                                                                                           | the researcher looks at the page header    | the name of every tool the app defines is listed, alongside the count, so the researcher can see the full tool surface without opening dev tools                                                      |
 
 ### Progressive tool availability
 
@@ -171,8 +174,12 @@ at every step.
 - The raw current-state snapshot view is removed; the log is the sole
   visible record of session activity going forward (current panel/chart
   rendering is unaffected — only the redundant text snapshot goes away).
-- Editing, deleting, or reordering log entries — the log is append-only,
-  matching the workspace's existing append-only model.
+- Editing, deleting, or reordering *individual* log entries — the log is
+  append-only for single entries, matching the workspace's existing
+  append-only model. The one exception is a deliberate, all-or-nothing
+  "Clear log" action (see Shared workspace & collaboration) that wipes
+  every entry at once; there is still no way to remove or reorder just
+  one entry.
 - New panel kinds beyond grid + its histogram toggle.
 - Reordering or resizing panels.
 - The header's tool count reflecting progressive availability (feature
