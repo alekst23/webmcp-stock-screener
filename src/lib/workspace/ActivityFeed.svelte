@@ -8,12 +8,18 @@
 	// call sites append via the same recordAction, so array order already is
 	// call order.
 	let { events, onclear }: { events: AgentActivityEvent[]; onclear?: () => void } = $props();
+
+	function clear(): void {
+		if (confirm('Clear the entire activity log? This cannot be undone.')) {
+			onclear?.();
+		}
+	}
 </script>
 
 <section class="activity-feed">
 	<div class="header-row">
 		<h2>Activity log ({events.length})</h2>
-		<button type="button" onclick={onclear} disabled={events.length === 0}>Clear log</button>
+		<button type="button" onclick={clear} disabled={events.length === 0}>Clear log</button>
 	</div>
 	{#if events.length === 0}
 		<p class="empty">No activity yet.</p>
