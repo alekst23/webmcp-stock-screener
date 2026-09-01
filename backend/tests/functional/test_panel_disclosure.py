@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 import main as main_module
 from application.load_panel import PANEL_KEY, load_panel
+from domain.errors import PanelStoreError
 from domain.models.panel import PanelStatus
 from domain.panel_disclosure import STALE_AFTER_SESSIONS, disclose
 from domain.trading_calendar import previous_weekday
@@ -183,6 +184,29 @@ class TestPartialCoverage:
         assert loaded is not None, "expected the panel to load"
         assert loaded.status.missing == [], f"got {loaded.status.missing}"
         assert loaded.status.row_count == len(_TICKERS) * _DAYS, f"got {loaded.status.row_count}"
+
+
+class TestUnreachableStore:
+    """T-0016-3 AC4: a configured store that cannot be reached must abort
+    startup rather than degrade to the mock panel -- the silent-mock hazard
+    a role-based AWS deploy would otherwise hit invisibly."""
+
+    def test_an_unreachable_store_raises_instead_of_falling_back_to_mock(
+        self, tmp_path: Path
+    ) -> None:
+        store = InMemoryPanelStore({PANEL_KEY: _panel_bytes()})
+
+        def _unreachable() -> None:
+            raise PanelStoreError("Object store bucket 'wrong-bucket' is not reachable")
+
+        store.ensure_reachable = _unreachable  # type: ignore[method-assign]
+        mock_path = tmp_path / "panel.parquet"
+        mock_path.write_bytes(_panel_bytes())
+
+        with pytest.raises(PanelStoreError) as caught:
+            load_panel(store, mock_path=mock_path)
+
+        assert "wrong-bucket" in str(caught.value), f"expected the bucket named, got {caught.value}"
 
 
 class TestNothingLoadable:

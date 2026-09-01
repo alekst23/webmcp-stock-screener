@@ -9,6 +9,13 @@ Damage is handled the same way: a panel with an unreadable row group is
 loaded without it and says which tickers are missing, rather than refusing to
 serve the ones that are fine. Only a panel with nothing readable in it is a
 failure (T-0013-5).
+
+A configured store is a different matter. `store is None` means no bucket
+was ever named -- the mock fallback is correct there. `store is not None`
+means a bucket was named, so `ensure_reachable()` runs before anything else
+and its PanelStoreError is left to propagate: a wrong bucket, a denied
+permission, or credentials that never resolve must abort startup, never
+degrade to the mock panel (T-0016-3).
 """
 
 from __future__ import annotations
@@ -50,10 +57,12 @@ def load_panel(
     behavior intact: api/routes/research.py already answers 503 with a
     remediation message when no engine is loaded.
     """
-    if store is not None and store.object_exists(panel_key):
-        loaded = _loaded(store.get_object(panel_key), source="object-store")
-        if loaded is not None:
-            return LoadedPanel(loaded.panel, _load_universe(store, universe_key), loaded.status)
+    if store is not None:
+        store.ensure_reachable()
+        if store.object_exists(panel_key):
+            loaded = _loaded(store.get_object(panel_key), source="object-store")
+            if loaded is not None:
+                return LoadedPanel(loaded.panel, _load_universe(store, universe_key), loaded.status)
     if mock_path.exists():
         loaded = _loaded(mock_path.read_bytes(), source="mock")
         if loaded is not None:
