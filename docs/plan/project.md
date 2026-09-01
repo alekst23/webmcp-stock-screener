@@ -38,8 +38,8 @@ fan out behind it.
 | EPIC-1013: Safety layer (preview & apply) | epic | specced | `epic/EPIC-1013-…` merged to main | 6 tickets. 2 tools; atomic apply over the operation registry |
 | EPIC-1014: High-value follow-up tools | epic | specced | `epic/EPIC-1014-…` merged to main | 11 tickets. backtest, watchlists, alerts, computed fields, export |
 | EPIC-1015: Legacy surface cutover | epic | specced | `epic/EPIC-1015-…` merged to main | 8 tickets. Gated on user approval; runs last |
-| EPIC-1001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-1001-pattern-research-workbench` | 8/10 tickets done; T-1001-2 blocked, T-1001-9/10 deprioritized |
-| EPIC-1016: Market data storage | epic | in-flight (another session) | `epic/EPIC-1016-market-data-storage` | Triaging issue #13 (13GB peak-memory bug loading the panel). Uncommitted `docs/design/market-data-storage/spec.md` sits in worktree `.worktrees/triage-13` as of this session's close — not touched, not reviewed. Owned by a session outside this one; do not edit `project.md` for it until that session reports back or the user says otherwise. |
+| EPIC-1001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-1001-pattern-research-workbench` | 8/10 tickets done; T-1001-2 blocked, T-1001-9/10 deprioritized. T-1001-9 IS implemented on `feat/T-1001-9-real-data-pipeline` (`8448059`, unmerged, CI green): EODHD backfill + nightly delta CLIs, R2 object store, universe metadata, `GET /api/research/panel`, and the compact `PanelFrame` (141 -> 25.1 B/row) that EPIC-1016 builds on. ACs 1-4 done against recorded shapes; AC5 awaits the real backfill. |
+| EPIC-1016: Market data storage | epic | specced | `epic/EPIC-1016-market-data-storage` | 6 tickets. Triaged from #13 (panel load peaks ~13 GB — backend cannot boot on real data at any tier). Spec + technical design committed `13afd89`; branch not merged. Target: full US listed universe (~6,268 tickers x 10+ y, ~12M rows) on 512 MB, memory bounded by query not dataset. Blocks T-1001-9's AC1 backfill and AC5 spot-check. |
 
 ## Implementation wave order
 
@@ -73,7 +73,7 @@ Dependencies only — everything within a wave runs in parallel.
 | `measure` and `splitInstances` have no equivalent in the spec's core tool list | EPIC-1015 | 2026-09-01 | User sign-off needed at T-1015-2 on whether these are deliberate capability drops. Nearest equivalent is follow-up `backtest_screener`. |
 | Multi-step temporal setup matching may be only partially covered by the new filter tree | EPIC-1015 | 2026-09-01 | User sign-off needed at T-1015-2 on partial parity. |
 | T-1001-2 unverified | T-1001-2 | 2026-08-30 | Human + real WebMCP browser + real AI agent must complete `T-1001-2-live-verification-runbook.md`. Deprioritized. |
-| EODHD paid tier / R2/S3 bucket | T-1001-9 | 2026-08-31 | Deprioritized along with T-1001-9. |
+| Panel load path peaks ~13 GB (issue #13) | T-1001-9 AC1/AC5, EPIC-1016 | 2026-09-01 | Real blocker for real data. EODHD paid tier and R2 are NO LONGER blockers: key verified live 2026-09-01 (`dailyRateLimit` 100000, arbitrary tickers, 2,680 rows for NVDA over 10y) and R2 credentials are in the gitignored root `.env`. Land EPIC-1016's T-1016-1/T-1016-2 before attempting the backfill. |
 | EPIC-1016 (market data storage, still being triaged) rearchitects the same OHLCV panel that EPIC-1008/EPIC-1011 read from — overlaps cross-epic reconciliation #4 below (bars-port ownership) | EPIC-1008, EPIC-1011, EPIC-1016 | 2026-09-01 | Once EPIC-1016 lands a spec, reconcile its storage interface against EPIC-1008's/EPIC-1011's port assumptions before Wave 1 (EPIC-1008) implements against a port that EPIC-1016 might reshape. |
 
 ## Cross-epic reconciliations pending
@@ -97,6 +97,10 @@ authoritative)._
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-01 | Filed #13 and triaged it as EPIC-1016 rather than patching `panel_io.py` in place | Fixing only the I/O boundary leaves residency linear in universe x history; panel size is a product input, so the ceiling would return. User chose the full-universe-on-free-tier target, which makes streaming in-scope. |
+| 2026-09-01 | EPIC-1016 numbered off-rule (derivation gives EPIC-1013, taken by Wave 0's Safety layer) | Using the derived number would have collided with unrelated specced work. Deviation recorded in the epic file. |
+| 2026-09-01 | Feature slug `market-data-storage`, not `panel-system` | `panel-system` already owns the agent-driven UI panel container — an unrelated concept sharing the word 'panel'. |
+| 2026-09-01 | Panel degradation is serve-and-disclose, not fail-closed | User decision. A failed nightly cron shouldn't take the app down, but stale or partial data must never read as current and complete. |
 | 2026-09-01 | Hardened `at-project-go`, `at-epic-new`, `at-epic-run` (global skills, not project-specific) after this session's Step-6 cleanup deleted a live worktree belonging to a different, concurrently-running session | The user asked "did you destroy any work on main?" — investigation found no `main` damage, but found the actual cause: cleanup deleted-by-glob-pattern instead of by provenance. Fixed: a run manifest scopes cleanup to only what the current run launched; `git worktree remove` no longer forces past uncommitted changes; epic numbering can be caller-pinned to avoid concurrent-scan collisions; agents in a fan-out no longer edit shared index files. See `~/.claude/skills/{at-project-go,at-epic-new,at-epic-run}/SKILL.md`. |
 | 2026-08-30 | Pre-approved the ~$20/mo EODHD paid-tier upgrade for T-1001-9, to proceed automatically once T-1001-8 unblocks it | Deadline is 2026-09-03 1pm PT; avoids re-asking mid-crunch |
 | 2026-08-30 | Uncommitted ticker-charts/instance-cache work (started by ChatGPT Codex) was finished rather than discarded | User confirmed this is live in-progress work worth keeping, not scratch — landed in commit `2b039af` |
