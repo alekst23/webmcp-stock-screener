@@ -15,6 +15,15 @@ class PanelStoreError(DomainError):
     """Raised when the panel object store cannot be read or written."""
 
 
+class PanelSchemaError(DomainError):
+    """Raised when a stored panel does not match the agreed column contract.
+
+    The bulk load path validates columns rather than rows, so this is where
+    producer drift surfaces -- naming the offending column, before any of the
+    panel is materialized.
+    """
+
+
 class PriceSourceError(DomainError):
     """Raised when the upstream market-data provider cannot be reached, or
     returns a payload that does not conform to the PriceBar contract."""

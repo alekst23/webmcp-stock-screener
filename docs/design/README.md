@@ -11,6 +11,9 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+- [Market Data Storage](market-data-storage/spec.md) — how the historical
+  price panel is stored, loaded, and queried so memory is bounded by the
+  query rather than the size of the dataset.
 
 ## New WebMCP Surface (full replacement, in progress)
 
