@@ -50,6 +50,46 @@ alone when it is merely serving a degraded panel.
 6. Panel provenance and staleness remain available to callers, unchanged,
    through the existing research surface.
 
+## Solution Approach
+
+A new `GET /health` route, defined in `backend/api/routes/health.py` and
+registered directly on the app in `backend/main.py`
+(`app.include_router(health_router)`), outside the `/api/spike` prefix per
+AC1. The handler takes no parameters -- no `Request`, no
+`Depends(get_engine)`, no read of `app.state` -- so it cannot touch the
+panel, the object store, or any file on disk. That satisfies AC2 (a process
+with no panel or with the mock fallback answers exactly like one with a real
+panel: the handler never looks) and AC3 (there is no I/O path to skip,
+because none exists).
+
+AC4's rate-limit exemption is implemented in the same middleware that
+already applies the blanket per-address budget (`main.py`'s
+`RateLimitMiddleware.dispatch`), not as a second middleware or a slowapi
+per-route decorator -- the latter is what that middleware's own docstring
+already documents as silently inert against `include_router()`-registered
+routes on this FastAPI version. `RateLimitMiddleware` gains an
+`exempt_paths: frozenset[str]` constructor parameter; `dispatch` checks
+`request.url.path` against it before calling `limiter.limiter.hit(...)`,
+calling `call_next` directly on a match. `main.py` passes
+`frozenset({HEALTH_PATH})`, where `HEALTH_PATH` is a constant exported from
+`api/routes/health.py` -- the same string the route itself is registered
+under -- so the exemption cannot drift from the route it exempts.
+
+AC5 ("deleting every `/api/spike` route leaves the endpoint working") is
+structural, not incidental: `api/routes/health.py` imports nothing from
+`api.routes.spike` (no shared `PANEL_PATH`, no shared response schema), and
+`main.py` registers `health_router` as its own `app.include_router()` call,
+never derived from or conditioned on `spike_router`'s presence. Deleting
+`backend/api/routes/spike.py` and its one registration line in `main.py`
+removes nothing `health.py` or the rate-limit exemption references. A test
+builds a bare `FastAPI()` app with only `health_router` registered -- no
+`spike_router`, no `research_router` -- and asserts `GET /health` still
+succeeds; that is the only way to demonstrate "structurally guaranteed"
+rather than "coincidentally true while spike.py still exists."
+
+`render.yaml`'s `healthCheckPath` is repointed from `/api/spike/ping` to
+`/health` in the same change (see Technical Considerations above).
+
 ## Design References
 
 - `backend/api/routes/spike.py` — the current health target and what it
