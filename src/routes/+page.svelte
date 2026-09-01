@@ -9,7 +9,10 @@
 	import {
 		buildWebmcpStatus,
 		formatAgentToolsContext,
+		formatAvailableStatus,
+		formatBridgeStatus,
 		formatWebmcpStatus,
+		type WebmcpBridgeState,
 		type WebmcpStatus
 	} from '$lib/webmcp/status';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
@@ -35,17 +38,77 @@
 	// progressive availability, which only affects what's registered.
 	let webmcpStatus = $state<WebmcpStatus | null>(null);
 
+	// Whether an agent can actually call any of them right now, and how many
+	// are registered at this moment. Kept apart from webmcpStatus so the
+	// defined count never has to stand in for callability.
+	let bridgeState = $state<WebmcpBridgeState>('connecting');
+	let availableNames = $state<string[]>([]);
+
 	onMount(() => {
 		webmcpStatus = buildWebmcpStatus(buildTools(engine));
-		void connectWebmcp(engine, activityStore);
+
+		// Cleanup can fire before the connect resolves; the flag lets that case
+		// tear down on arrival rather than leak this mount's registrations onto
+		// a bridge the next mount will register against again.
+		let disposed = false;
+		const connecting = connectWebmcp(engine, activityStore, (names) => {
+			availableNames = names;
+		})
+			.then((connection) => {
+				if (disposed) {
+					void connection?.dispose();
+					return null;
+				}
+				bridgeState = connection ? 'connected' : 'unavailable';
+				return connection;
+			})
+			.catch(() => {
+				if (!disposed) {
+					bridgeState = 'failed';
+					availableNames = [];
+				}
+				return null;
+			});
+
+		return () => {
+			disposed = true;
+			void connecting.then((connection) => connection?.dispose());
+		};
 	});
 </script>
 
 <main>
 	<h1>WebMCP Pattern Research Workbench</h1>
 	{#if webmcpStatus}
-		<p class="webmcp-status">{formatWebmcpStatus(webmcpStatus)}</p>
-		{@html `<!-- ${formatAgentToolsContext(webmcpStatus).replaceAll('--', '—')} -->`}
+		<div class="webmcp-status">
+			<details>
+				<summary>{formatWebmcpStatus(webmcpStatus)}</summary>
+				<ul>
+					{#each webmcpStatus.toolNames as name (name)}
+						<li>{name}</li>
+					{/each}
+				</ul>
+			</details>
+			<details>
+				<summary>{formatAvailableStatus(availableNames.length)}</summary>
+				{#if availableNames.length}
+					<ul>
+						{#each availableNames as name (name)}
+							<li>{name}</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="empty">No tools are registered for an agent to call right now.</p>
+				{/if}
+			</details>
+			<span
+				class="bridge"
+				class:degraded={bridgeState === 'unavailable' || bridgeState === 'failed'}
+			>
+				{formatBridgeStatus(bridgeState)}
+			</span>
+		</div>
+		{@html `<!-- ${formatAgentToolsContext(webmcpStatus, bridgeState)} -->`}
 	{/if}
 	<p>
 		WebMCP Pattern Research Workbench lets a trader or researcher and an AI agent turn a vague chart
@@ -87,7 +150,36 @@
 	}
 
 	.webmcp-status {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem 1rem;
 		font-size: 0.9rem;
 		color: #555;
+	}
+
+	.webmcp-status summary {
+		cursor: pointer;
+	}
+
+	.webmcp-status ul {
+		margin: 0.25rem 0 0;
+		padding-left: 1.25rem;
+		font-family: ui-monospace, monospace;
+		font-size: 0.85rem;
+	}
+
+	.webmcp-status .empty {
+		margin: 0.25rem 0 0;
+		font-style: italic;
+	}
+
+	/* A degraded bridge must not read like a working one at a glance -- the
+	   whole point of this line is that "defined" never implies "callable". */
+	.bridge.degraded {
+		color: #a33;
+		background: #fdf0f0;
+		border-radius: 0.2rem;
+		padding: 0 0.35rem;
 	}
 </style>

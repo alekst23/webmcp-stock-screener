@@ -93,7 +93,7 @@ describe('connectWebmcp live registration signal', () => {
 
 		expect(seen.length, 'expected at least one change notification on connect').toBeGreaterThan(0);
 		expect(
-			seen[seen.length - 1].length,
+			seen[seen.length - 1]!.length,
 			`last notification should match the bridge's registration count, got: ${JSON.stringify(seen)}`
 		).toBe(bridge.registered.size);
 	});
