@@ -39,7 +39,7 @@ fan out behind it.
 | EPIC-1014: High-value follow-up tools | epic | specced | `epic/EPIC-1014-…` merged to main | 11 tickets. backtest, watchlists, alerts, computed fields, export |
 | EPIC-1015: Legacy surface cutover | epic | specced | `epic/EPIC-1015-…` merged to main | 8 tickets. Gated on user approval; runs last |
 | EPIC-1001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-1001-pattern-research-workbench` | 8/10 tickets done; T-1001-2 blocked, T-1001-9/10 deprioritized. T-1001-9 IS implemented on `feat/T-1001-9-real-data-pipeline` (`8448059`, unmerged, CI green): EODHD backfill + nightly delta CLIs, R2 object store, universe metadata, `GET /api/research/panel`, and the compact `PanelFrame` (141 -> 25.1 B/row) that EPIC-1016 builds on. ACs 1-4 done against recorded shapes; AC5 awaits the real backfill. |
-| EPIC-1016: Market data storage | epic | specced | `epic/EPIC-1016-market-data-storage` | 6 tickets. Triaged from #13 (panel load peaks ~13 GB — backend cannot boot on real data at any tier). Spec + technical design committed `13afd89`; branch not merged. Target: full US listed universe (~6,268 tickers x 10+ y, ~12M rows) on 512 MB, memory bounded by query not dataset. Blocks T-1001-9's AC1 backfill and AC5 spot-check. |
+| EPIC-1016: Market data storage | epic | specced | `epic/EPIC-1016-market-data-storage` | 5 tickets scheduled + 1 deferred, commits `13afd89`/`fc73984`, branch not merged. Triaged from #13 (panel load peaks ~13 GB — backend cannot boot on real data at any tier). **POC scope**: trimmed liquid universe (~2,000 tickers x 10+y, ~5M rows, ~130 MB) fully resident on 512 MB; removes cost that grows faster than the data, but does NOT decouple memory from dataset size. Streaming (T-1016-4) deferred — DuckDB-over-R2 is the designated next rung. Blocks T-1001-9's AC1 backfill and AC5 spot-check. |
 
 ## Implementation wave order
 
@@ -97,6 +97,8 @@ authoritative)._
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-01 | EPIC-1016 retargeted to POC scope; T-1016-4 (chunked streaming) deferred | User set the goal as a decent POC with a real DB understood as the production answer. Given that, a hand-rolled chunked scanner is a query engine built to be discarded when it starts mattering — it buys no latency (findInstances scans the whole universe by design), only headroom, which DuckDB-over-R2 gives for free off the same partitioned Parquet. Upgrade ladder recorded in technical.md. |
+| 2026-09-01 | Panel universe trimmed by a liquidity/market-cap floor rather than taking all ~6,268 listed names | Product decision as much as sizing: thinly-traded microcaps distort pattern base rates. T-1016-6 fixes and records the cut. |
 | 2026-09-01 | Filed #13 and triaged it as EPIC-1016 rather than patching `panel_io.py` in place | Fixing only the I/O boundary leaves residency linear in universe x history; panel size is a product input, so the ceiling would return. User chose the full-universe-on-free-tier target, which makes streaming in-scope. |
 | 2026-09-01 | EPIC-1016 numbered off-rule (derivation gives EPIC-1013, taken by Wave 0's Safety layer) | Using the derived number would have collided with unrelated specced work. Deviation recorded in the epic file. |
 | 2026-09-01 | Feature slug `market-data-storage`, not `panel-system` | `panel-system` already owns the agent-driven UI panel container — an unrelated concept sharing the word 'panel'. |
