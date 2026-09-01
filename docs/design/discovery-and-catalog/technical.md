@@ -22,7 +22,8 @@ Everything here lives in **new files**. `src/lib/webmcp/tools.ts`,
 | `src/lib/surface/provenance.ts` | domain | `DiscoveryEnvelope`, `Provenance`, engine version (T-1008-1) |
 | `src/lib/surface/ids.ts` | domain | stable-ID construction and validation (T-1008-1) |
 | `src/lib/catalog/types.ts` | domain | catalog item type model (T-1008-2) |
-| `src/lib/catalog/registry.ts` | domain | seeded inventory + query surface (T-1008-2) |
+| `src/lib/catalog/items.ts` | domain | seeded inventory, data only (T-1008-2) |
+| `src/lib/catalog/registry.ts` | domain | query surface over the inventory (T-1008-2) |
 | `src/lib/discovery/ports.ts` | domain | `InstrumentDirectory` and its record types (T-1008-3) |
 | `src/lib/discovery/unavailableDirectory.ts` | infra | default adapter when nothing is configured (T-1008-3) |
 | `src/lib/webmcp/discovery/*.ts` | api | the three tool specs (T-1008-4/5/6) |
@@ -101,7 +102,7 @@ names.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | `'available' \| 'partial' \| 'unavailable'` | |
+| `status` | `'available' \| 'partial' \| 'unavailable'` | can an agent actually use this item today? |
 | `reason` | `string \| undefined` | required when not `available` |
 | `requiresReferenceData` | `boolean` | true when the item needs reference data this project has no source for |
 | `intervalIds` | `string[]` | intervals the item is available over |
@@ -140,10 +141,31 @@ enumValues?, required }`.
 | `searchCatalogItems` | `(query: CatalogQuery) => CatalogMatch[]` | ranked search across label, ID, aliases, tags |
 | `isOperatorValidForField` | `(operatorId: string, fieldId: string) => OperatorFieldCheck` | **EPIC-1009's validation hook** — reports valid/invalid with a reason |
 | `resolveStudy` | `(studyId: string) => StudyItem \| undefined` | **EPIC-1011's resolution hook** |
+| `clampCatalogLimit` | `(limit?: number) => { limit, clamped }` | bounds a page to `MAX_CATALOG_RESULTS` (50), default 20 |
+| `suggestCatalogIds` | `(unknownId: string, max?) => string[]` | nearest real IDs for a miss; `describe_catalog_item`'s self-correction hint |
 
 `CatalogQuery`: `{ text?, kinds?, includeUnavailable?, limit? }`.
 `CatalogMatch`: `{ item: CatalogItem, score: number, matchedOn: 'id' |
-'label' | 'alias' | 'tag' | 'description' }`.
+'label' | 'alias' | 'tag' | 'description' | 'enumeration' }`. `'enumeration'`
+is what an empty-text kind-restricted listing reports: nothing was matched
+against, so attributing the hit to a field that played no part would be a
+small lie an agent would try to reason from.
+
+Ranking is a fixed ladder (exact ID 100, exact label 90, exact alias 80,
+then prefix, then substring, then tag, then description), ties broken on ID.
+Deliberately predictable rather than tuned: an agent that cannot anticipate
+the ordering re-queries instead of trusting it.
+
+**What `availability` means.** It answers "can an agent use this today?",
+and the `reason` says which kind of no it is — no data source, no engine
+support, or no consuming tool yet. An agent that cannot tell "unsupported"
+from "not wired up" retries forever. Concretely: daily OHLCV fields,
+`interval.1d`, and the studies the expression engine really implements
+(`sma`, `ema`, `atr`) are available; RSI/MACD/Bollinger are declared but
+unavailable pending engine support; VWAP and the intraday intervals are
+unavailable for want of intraday data; sector/industry/index/exchange/
+country/market-cap/fundamentals fields and the index universes are
+unavailable with `requiresReferenceData: true`.
 
 Returned collections are `readonly`; the inventory is frozen at module
 load. Registry **data** and registry **query logic** are separate modules so

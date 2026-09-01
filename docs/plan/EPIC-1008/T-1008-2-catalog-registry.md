@@ -2,9 +2,51 @@
 
 **Epic**: EPIC-1008 (Discovery & Catalog)
 **Design**: docs/design/discovery-and-catalog/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1008-1
 **Blocks**: T-1008-5, T-1008-6
+
+## Solution Approach
+
+Three new domain modules, with data and query logic deliberately separated
+so a real data source can later contribute availability records without
+touching how the catalog is searched.
+
+- `src/lib/catalog/types.ts` — the item model. `CatalogItem` is a
+  discriminated union on `kind`, so an entry missing its kind's required
+  fields does not compile (AC12). `DataAvailability` is likewise a union:
+  `status: 'partial' | 'unavailable'` **requires** a `reason`, making
+  "unavailable, no explanation" unrepresentable.
+- `src/lib/catalog/items.ts` — the seeded inventory: 5 intervals, 17
+  fields, 12 operators spanning all eight condition families, 7 studies, 3
+  indicators, 3 patterns, 4 universes, 3 templates.
+- `src/lib/catalog/registry.ts` — `getCatalogItem`, `listCatalogItems`,
+  `searchCatalogItems`, `isOperatorValidForField`, `resolveStudy`, plus
+  `clampCatalogLimit` and `suggestCatalogIds` (T-1008-6's self-correction
+  hint). The inventory is `Object.freeze`d at module load, so a caller
+  cannot corrupt an item two sibling epics also hold.
+
+**What `availability` means.** It answers "can an agent use this today?",
+and the `reason` says which kind of no it is: no data source, no engine
+support, or no consuming tool yet. An agent that cannot tell "unsupported"
+from "not wired up" retries forever. So: daily OHLCV fields, `interval.1d`
+and the studies the expression engine really implements (`sma`, `ema`,
+`atr`) are available; RSI/MACD/Bollinger are declared but unavailable
+pending engine support; VWAP and intraday intervals are unavailable for
+want of intraday data; the reference-data fields and index universes are
+unavailable with `requiresReferenceData: true`. Nothing claims data it does
+not have.
+
+Ranking is a fixed ladder (exact ID, exact label, exact alias, prefix,
+substring, tag, description) with ties broken on ID — predictable rather
+than tuned, because an agent that cannot anticipate ordering re-queries
+instead of trusting it. An empty text query is enumeration, reported as
+`matchedOn: 'enumeration'` rather than attributed to a field that played no
+part.
+
+Tests: `registry.test.ts`. Mutation-checked — dropping `Object.freeze`,
+removing the `includeUnavailable` filter, and making the operand-type check
+always pass each turn their tests red.
 
 ## Description
 
