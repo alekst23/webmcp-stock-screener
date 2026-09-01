@@ -24,6 +24,8 @@ from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+from api.routes.health import HEALTH_PATH
+from api.routes.health import router as health_router
 from api.routes.research import router as research_router
 from api.routes.spike import router as spike_router
 from application.load_panel import load_panel
@@ -98,14 +100,27 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     reusing slowapi/limits' storage and window-counting strategy.
     """
 
-    def __init__(self, app: ASGIApp, limiter: Limiter, rate_limit: RateLimitItem) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        limiter: Limiter,
+        rate_limit: RateLimitItem,
+        exempt_paths: frozenset[str] = frozenset(),
+    ) -> None:
         super().__init__(app)
         self._limiter = limiter
         self._rate_limit = rate_limit
+        self._exempt_paths = exempt_paths
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        # The liveness probe (T-0016-2 AC4) is exempt so a platform health
+        # check at its own interval can never be throttled into a false
+        # negative -- checked by path, not by keying off the caller's
+        # address, since the whole point is that this path has no budget.
+        if request.url.path in self._exempt_paths:
+            return await call_next(request)
         client_key = get_remote_address(request)
         if not self._limiter.limiter.hit(self._rate_limit, client_key):
             return JSONResponse({"detail": "Rate limit exceeded"}, status_code=429)
@@ -116,7 +131,12 @@ limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title="WebMCP Pattern Research Workbench API", lifespan=_lifespan)
 
-app.add_middleware(RateLimitMiddleware, limiter=limiter, rate_limit=parse(_rate_limit_default()))
+app.add_middleware(
+    RateLimitMiddleware,
+    limiter=limiter,
+    rate_limit=parse(_rate_limit_default()),
+    exempt_paths=frozenset({HEALTH_PATH}),
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -125,6 +145,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(health_router)
 app.include_router(spike_router)
 app.include_router(research_router)
 

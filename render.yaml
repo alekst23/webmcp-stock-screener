@@ -47,11 +47,13 @@ services:
       uv sync --frozen &&
       (test -f data/mock/panel.parquet || uv run python scripts/generate_mock_panel.py)
     startCommand: "uv run uvicorn main:app --host 0.0.0.0 --port $PORT"
-    # Exercises the panel file the build step generates -- if generation
-    # failed, this fails closed instead of serving a broken deploy. Swap
-    # for a T-0001-5 endpoint once one exists that doesn't depend on
-    # route-specific state.
-    healthCheckPath: "/api/spike/ping"
+    # T-0016-2: liveness only -- succeeds whenever the process is up and
+    # serving HTTP, independent of whether a panel is loaded or which one
+    # (backend/api/routes/health.py). Deliberately not /api/spike/ping,
+    # which reads the mock Parquet file and builds a PriceBar on every
+    # probe, and which the /api/spike stack is slated to be deleted
+    # entirely (EPIC-1015) -- this path survives that deletion unchanged.
+    healthCheckPath: "/health"
     envVars:
       # Secrets/deployment-specific values -- `sync: false` means Render
       # will NOT populate them from this file; a human sets the real value
