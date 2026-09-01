@@ -6,8 +6,13 @@ Downloads the stored panel, appends one bulk-by-exchange trading day, and
 re-uploads it. One bulk call (~100 quota units), not one call per ticker.
 
 Idempotent: re-running for the same day replaces those rows rather than
-duplicating them (infra/panel_io.py's merge_bars), so a retried cron run or a
-manual catch-up is safe.
+duplicating them (infra/panel_append.py), so a retried cron run or a manual
+catch-up is safe.
+
+    uv run python scripts/nightly_delta.py --catch-up
+
+resumes from the panel's own as-of date instead, applying every session it is
+missing in one rewrite -- the recovery path after a run of failed nights.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ if __package__ in (None, ""):
 from application.append_daily_delta import (
     PANEL_KEY,
     append_daily_delta,
+    catch_up_sessions,
     latest_completed_trading_day,
 )
 from domain.errors import PanelStoreError, PriceSourceError
@@ -42,14 +48,23 @@ def main() -> None:
         help="Trading day to append (default: the most recent weekday)",
     )
     parser.add_argument("--key", default=PANEL_KEY)
+    parser.add_argument(
+        "--catch-up",
+        action="store_true",
+        help="Apply every session missing since the panel's as-of date, not just one",
+    )
     args = parser.parse_args()
 
     api_key = require_api_key()
     store = require_panel_store()
     day = args.day or latest_completed_trading_day(date.today())
+    client = EodhdClient(api_key)
 
     try:
-        status = append_daily_delta(EodhdClient(api_key), store, args.exchange, day, key=args.key)
+        if args.catch_up:
+            status = catch_up_sessions(client, store, args.exchange, day, key=args.key)
+        else:
+            status = append_daily_delta(client, store, args.exchange, day, key=args.key)
     except (PanelStoreError, PriceSourceError) as exc:
         # A cron job that exits 0 on failure is a silently stale dataset --
         # exactly what AC2's "kept current without manual intervention"

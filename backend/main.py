@@ -64,7 +64,7 @@ def _load_engine() -> tuple[PandasPatternResearchEngine | None, PanelStatus | No
     loaded = load_panel(_panel_store(), PANEL_PATH)
     if loaded is None:
         return None, None
-    engine = PandasPatternResearchEngine.from_price_bars(loaded.bars, loaded.universe)
+    engine = PandasPatternResearchEngine(loaded.panel, loaded.universe)
     return engine, loaded.status
 
 
