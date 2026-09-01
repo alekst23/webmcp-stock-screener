@@ -85,9 +85,9 @@ so that "we ported it" is a demonstration rather than an assertion.
 - The pandas engine constructs from price bars and the DuckDB engine from
   storage. The harness needs one panel expressible both ways, which is a
   constraint on the fixture, not on either engine.
-- If T-1016-4 (per-ticker chunked evaluation) is taken first, it becomes a
+- If T-0013-4 (per-ticker chunked evaluation) is taken first, it becomes a
   third implementation over the same corpus — the harness should not assume
-  exactly two engines. See the epic's "Relationship to T-1016-4".
+  exactly two engines. See the epic's "Relationship to T-0013-4".
 
 ## Out of Scope
 

@@ -15,7 +15,7 @@ so they read far less of the panel than a search does — but two of them have
 teeth. `measure` compares against a base rate drawn from across the whole
 panel, and `get_instance_windows` fetches a bar window around each sampled
 instance. Both are scattered reads, which is precisely the access pattern
-T-1016-3 recorded as the case where ticker pruning does *not* help.
+T-0013-3 recorded as the case where ticker pruning does *not* help.
 
 `split_instances` in condition mode re-evaluates an arbitrary expression at
 each instance's bar, so it inherits everything from T-0015-2 and must not
@@ -60,7 +60,7 @@ so that swapping the engine does not change my conclusions.
    dominates the search peak T-0015-8 measures.
 10. A scattered read across many tickers — which is what these methods
     generate — is measured for bytes read and latency, and the figure is
-    recorded next to T-1016-3's pruning table so the two are comparable.
+    recorded next to T-0013-3's pruning table so the two are comparable.
 
 ## Design References
 
@@ -70,8 +70,8 @@ so that swapping the engine does not change my conclusions.
   strategies, forward returns, base-rate sampling, splits, and windows.
 - `backend/domain/models/measurement.py` — `MeasureResult`,
   `BaseRateResult`, `InstanceWindow`.
-- `docs/plan/EPIC-1016/T-1016-3-ticker-partitioned-parquet.md` (on
-  `epic/EPIC-1016-market-data-storage`) — its "where pruning does not help"
+- `docs/plan/EPIC-0013/T-0013-3-ticker-partitioned-parquet.md` (on
+  `epic/EPIC-0013-market-data-storage`) — its "where pruning does not help"
   section is the basis for AC10: a thin sample scattered across the
   alphabet reads nearly the whole file.
 - `docs/design/duckdb-query-engine/technical.md`.

@@ -1,7 +1,7 @@
 # EPIC-0015: DuckDB Query Engine
 
-**Depends on**: T-1016-3 (ticker-partitioned Parquet — branch
-`epic/EPIC-1016-market-data-storage`, **unmerged**) — supplies the sorted,
+**Depends on**: T-0013-3 (ticker-partitioned Parquet — branch
+`epic/EPIC-0013-market-data-storage`, **unmerged**) — supplies the sorted,
 row-group-pruned Parquet layout this engine reads. Nothing here can be
 measured against a real layout until that branch lands on `main`.
 **Blocks**: —
@@ -148,17 +148,17 @@ run before the engine is complete.
   corrected trigger, the SQL translation strategy, and the recorded
   disagreement over sequencing.
 - `docs/design/market-data-storage/technical.md` (on
-  `epic/EPIC-1016-market-data-storage`, unmerged) — the three-rung upgrade
+  `epic/EPIC-0013-market-data-storage`, unmerged) — the three-rung upgrade
   ladder that designates DuckDB as rung 2, and the trigger wording this epic
   corrects.
-- `docs/plan/EPIC-1016/T-1016-3-ticker-partitioned-parquet.md` (same branch)
+- `docs/plan/EPIC-0013/T-0013-3-ticker-partitioned-parquet.md` (same branch)
   — the partition layout, row-group sizing, and measured pruning fractions
   this engine reads against. Its "where pruning does not help" section is
   load-bearing for T-0015-1.
-- `docs/plan/EPIC-1016/T-1016-6-verify-full-universe-scale.md` (same branch)
+- `docs/plan/EPIC-0013/T-0013-6-verify-full-universe-scale.md` (same branch)
   — records the trigger as already fired, and the two options.
-- `docs/plan/EPIC-1016/T-1016-4-streaming-universe-evaluation.md` (same
-  branch) — the deferred alternative; see "Relationship to T-1016-4" below.
+- `docs/plan/EPIC-0013/T-0013-4-streaming-universe-evaluation.md` (same
+  branch) — the deferred alternative; see "Relationship to T-0013-4" below.
 - `backend/domain/contracts/engine.py` — the seven-method Protocol that must
   not change.
 - `backend/infra/expression.py` — the module docstring documents the
@@ -181,23 +181,23 @@ Full reasoning in `docs/design/duckdb-query-engine/technical.md`.
 | 6 | Does the target instance have a usable spill location? DuckDB bounds memory by spilling; the free plan has no persistent disk and the ephemeral filesystem has not been checked. | Set an explicit memory limit and a verified temp directory; treat "no usable spill location" as a deployment blocker. | T-0015-1, T-0015-8 |
 | 7 | Float precision and equivalence tolerance — panel is float32, SQL will likely compute in double. | Compare instance sets exactly; explain each disagreement individually rather than widening a tolerance. Numeric statistics get a per-field justified tolerance. | T-0015-7 |
 | 8 | If DuckDB fails to initialise at startup — fall back to pandas, or refuse to start? | Fall back with a loud, observable reason. Either choice must be stated, because silently serving from a different engine than selected is worse than both. | T-0015-9 |
-| 9 | Sequencing against T-1016-4. | **Unresolved by design** — see below. | user |
+| 9 | Sequencing against T-0013-4. | **Unresolved by design** — see below. | user |
 
-## Relationship to T-1016-4 — recorded, not resolved
+## Relationship to T-0013-4 — recorded, not resolved
 
-EPIC-1016's T-1016-4 (per-ticker chunked evaluation) is deferred, not
+EPIC-0013's T-0013-4 (per-ticker chunked evaluation) is deferred, not
 deleted, and the two workstreams overlap. **The user has not decided the
 sequencing.** Both positions, as stated:
 
-**Against doing T-1016-4 first** (`T-1016-6`): trimming the evaluator's
+**Against doing T-0013-4 first** (`T-0013-6`): trimming the evaluator's
 intermediates — float32 arithmetic, chunked condition evaluation — is
 *"exactly the hand-rolled query engine `technical.md` argues against
-building."* T-1016-4's own file goes further: *"do not implement this
+building."* T-0013-4's own file goes further: *"do not implement this
 without first rejecting DuckDB for a stated reason."* If DuckDB is happening
 anyway, every hour spent on the pandas evaluator is thrown away and the SQL
 port is unavoidable regardless.
 
-**For doing T-1016-4 first** (orchestrator): per-ticker chunking is a *loop
+**For doing T-0013-4 first** (orchestrator): per-ticker chunking is a *loop
 boundary*, not a scanner. `pandas_engine.py` already calls
 `panel.groupby("ticker")` on every rolling operation and in
 `_search_all_tickers`; the change is to evaluate conditions inside that
@@ -207,7 +207,7 @@ make a hand-rolled scanner a liability. It is roughly a day's work against a
 week-plus for the SQL port, it unblocks the POC immediately, and it is
 deleted in a single commit when this epic lands.
 
-Neither position is adopted here. What this epic does commit to: if T-1016-4
+Neither position is adopted here. What this epic does commit to: if T-0013-4
 is taken first, it is a bridge with a scheduled demolition date, and
 T-0015-7's differential harness gains a third engine to check rather than
 changing shape.
@@ -221,9 +221,9 @@ changing shape.
   implementation that T-0015-7 checks against, and as the mock-panel path.
   Retiring it is a later decision that needs the measurements this epic
   produces.
-- Deciding the T-1016-4 sequencing (above).
+- Deciding the T-0013-4 sequencing (above).
 - Merging, rebasing, or otherwise touching
-  `epic/EPIC-1016-market-data-storage`.
+  `epic/EPIC-0013-market-data-storage`.
 - The real paid backfill and the deployed-instance measurements — those
-  remain T-1016-6's outstanding ACs.
+  remain T-0013-6's outstanding ACs.
 - Intraday bars, fundamentals, and any change to the ingestion pipeline.

@@ -36,7 +36,7 @@ rows), as absolute process RSS — the quantity Render's OOM killer acts on:
 | **peak during search** | **723.5 MB** |
 
 The panel is 65.7 MB against a 512 MB budget. `market-data-storage`'s
-residency claim holds precisely, as T-1016-6 already recorded. What overruns
+residency claim holds precisely, as T-0013-6 already recorded. What overruns
 the budget is *evaluation transients*, and the written trigger would never
 have fired on them.
 
@@ -49,7 +49,7 @@ searched two ways:
 | 3 steps, 4 composed studies | **348 MB (+65%)** |
 
 Identical rows. The cost is set by **how the question is written**. That is
-why trimming the universe — T-1016-6's option 1 — is a fix with a short
+why trimming the universe — T-0013-6's option 1 — is a fix with a short
 half-life: it buys headroom against row count while leaving the actual
 gradient untouched, and the next expressive pattern spends it.
 
@@ -198,7 +198,7 @@ enough to hide a wrong window bound.
 
 ### Memory must be measured absolutely
 
-EPIC-1016's `backend/scripts/measure_universe_scale.py` captures a baseline
+EPIC-0013's `backend/scripts/measure_universe_scale.py` captures a baseline
 after the panel is built and subtracts it from every reading. Its figures are
 therefore *growth*, not footprint, and understate what Render sees by roughly
 the 90-100 MB of interpreter and library residency measured above.
@@ -222,9 +222,9 @@ state, not a misconfiguration, and must stay that way: a local checkout and
 every test run legitimately have no credentials and fall back to the mock
 panel.
 
-**Pushdown against T-1016-3's layout.** The panel is written sorted by
+**Pushdown against T-0013-3's layout.** The panel is written sorted by
 ticker in 25,000-row row groups (~10 tickers' full history each), and
-T-1016-3 measured what that buys: 1 ticker reads 0.9% of the file, 100
+T-0013-3 measured what that buys: 1 ticker reads 0.9% of the file, 100
 adjacent tickers 4.3%, half the universe 51.3%, and `close` alone 24.4%.
 Its own caveat is the one that matters here — **pruning is a function of
 ticker *adjacency*, not ticker count.** A hundred tickers scattered across
@@ -232,7 +232,7 @@ the alphabet touch 100 of 120 row groups and read 83%. Column projection
 pays unconditionally; ticker pruning pays only for narrow or contiguous
 selections. Scattered reads are exactly the access pattern
 `get_instance_windows` and the base-rate sample generate, which is why
-T-0015-6 measures them separately rather than inheriting T-1016-3's table.
+T-0015-6 measures them separately rather than inheriting T-0013-3's table.
 
 **Caching versus re-fetch** is deliberately a ticket-level decision
 (T-0015-1) with an explicit requirement to *record* the behavior rather than
@@ -243,8 +243,8 @@ the residency this epic exists to remove.
 
 ## Dependency on unmerged work
 
-**T-1016-3 (ticker-partitioned Parquet) is implemented but unmerged**, on
-`epic/EPIC-1016-market-data-storage`. This epic reads the layout it produces.
+**T-0013-3 (ticker-partitioned Parquet) is implemented but unmerged**, on
+`epic/EPIC-0013-market-data-storage`. This epic reads the layout it produces.
 Until that branch lands on `main`, EPIC-0015's pushdown measurements have no
 real layout to measure against.
 
@@ -315,22 +315,22 @@ can proceed without waiting, and so a different choice has to be argued for.
    (T-0015-9 AC8), because silently serving from a different engine than the
    operator selected is worse than either.
 
-9. **Sequencing against T-1016-4.** Unresolved by design — see below.
+9. **Sequencing against T-0013-4.** Unresolved by design — see below.
 
-## Relationship to T-1016-4 — recorded, not resolved
+## Relationship to T-0013-4 — recorded, not resolved
 
-EPIC-1016's T-1016-4 (per-ticker chunked evaluation) is deferred, not
+EPIC-0013's T-0013-4 (per-ticker chunked evaluation) is deferred, not
 deleted. Its file says: *"do not implement this without first rejecting
 DuckDB for a stated reason."* **The user has not decided the sequencing, and
 this epic does not decide it either.** Both positions, as stated:
 
-**Against T-1016-4 first** (`T-1016-6`): trimming the evaluator's
+**Against T-0013-4 first** (`T-0013-6`): trimming the evaluator's
 intermediates — float32 arithmetic, chunked condition evaluation — is
 *"exactly the hand-rolled query engine `technical.md` argues against
 building."* If DuckDB is happening anyway, every hour spent on the pandas
 evaluator is thrown away, and the SQL port is unavoidable either way.
 
-**For T-1016-4 first** (orchestrator): per-ticker chunking is a *loop
+**For T-0013-4 first** (orchestrator): per-ticker chunking is a *loop
 boundary*, not a scanner. `pandas_engine.py` already calls
 `panel.groupby("ticker")` on every rolling operation and in
 `_search_all_tickers`; the change is evaluating conditions inside that
@@ -340,7 +340,7 @@ make a hand-rolled scanner a liability. Roughly a day's work against a
 week-plus for the SQL port, it unblocks the POC immediately, and it is
 deleted in a single commit when EPIC-0015 lands.
 
-What this design does commit to: if T-1016-4 is taken first, it is a bridge
+What this design does commit to: if T-0013-4 is taken first, it is a bridge
 with a scheduled demolition date, and it becomes a third implementation in
 T-0015-7's differential harness — which is why that harness must not assume
 exactly two engines.

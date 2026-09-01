@@ -15,7 +15,7 @@ not happen.
 
 Two things must be right about the measurement or it proves nothing.
 
-**It must be absolute.** EPIC-1016's `scripts/measure_universe_scale.py`
+**It must be absolute.** EPIC-0013's `scripts/measure_universe_scale.py`
 subtracts a baseline captured after the panel is built, so its figures are
 *growth*, not footprint. Render kills on the process's whole resident set —
 interpreter, imported libraries, panel, and transients together. The
@@ -66,14 +66,14 @@ projection from the wrong one.
 7. The measurement runs from a committed script that a later change can be
    re-run against, and its output is recorded durably enough to serve as a
    regression baseline.
-8. Where the new figures contradict a figure recorded in EPIC-1016's
-   T-1016-6, the contradiction is stated explicitly and the cause identified
+8. Where the new figures contradict a figure recorded in EPIC-0013's
+   T-0013-6, the contradiction is stated explicitly and the cause identified
    — baseline subtraction, panel shape, or pattern complexity.
 
 ## Design References
 
-- `docs/plan/EPIC-1016/T-1016-6-verify-full-universe-scale.md` (on
-  `epic/EPIC-1016-market-data-storage`) — the existing measurements, their
+- `docs/plan/EPIC-0013/T-0013-6-verify-full-universe-scale.md` (on
+  `epic/EPIC-0013-market-data-storage`) — the existing measurements, their
   baseline-subtracted method, and the ~121 bytes/row marginal search cost
   this ticket's figures should be read against.
 - `backend/scripts/measure_universe_scale.py` and
@@ -90,13 +90,13 @@ projection from the wrong one.
 - A query engine that spills to disk trades memory for I/O. Report latency
   beside memory so a passing memory figure that costs ten seconds a query is
   visible rather than celebrated.
-- The 512 MB budget assumption is inherited from EPIC-1016 and from
+- The 512 MB budget assumption is inherited from EPIC-0013 and from
   `render.yaml`'s instance tier. If the deployed tier has changed, state the
   real budget rather than measuring against a stale one.
 
 ## Out of Scope
 
 Correctness (T-0015-7). The deployed-instance measurements and the real paid
-backfill, which remain T-1016-6's outstanding acceptance criteria — this
+backfill, which remain T-0013-6's outstanding acceptance criteria — this
 ticket measures locally on a synthetic panel of the target shape, which is
 what the memory question actually depends on.

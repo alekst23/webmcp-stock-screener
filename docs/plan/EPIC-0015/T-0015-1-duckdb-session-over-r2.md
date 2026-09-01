@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-0015 (DuckDB Query Engine)
 **Status**: Open
-**Depends on**: — (blocked in practice on T-1016-3 landing on `main`)
+**Depends on**: — (blocked in practice on T-0013-3 landing on `main`)
 **Blocks**: T-0015-5
 **Issue**: #15
 **Design**: docs/design/duckdb-query-engine/
@@ -37,7 +37,7 @@ size.
 2. Querying a named subset of tickers reads materially fewer bytes from the
    remote object than querying the whole panel, demonstrated by measured
    bytes or row-groups read rather than by inspection. The measured figure is
-   compared against the equivalent figure T-1016-3 recorded for the same
+   compared against the equivalent figure T-0013-3 recorded for the same
    read, and any divergence is explained.
 3. Querying a named subset of columns does not read the unnamed ones.
 4. Restricting a query by date range prunes work beyond what the ticker
@@ -58,8 +58,8 @@ size.
 
 ## Design References
 
-- `docs/plan/EPIC-1016/T-1016-3-ticker-partitioned-parquet.md` (on
-  `epic/EPIC-1016-market-data-storage`) — the layout being read: sorted by
+- `docs/plan/EPIC-0013/T-0013-3-ticker-partitioned-parquet.md` (on
+  `epic/EPIC-0013-market-data-storage`) — the layout being read: sorted by
   ticker, 25,000-row row groups, with measured pruning fractions to compare
   against. Its "where pruning does not help" section is the AC2 baseline:
   pruning is a function of ticker *adjacency*, not ticker count, and a thin
@@ -85,5 +85,5 @@ size.
 ## Out of Scope
 
 Expression compilation (T-0015-2), pattern matching (T-0015-4), and any
-change to how the panel is *written* — this ticket reads T-1016-3's layout
+change to how the panel is *written* — this ticket reads T-0013-3's layout
 as it stands.

@@ -98,4 +98,4 @@ it misbehaves.
 Removing `PandasPatternResearchEngine` — it remains the reference
 implementation T-0015-7 compares against. Changing the API surface or any
 route's response shape. The deployed-instance measurements, which remain
-T-1016-6's outstanding acceptance criteria.
+T-0013-6's outstanding acceptance criteria.
