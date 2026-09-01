@@ -54,4 +54,9 @@ Both ACs are satisfied by hotfix/webmcp-bridge-status.
 - AC2: fixed rather than documented as unreachable — it is reachable today
   (`ssr` is off and `/` ↔ `/dev` is client-side navigation, which unmounts and
   remounts `+page.svelte`). `WebmcpConnection.dispose()` unregisters every tool
-  the mount registered, called from `onMount`'s returned cleanup.
+  the mount still owns, called from `onMount`'s returned cleanup. Two
+  qualifications, both in `technical.md`: a bridge whose optional
+  `unregisterTool` is absent cannot retire anything, and `dispose()` then
+  reports nothing as torn down rather than claiming a teardown that did not
+  happen; and a connection only unregisters names no newer mount has since
+  claimed, so a late cleanup cannot wipe a live mount's registrations.

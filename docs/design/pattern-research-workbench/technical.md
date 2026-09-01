@@ -193,12 +193,16 @@ one is "this browser can't", the other is "this browser could and
 didn't". `connecting` must never render as `connected` — that is the
 same class of premature claim this whole change exists to remove.
 
-`formatWebmcpStatus(status: WebmcpStatus) -> string` — returns
+`formatDefinedStatus(status: WebmcpStatus) -> string` — returns
 `"<toolCount> WebMCP tools defined"`. Still unconditional, still never
 mentions connection state; the existing
 `not.toContain('connected'|'unavailable')` guard test stays green and
 keeps guarding a real invariant, because bridge state lives in a
 _separate_ formatter and a separate element rather than being folded in.
+Named `formatDefinedStatus`, not `formatWebmcpStatus`: its siblings are
+`formatAvailableStatus` and `formatBridgeStatus`, and a generic name for
+the one function whose whole job is saying "defined, not callable" is
+exactly the imprecision that caused the production failure.
 
 `formatAvailableStatus(availableCount: number) -> string` — returns
 `"<availableCount> available"`. Driven by live registration, so it does
@@ -207,10 +211,10 @@ in `spec.md`). The two counts are deliberately shown together so neither
 number has to stand in for the other.
 
 `formatBridgeStatus(state: WebmcpBridgeState) -> string` — one short
-clause per state, e.g. `"bridge unavailable in this browser"`. Separate
-from `formatWebmcpStatus` for the same reason `formatAgentToolsContext`
-is: different claims with different truth conditions must not share a
-string.
+clause per state, e.g. `"agent bridge unavailable in this browser"`.
+Separate from `formatDefinedStatus` for the same reason
+`formatAgentToolsContext` is: different claims with different truth
+conditions must not share a string.
 
 `buildWebmcpStatus(tools: { name: string }[]) -> WebmcpStatus` — new pure
 helper (hotfix/workbench-ui-refactor) so the count/name-list pairing is
@@ -222,7 +226,7 @@ Takes the minimal shape it needs (structurally compatible with
 `formatAgentToolsContext(status: WebmcpStatus, bridge: WebmcpBridgeState) -> string`
 — pure helper (hotfix/workbench-ui-refactor) producing the preface +
 tool-name listing for the agent-only HTML comment described below; kept
-separate from `formatWebmcpStatus` because the two have different
+separate from `formatDefinedStatus` because the two have different
 audiences and must never be merged into one string.
 
 `--` is illegal inside an HTML comment body and would truncate the
@@ -233,6 +237,10 @@ put it: producing comment-safe content is this function's entire job, so
 a second call site should not be able to forget the `.replaceAll`. The
 caller's escaping is removed rather than kept as belt-and-braces — one
 owner for the invariant, tested directly against every bridge state. The
+source literals write `—` directly rather than relying on the
+`.replaceAll` to convert an intended em dash, so the guard has exactly
+one job left — the interpolated tool names, which this module does not
+control — and a reader can tell the typography from the safety net. The
 preface tells the reader
 this is the full defined tool surface (per feature #10's Non-Goal), not
 necessarily what's currently unlocked, and to treat
@@ -248,8 +256,28 @@ or `'connecting'`, which would silently mislabel every caller that
 forgot to pass it. Requiring it makes every call site state its truth
 condition explicitly, and the compiler enforces it.
 
-When `bridge` is not `'connected'`, the comment states plainly that the
-tools are **not callable in this session** and directs the reader to the
+All four states get their own wording — the function switches on
+`bridge`, it does not test `bridge === 'connected'`. Collapsing the three
+non-connected states into one "not callable, drive the UI" branch asserts
+something untrue for two of them:
+
+| State         | What the comment says                                                                                                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `connecting`  | registration is in progress and nothing is callable **yet**; the comment predates the bridge settling and is not evidence that it failed — query `document.modelContext` for live state |
+| `connected`   | the page registers N tools via `document.modelContext`; call them through the WebMCP protocol                                                                                           |
+| `unavailable` | not callable — `document.modelContext` is not connected here; drive the visible UI controls instead                                                                                     |
+| `failed`      | `document.modelContext` **is** present, registering against it failed, so they are not callable; drive the UI, and the underlying error is in the browser console                       |
+
+`connecting` is the load-bearing one: `onMount` is synchronous and
+`connect()` needs a dozen-plus microtasks to settle, so `connecting` is
+what the **first DOM render shows on a working WebMCP browser**. Emitting
+the unavailable text there would send every agent to the UI fallback on
+every page load — the mirror image of the original bug, and just as
+false. `failed` is the other: a bridge object is right there, so telling
+the reader `document.modelContext` is absent sends it looking for
+something it can see.
+
+Where a state is not callable, the comment directs the reader to the
 page's visible UI controls, which perform the same operations. This is
 the half the previous text lacked: the real agent correctly diagnosed the
 missing bridge on its own and found the UI fallback unaided, but nothing
@@ -267,7 +295,7 @@ here.) `+page.svelte` renders the list as a real HTML comment node via
 `{@html}` immediately after the `.webmcp-status` count line:
 
 ```svelte
-{@html `<!-- ${formatAgentToolsContext(webmcpStatus).replaceAll('--', '—')} -->`}
+{@html `<!-- ${formatAgentToolsContext(webmcpStatus, bridgeState)} -->`}
 ```
 
 A literal `<!-- -->` written directly in a `.svelte` template is stripped
@@ -315,18 +343,92 @@ available count live. A callback rather than a fourth `Writable` param:
 exists and only needs surfacing — introducing another store to observe
 it would be indirection without a second consumer to justify it.
 
+The fire condition is `changed || !notified`, not `changed`: the **first**
+refresh always reports, even when it registered nothing, so the caller
+can tell "connected with zero tools" from "never heard back" and does not
+sit on a stale `connecting` count forever. Every later refresh reports
+only on an actual change, so a no-op sync after a tool call does not
+churn the header.
+
 `WebmcpConnection` gains `dispose(): Promise<void>`, which unregisters
-every tool it registered. T-1004-2 AC2 asked whether remount needs
-cleanup; it does, and the answer is not "document why it's unreachable".
+every tool this connection **still owns**, best-effort — see the two
+qualifications below. T-1004-2 AC2 asked whether remount needs cleanup;
+it does, and the answer is not "document why it's unreachable".
 `connect()` closes over a fresh `registered: Set<string>` per call, while
 `document.modelContext` retains the previous mount's registrations — so a
 remount re-registers every tool against a bridge that already has them,
 with the new closure unaware of the old set. This is reachable in this
 app today: `ssr` is disabled and `/` ↔ `/dev` is client-side navigation,
-which unmounts and remounts `+page.svelte`. `onMount` returns a cleanup
-that awaits the in-flight connect and disposes it, guarded by a
+which unmounts and remounts `+page.svelte`. `session.ts` returns a
+cleanup that awaits the in-flight connect and disposes it, guarded by a
 `disposed` flag so a cleanup firing before the promise resolves still
 tears down rather than leaking a live registration.
+
+**Connect is atomic (hotfix/webmcp-bridge-status).** If `registerTool`
+throws partway through the initial `refresh()`, `connect()` disposes what
+it already registered before rethrowing. Otherwise the earlier tools stay
+live on a shared bridge with no handle ever reaching the caller — and an
+agent calling one of those orphans runs `sync()` → `refresh()`, which
+re-registers the rest, so the header climbs to "6 available · agent
+bridge failed to connect". This is what makes the `failed` state's claim
+("nothing here is callable") actually true.
+
+**`refresh()` early-returns once disposed.** A tool descriptor an agent
+captured before unmount stays callable forever, and its `execute()` syncs
+— without the guard, one stale call re-registers the entire surface
+against a bridge no live object can ever tear down.
+
+**Retirement and disposal are only reported when they happen.**
+`ModelContext.unregisterTool` is optional in the draft spec (`types.ts`),
+and the previous `mc.unregisterTool?.(name)` no-oped while
+`registered.delete(name)` ran regardless — so `dispose()` reported a
+clean teardown with every descriptor still live, and `refresh()`'s retire
+branch dropped tools from the visible "N available" count while they
+stayed callable. `connect()` now captures whether the bridge can
+unregister at all; when it cannot, nothing is retired and nothing is
+dropped from the reported set. The count under-reporting a live surface
+is the same failure mode as over-reporting a dead one.
+
+**Ownership across overlapping mounts.** `document.modelContext` is one
+shared object and every mount registers identical tool names against it,
+so unregistering by name lets a late-resolving old mount wipe a live
+one's registrations — leaving the live mount reporting 6 available with 0
+actually on the bridge, the worst direction to be wrong in. A
+module-level `Map<toolName, generation>` records which connection last
+registered each name; each `connect()` takes the next generation, and
+`dispose()`/retire only touch names they still own. Disposal is also
+best-effort per name: one rejecting `unregisterTool` no longer strands
+the tools after it, and a name that could not be unregistered stays in
+the reported set because it may well still be live.
+
+### `startBridgeSession` — the page's bridge state machine (hotfix/webmcp-bridge-status)
+
+`src/lib/webmcp/session.ts`.
+
+```ts
+startBridgeSession(
+	engine: ResearchEngine,
+	activity: Writable<AgentActivityEvent[]> | undefined,
+	onState: (state: WebmcpBridgeState) => void,
+	onTools: (names: string[]) => void
+): () => void; // the disposer, for onMount's cleanup
+```
+
+The `connectWebmcp` result → `WebmcpBridgeState` mapping, plus the
+cleanup-before-resolve race, extracted out of `+page.svelte`'s `onMount`
+so it is reachable from a plain unit test. Covering it in place would
+mean adding a component-testing stack (three devDeps and a
+`resolve.conditions` change) that drags in `$env/dynamic/public`, the
+`localStorage` singleton, and five unrelated child components — a large
+dependency bill to test the few lines that decide whether the page tells
+an agent the truth about callability. `+page.svelte`'s `onMount` returns
+the disposer directly.
+
+The rejection path `console.error`s the underlying error rather than
+discarding it (`spec.md`'s "Bridge fails to connect" asks for the failure
+to be reported with the reason surfaced). It goes to the console, not the
+header: the header line has one clause, and a researcher cannot act on a
+registration stack trace — but whoever is diagnosing the page can.
 
 ### `clearActivity` — manual full-log clear (hotfix/workbench-ui-refactor)
 
