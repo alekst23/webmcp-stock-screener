@@ -192,7 +192,10 @@ def _compact_group(
         if wanted is not None
         else None
     )
-    rows = _matching_rows(symbols, wanted) if symbols is not None else None
+    # Guard on `wanted`, not `symbols`: `symbols` is only built when `wanted`
+    # is set, and tying the call to that one condition keeps the pair from
+    # drifting apart if either side is edited later.
+    rows = None if wanted is None or symbols is None else _matching_rows(symbols, wanted)
     columns: dict[str, np.ndarray] = {}
     for name in output:
         if name == "ticker":
