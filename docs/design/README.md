@@ -36,3 +36,9 @@ feature spec may be touched by multiple epics as it evolves.
 - [Similarity Search](similarity-search/spec.md) — from a captured chart
   setup, find resembling symbols and historical windows, explain every
   match feature by feature, and compare candidates visually.
+## Program
+
+- [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — retiring the
+  original 11-tool pattern-research surface once its ~33-tool replacement
+  is in place: inventory, capability-parity check, migration, deletion,
+  and live-deployment verification.
