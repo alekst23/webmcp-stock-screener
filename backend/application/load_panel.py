@@ -13,10 +13,10 @@ from pathlib import Path
 
 from domain.contracts.panel_store import PanelStore
 from domain.models.panel import PanelStatus
-from domain.models.price import PriceBar
 from domain.models.universe import TickerMetadata
 from infra.nasdaq_screener import universe_from_csv
-from infra.panel_io import panel_status, parquet_bytes_to_bars
+from infra.panel_frame import PanelFrame
+from infra.panel_io import panel_status_from_frame, parquet_bytes_to_panel
 
 PANEL_KEY = "panel.parquet"
 UNIVERSE_KEY = "universe.csv"
@@ -24,7 +24,7 @@ UNIVERSE_KEY = "universe.csv"
 
 @dataclass(frozen=True)
 class LoadedPanel:
-    bars: list[PriceBar]
+    panel: PanelFrame
     universe: dict[str, TickerMetadata]
     status: PanelStatus
 
@@ -42,12 +42,14 @@ def load_panel(
     remediation message when no engine is loaded.
     """
     if store is not None and store.object_exists(panel_key):
-        bars = parquet_bytes_to_bars(store.get_object(panel_key))
+        frame = parquet_bytes_to_panel(store.get_object(panel_key))
         universe = _load_universe(store, universe_key)
-        return LoadedPanel(bars, universe, panel_status(bars, source="object-store"))
+        return LoadedPanel(
+            PanelFrame(frame), universe, panel_status_from_frame(frame, source="object-store")
+        )
     if mock_path.exists():
-        bars = parquet_bytes_to_bars(mock_path.read_bytes())
-        return LoadedPanel(bars, {}, panel_status(bars, source="mock"))
+        frame = parquet_bytes_to_panel(mock_path.read_bytes())
+        return LoadedPanel(PanelFrame(frame), {}, panel_status_from_frame(frame, source="mock"))
     return None
 
 
