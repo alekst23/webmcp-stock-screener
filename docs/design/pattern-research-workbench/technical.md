@@ -149,28 +149,68 @@ writes to `activityStore` any other way. It reuses the existing
 `ok`/`fail` `ToolResult` builders are exported so `ChartToolbar.svelte`
 can build the same result shape without re-implementing it.
 
-### `WebmcpStatus` / `formatWebmcpStatus` / `buildWebmcpStatus` — header status contract (T-1004-1, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor)
+### `WebmcpStatus` / `WebmcpBridgeState` / header status contract (T-1004-1, T-1004-2, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status)
 
-`src/lib/webmcp/status.ts`. Pure formatter backing the header's "WebMCP
-tool count always visible" scenario. `toolCount` is
-`buildTools(engine).length` — the full defined tool surface, unaffected by
-feature #10's progressive availability. Computed synchronously in
-`+page.svelte`'s `onMount`, independent of `connectWebmcp()`'s resolution
-— the header no longer waits on or reflects actual connection state
-(dropped by hotfix/webmcp-tools-always-visible; `connectWebmcp()` still
-runs, for real WebMCP registration, it just no longer gates the header).
+`src/lib/webmcp/status.ts`. Pure formatters backing the header's two
+counts and its bridge-state line.
 
-| Field       | Type       | Description                                                                                                      |
-| ----------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
-| `toolCount` | `number`   | `buildTools(engine).length`                                                                                      |
-| `toolNames` | `string[]` | new (hotfix/workbench-ui-refactor) — `buildTools(engine).map(t => t.name)`, same order `buildTools` returns them |
+**Why this changed (hotfix/webmcp-bridge-status).** T-1004-1 originally
+rendered `"WebMCP connected · N tools available"` with an explicit
+`"WebMCP isn't available in this browser"` branch.
+hotfix/webmcp-tools-always-visible deleted that branching so the count
+would always show, which left the header asserting availability
+unconditionally. A real agent then visited the deployed site, read
+`"11 WebMCP tools available"` and the agent comment's
+`"this page registers 11 tools"`, found `document.modelContext` absent,
+and had to diagnose the contradiction itself before falling back to the
+UI. The word `available` was doing the damage: it reads as _callable_,
+which is exactly what it was not. The fix keeps the always-visible count
+the hotfix wanted, renames it to the honest word (`defined` — the term
+`spec.md` already used in prose), and adds a second, live count plus a
+bridge-state line beside it.
 
-`formatWebmcpStatus(status: WebmcpStatus) -> string` — always
-`"<toolCount> WebMCP tools available"` (hotfix/workbench-ui-refactor
-adds the "WebMCP" word for clarity), regardless of browser support or
-connection state. Unchanged by the `toolNames` addition — the name list
-is never rendered as visible UI (see below), so the existing exact-match
-tests stay valid.
+| Field       | Type       | Description                                                                 |
+| ----------- | ---------- | --------------------------------------------------------------------------- |
+| `toolCount` | `number`   | `buildTools(engine).length` — the full defined surface, never varies        |
+| `toolNames` | `string[]` | `buildTools(engine).map(t => t.name)`, same order `buildTools` returns them |
+
+```ts
+export type WebmcpBridgeState = 'connecting' | 'connected' | 'unavailable' | 'failed';
+```
+
+Four states, each mapping to a distinct real condition — collapsing any
+pair loses information the agent feedback showed is load-bearing:
+
+| State         | Cause                                                                  |
+| ------------- | ---------------------------------------------------------------------- |
+| `connecting`  | `connectWebmcp()` in flight; `onMount` is sync, resolution is not      |
+| `connected`   | resolved to a `WebmcpConnection`                                       |
+| `unavailable` | resolved to `null` — `document.modelContext` absent (the agent's case) |
+| `failed`      | rejected — `getWorkspace()` or `registerTool()` threw (T-1004-2 AC1)   |
+
+`unavailable` and `failed` both show 0 available and must stay distinct:
+one is "this browser can't", the other is "this browser could and
+didn't". `connecting` must never render as `connected` — that is the
+same class of premature claim this whole change exists to remove.
+
+`formatWebmcpStatus(status: WebmcpStatus) -> string` — returns
+`"<toolCount> WebMCP tools defined"`. Still unconditional, still never
+mentions connection state; the existing
+`not.toContain('connected'|'unavailable')` guard test stays green and
+keeps guarding a real invariant, because bridge state lives in a
+_separate_ formatter and a separate element rather than being folded in.
+
+`formatAvailableStatus(availableCount: number) -> string` — returns
+`"<availableCount> available"`. Driven by live registration, so it does
+reflect feature #10's progressive availability (see the amended Non-Goal
+in `spec.md`). The two counts are deliberately shown together so neither
+number has to stand in for the other.
+
+`formatBridgeStatus(state: WebmcpBridgeState) -> string` — one short
+clause per state, e.g. `"bridge unavailable in this browser"`. Separate
+from `formatWebmcpStatus` for the same reason `formatAgentToolsContext`
+is: different claims with different truth conditions must not share a
+string.
 
 `buildWebmcpStatus(tools: { name: string }[]) -> WebmcpStatus` — new pure
 helper (hotfix/workbench-ui-refactor) so the count/name-list pairing is
@@ -179,20 +219,38 @@ Takes the minimal shape it needs (structurally compatible with
 `ToolSpec[]`) rather than depending on the full `ToolSpec` type.
 `+page.svelte` calls it as `buildWebmcpStatus(buildTools(engine))`.
 
-`formatAgentToolsContext(status: WebmcpStatus) -> string` — new pure
-helper (hotfix/workbench-ui-refactor). Produces the preface + tool-name
-listing for the agent-only HTML comment described below; kept separate
-from `formatWebmcpStatus` because the two have different audiences and
-must never be merged into one string. Any literal `--` in the output is
-replaced with an em dash (`—`) before the caller wraps it in `<!-- -->`,
-since `--` is illegal inside an HTML comment body and could otherwise
-truncate it early — defensive only, `toolNames` is a static, hardcoded
-list, not user input. The preface also tells the reader this is the full
-defined tool surface (per feature #10's Non-Goal), not necessarily
-what's currently unlocked, and to treat `document.modelContext` itself
-— not this static comment — as authoritative for live availability and
-schemas, so a page reload never leaves a stale snapshot in the comment
-that an agent could mistake for ground truth.
+`formatAgentToolsContext(status: WebmcpStatus, bridge: WebmcpBridgeState) -> string`
+— pure helper (hotfix/workbench-ui-refactor) producing the preface +
+tool-name listing for the agent-only HTML comment described below; kept
+separate from `formatWebmcpStatus` because the two have different
+audiences and must never be merged into one string. Any literal `--` in
+the output is replaced with an em dash (`—`) before the caller wraps it
+in `<!-- -->`, since `--` is illegal inside an HTML comment body and
+could otherwise truncate it early — defensive only, `toolNames` is a
+static, hardcoded list, not user input. The preface tells the reader
+this is the full defined tool surface (per feature #10's Non-Goal), not
+necessarily what's currently unlocked, and to treat
+`document.modelContext` itself — not this static comment — as
+authoritative for live availability and schemas, so a page reload never
+leaves a stale snapshot in the comment that an agent could mistake for
+ground truth.
+
+The `bridge` parameter (hotfix/webmcp-bridge-status) is **required, not
+optional with a default**. A default would have to be either
+`'connected'` — re-creating the exact false claim this change removes —
+or `'connecting'`, which would silently mislabel every caller that
+forgot to pass it. Requiring it makes every call site state its truth
+condition explicitly, and the compiler enforces it.
+
+When `bridge` is not `'connected'`, the comment states plainly that the
+tools are **not callable in this session** and directs the reader to the
+page's visible UI controls, which perform the same operations. This is
+the half the previous text lacked: the real agent correctly diagnosed the
+missing bridge on its own and found the UI fallback unaided, but nothing
+on the page told it that fallback existed. The tool names are still
+listed in every state — knowing the surface exists is useful even when
+it is not reachable, and it is what let that agent identify
+`showTickerCharts` as the call it wanted.
 
 **Human-visible vs. agent-visible tool surface (hotfix/workbench-ui-refactor):**
 The original redlined mockup called for a tool-name list that's
@@ -216,6 +274,53 @@ written statically in the template source, not to strings passed through
 in the page's rendered HTML for anything that reads page source —
 exactly the "invisible in the UI, visible to an agent" scenario in
 `spec.md`.
+
+**Amended by hotfix/webmcp-bridge-status: names are now human-reachable
+on request.** The original constraint was "not rendered for the human".
+It is now "not rendered _until the researcher asks_": each header count
+is a collapsed `<details>` whose `<summary>` is the count itself, and
+whose body is the corresponding name list. Default rendering is
+unchanged — no names visible, no a11y entries for them — so the redline
+that motivated the comment still holds on page load.
+
+Two things justified widening it. First, clickability buys the agent
+**nothing**: agents read the DOM, and collapsed `<details>` content is
+already in the DOM, exactly as the comment already was. The disclosure is
+purely a human affordance, so it cannot regress the agent-facing channel.
+Second, the human gained a need the agent doesn't have — until now,
+feature #10's progressive availability was entirely invisible to the
+researcher, with tools silently registering and retiring while the
+person steering the session had no way to observe it. That is squarely
+the Intent's "a human able to see and steer that process at every step."
+
+The HTML comment is retained unchanged in its role. It is the channel
+that demonstrably reached a real agent in production, and it remains the
+only one that works for a reader that never renders or clicks anything.
+
+### `WebmcpConnection` lifecycle — live registration and remount (T-1004-2)
+
+`src/lib/webmcp/register.ts`. Two additions, both driven by T-1004-2.
+
+`connectWebmcp(engine, activity?, onToolsChanged?)` takes a third
+optional callback, invoked by `refresh()` with the current registered
+names every time the set changes. `+page.svelte` uses it to keep the
+available count live. A callback rather than a fourth `Writable` param:
+`refresh()` already runs after every tool execute, so the change signal
+exists and only needs surfacing — introducing another store to observe
+it would be indirection without a second consumer to justify it.
+
+`WebmcpConnection` gains `dispose(): Promise<void>`, which unregisters
+every tool it registered. T-1004-2 AC2 asked whether remount needs
+cleanup; it does, and the answer is not "document why it's unreachable".
+`connect()` closes over a fresh `registered: Set<string>` per call, while
+`document.modelContext` retains the previous mount's registrations — so a
+remount re-registers every tool against a bridge that already has them,
+with the new closure unaware of the old set. This is reachable in this
+app today: `ssr` is disabled and `/` ↔ `/dev` is client-side navigation,
+which unmounts and remounts `+page.svelte`. `onMount` returns a cleanup
+that awaits the in-flight connect and disposes it, guarded by a
+`disposed` flag so a cleanup firing before the promise resolves still
+tears down rather than leaking a live registration.
 
 ### `clearActivity` — manual full-log clear (hotfix/workbench-ui-refactor)
 

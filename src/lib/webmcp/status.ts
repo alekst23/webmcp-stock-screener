@@ -3,6 +3,13 @@ export interface WebmcpStatus {
 	toolNames: string[];
 }
 
+// Whether an agent can actually call this page's tools right now.
+// `unavailable` and `failed` both mean zero callable tools but must stay
+// distinct: one is "this browser can't", the other is "this browser could
+// and didn't". `connecting` must never render as `connected` -- claiming a
+// live bridge before one exists is the failure this type was added to fix.
+export type WebmcpBridgeState = 'connecting' | 'connected' | 'unavailable' | 'failed';
+
 // Renders WebmcpStatus into the header string. Always shows the tool
 // count -- no connection-state branching (hotfix/webmcp-tools-always-visible).
 // Unaffected by toolNames -- the name list is never rendered as visible
