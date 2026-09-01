@@ -4,14 +4,14 @@
 	import { workspaceStore } from '$lib/workspace/store';
 	import { activityStore, clearActivity } from '$lib/workspace/activity';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
-	import { connectWebmcp } from '$lib/webmcp/register';
+	import { startBridgeSession } from '$lib/webmcp/session';
 	import { buildTools } from '$lib/webmcp/tools';
 	import {
 		buildWebmcpStatus,
 		formatAgentToolsContext,
 		formatAvailableStatus,
 		formatBridgeStatus,
-		formatWebmcpStatus,
+		formatDefinedStatus,
 		type WebmcpBridgeState,
 		type WebmcpStatus
 	} from '$lib/webmcp/status';
@@ -47,33 +47,14 @@
 	onMount(() => {
 		webmcpStatus = buildWebmcpStatus(buildTools(engine));
 
-		// Cleanup can fire before the connect resolves; the flag lets that case
-		// tear down on arrival rather than leak this mount's registrations onto
-		// a bridge the next mount will register against again.
-		let disposed = false;
-		const connecting = connectWebmcp(engine, activityStore, (names) => {
-			availableNames = names;
-		})
-			.then((connection) => {
-				if (disposed) {
-					void connection?.dispose();
-					return null;
-				}
-				bridgeState = connection ? 'connected' : 'unavailable';
-				return connection;
-			})
-			.catch(() => {
-				if (!disposed) {
-					bridgeState = 'failed';
-					availableNames = [];
-				}
-				return null;
-			});
-
-		return () => {
-			disposed = true;
-			void connecting.then((connection) => connection?.dispose());
-		};
+		// The bridge state machine lives in session.ts so it is testable without
+		// mounting this component (hotfix/webmcp-bridge-status).
+		return startBridgeSession(
+			engine,
+			activityStore,
+			(state) => (bridgeState = state),
+			(names) => (availableNames = names)
+		);
 	});
 </script>
 
@@ -82,7 +63,7 @@
 	{#if webmcpStatus}
 		<div class="webmcp-status">
 			<details>
-				<summary>{formatWebmcpStatus(webmcpStatus)}</summary>
+				<summary>{formatDefinedStatus(webmcpStatus)}</summary>
 				<ul>
 					{#each webmcpStatus.toolNames as name (name)}
 						<li>{name}</li>
