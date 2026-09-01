@@ -1,9 +1,9 @@
 # EPIC-0013: Market Data Storage
 
-**Depends on**: T-1001-9 (real data pipeline — `feat/T-1001-9-real-data-pipeline`,
+**Depends on**: T-0015-9 (real data pipeline — `feat/T-0015-9-real-data-pipeline`,
 commit `8448059`, unmerged) — supplies the compact `PanelFrame`, R2 object
 store, and `PanelStatus` this epic builds on
-**Blocks**: T-1001-9's AC1 real backfill and AC5 spot-check
+**Blocks**: T-0015-9's AC1 real backfill and AC5 spot-check
 **Design**: docs/design/market-data-storage/
 **Issue**: #13
 
@@ -20,7 +20,7 @@ at ~13 GB on every startup. That is unaffordable on any Render tier,
 including a 2 GB Standard instance. `merge_bars` compounds it, building a
 whole-panel `(ticker, date)` dict on every nightly delta to append one day.
 
-T-1001-9 already fixed steady-state residency (141 -> 25.1 bytes/row) but
+T-0015-9 already fixed steady-state residency (141 -> 25.1 bytes/row) but
 left the I/O boundary in front of it row-object-based, so peak load was
 never addressed.
 

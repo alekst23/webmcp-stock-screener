@@ -39,7 +39,7 @@ so that keeping the panel current does not get more expensive every night.
 
 ## Out of Scope
 
-Scheduling and cron wiring (already in `render.yaml` from T-1001-9).
+Scheduling and cron wiring (already in `render.yaml` from T-0015-9).
 
 ## Implementation Plan
 

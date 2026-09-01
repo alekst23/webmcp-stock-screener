@@ -9,10 +9,10 @@ faults, each measured on this codebase rather than estimated:
 | Structure | Measured | At 12M rows |
 |---|---|---|
 | `list[PriceBar]` at the I/O boundary (`panel_io.py`) | 1,081 B/row | **~13 GB** transient, every load |
-| `(ticker, date)` dicts (pre-T-1001-9 `pandas_engine.py`) | 118 B/row | ~1.4 GB — an index larger than its data |
-| Compact `PanelFrame` (T-1001-9) | 25.1 B/row | ~310 MB resident |
+| `(ticker, date)` dicts (pre-T-0015-9 `pandas_engine.py`) | 118 B/row | ~1.4 GB — an index larger than its data |
+| Compact `PanelFrame` (T-0015-9) | 25.1 B/row | ~310 MB resident |
 
-T-1001-9 fixed the third. The first is untouched and is the hard
+T-0015-9 fixed the third. The first is untouched and is the hard
 blocker: the backend cannot boot on real data at *any* instance size,
 including a 2 GB Render Standard.
 
@@ -75,7 +75,7 @@ reads the same partitioned Parquet and benefits from the same layout.
 
 ### float32, not scaled int32
 
-Carried forward from T-1001-9 and reaffirmed. Fixed-point at
+Carried forward from T-0015-9 and reaffirmed. Fixed-point at
 `PriceBar`'s 4 decimals needs a 10,000x scale, which overflows int32
 above $214,748; BRK.A trades near $712,000. float32 is the same 4
 bytes, spans the range, and holds ~7 significant digits — worst case
@@ -110,7 +110,7 @@ for: a retried cron or a manual catch-up leaves one row per ticker-day.
 
 ### `PanelStatus` — extended
 
-T-1001-9 introduced `as_of`, `first_date`, `ticker_count`, `row_count`,
+T-0015-9 introduced `as_of`, `first_date`, `ticker_count`, `row_count`,
 `source`. This feature adds the degradation the product spec requires
 to be disclosed: whether the panel is stale, whether coverage is
 partial, and what is missing. Serve-and-disclose is the rule — hard

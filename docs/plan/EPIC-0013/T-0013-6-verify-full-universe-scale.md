@@ -22,7 +22,7 @@ as much as a sizing one — thinly-traded microcaps distort pattern base rates
 — so the chosen cut and its rationale are recorded, not left implicit in a
 CLI flag someone ran once.
 
-This is also where T-1001-9's deferred AC1 and AC5 finally close: the real
+This is also where T-0015-9's deferred AC1 and AC5 finally close: the real
 backfill runs, and the spot-check validates results against independently
 known real-world facts.
 

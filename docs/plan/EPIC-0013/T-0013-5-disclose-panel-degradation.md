@@ -18,7 +18,7 @@ nightly delta did not run.
 The rule is serve-and-disclose: results are still produced, and the
 panel's true state travels with them. Hard failure only when nothing is
 loadable. Never present stale or partial data as current and complete —
-that is the point of T-1001-9's AC4, extended to the cases that arise once
+that is the point of T-0015-9's AC4, extended to the cases that arise once
 the panel lives in object storage.
 
 ## User Story
