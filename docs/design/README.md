@@ -33,3 +33,6 @@ feature spec may be touched by multiple epics as it evolves.
 - [Chart Tools](chart-tools/spec.md) — the agent-drivable chart:
   configure what it shows, manage studies, read a bounded slice of the
   underlying numbers, annotate it, and capture a reference setup.
+- [Similarity Search](similarity-search/spec.md) — from a captured chart
+  setup, find resembling symbols and historical windows, explain every
+  match feature by feature, and compare candidates visually.
