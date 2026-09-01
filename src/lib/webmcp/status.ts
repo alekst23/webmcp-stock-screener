@@ -31,8 +31,10 @@ export function formatAgentToolsContext(status: WebmcpStatus): string {
 	return (
 		`WebMCP agent context: this page registers ${status.toolCount} tools via ` +
 		`document.modelContext for the shared Pattern Research Workbench session. ` +
-		`Available tools: ${status.toolNames.join(', ')}. Call them through the WebMCP ` +
-		`protocol to read and modify workspace state a human researcher can see and ` +
-		`steer directly.`
+		`Available tools: ${status.toolNames.join(', ')}. This is the full defined tool ` +
+		`surface, not necessarily what's currently unlocked by workflow state -- query ` +
+		`document.modelContext directly for authoritative live availability and schemas. ` +
+		`Call the tools through the WebMCP protocol to read and modify workspace state a ` +
+		`human researcher can see and steer directly.`
 	);
 }

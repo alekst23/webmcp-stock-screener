@@ -64,4 +64,11 @@ describe('formatAgentToolsContext', () => {
 		expect(result.length).toBeGreaterThan('getWorkspace'.length + 20);
 		expect(result).toMatch(/^WebMCP agent context:/);
 	});
+
+	it('tells the agent to treat document.modelContext as the live source, not this static list', () => {
+		const result = formatAgentToolsContext({ toolCount: 1, toolNames: ['getWorkspace'] });
+
+		expect(result).toContain('not necessarily what');
+		expect(result).toContain('authoritative');
+	});
 });

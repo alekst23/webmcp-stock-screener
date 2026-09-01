@@ -186,7 +186,12 @@ must never be merged into one string. Any literal `--` in the output is
 replaced with an em dash (`—`) before the caller wraps it in `<!-- -->`,
 since `--` is illegal inside an HTML comment body and could otherwise
 truncate it early — defensive only, `toolNames` is a static, hardcoded
-list, not user input.
+list, not user input. The preface also tells the reader this is the full
+defined tool surface (per feature #10's Non-Goal), not necessarily
+what's currently unlocked, and to treat `document.modelContext` itself
+— not this static comment — as authoritative for live availability and
+schemas, so a page reload never leaves a stale snapshot in the comment
+that an agent could mistake for ground truth.
 
 **Human-visible vs. agent-visible tool surface (hotfix/workbench-ui-refactor):**
 The original redlined mockup called for a tool-name list that's
