@@ -11,3 +11,11 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+
+## New WebMCP Surface (full replacement, in progress)
+
+- [Discovery & Catalog](discovery-and-catalog/spec.md) — resolve free text
+  to canonical instrument IDs, and search/describe the typed catalog of
+  fields, operators, studies, indicators, patterns, intervals, universes,
+  and templates. Owns the catalog registry the filter-tree and chart-study
+  epics validate against.
