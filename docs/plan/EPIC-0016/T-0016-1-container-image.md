@@ -1,7 +1,10 @@
 # T-0016-1: Container image for the backend
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done — verified 2026-09-01 by a real `docker build`/`docker run` pass
+(see Verification Evidence). The Dockerfile itself needed no code changes;
+the previous UNVERIFIED status was purely a consequence of the host disk
+exhaustion blocking `docker build` from ever completing.
 **Depends on**: —
 **Blocks**: T-0016-6, T-0016-8
 **Issue**: #16
@@ -178,3 +181,69 @@ Render passes the listen port as `$PORT`. Do not hardcode 8000.
 
 Where the image is stored and how it is pushed (T-0016-4 provisions the
 registry). Any change to application source.
+
+## Verification Evidence (2026-09-01)
+
+Host: Docker Desktop 4.49.0, engine 28.5.1, 81 GB free disk. Image built
+from a clean worktree checkout: `docker build -f Dockerfile .` from
+`backend/`.
+
+- **AC1 (clean build, no manual steps)**: `docker build --no-cache -f
+  Dockerfile .` from `backend/` completed successfully end to end — no
+  manual steps beyond the single build command. Final image `657MB`.
+- **AC2 (default command serves HTTP on `$PORT`)**: `docker run -d -p
+  18080:8080 -e PORT=8080 <image>` — container logs showed `Uvicorn running
+  on http://0.0.0.0:8080`; `curl http://localhost:18080/health` returned
+  `{"status":"ok"}` with `HTTP_STATUS:200`.
+- **AC3 (alternate command reaches the same argparse/failure messages)**: ran
+  `backfill_panel.py --dry-run`, `nightly_delta.py`, and
+  `load_universe_metadata.py` (no args, and with a nonexistent path) both via
+  `uv run python scripts/<name>.py` locally and via `docker run --rm <image>
+  python scripts/<name>.py` with identical arguments. Output was
+  byte-for-byte identical in every case: the missing-`EODHD_API_KEY` message,
+  argparse's `usage:`/`error: the following arguments are required: csv_path`
+  (exit 2), and `No such file: /nonexistent.csv` (exit 1) all matched between
+  local and containerized runs.
+- **AC4 (deps match `uv.lock` exactly)**: `--frozen` is used on both `uv
+  sync` calls, so a stale lock fails the build rather than re-resolving.
+  Enumerated the built venv's installed distributions
+  (`importlib.metadata.distributions()`) inside the container and diffed
+  against `uv.lock`'s non-dev package/version pairs: every runtime package
+  and version matched exactly (numpy 2.2.6, pandas 2.3.3, pyarrow 25.0.1,
+  websockets 16.1.1, etc. — the lock's platform-specific alternates for
+  other platforms were correctly not installed). `pytest` and the other
+  `dev`-group-only packages (`iniconfig`, `pluggy`, `pygments`, `tomli`,
+  `colorama`) were absent, confirming `--no-dev` took effect.
+- **AC5 (no secret/.env/credential/real data in any layer)**: `docker save`
+  the image, extracted every OCI blob, and `tar -tzf`'d each layer's full
+  file listing (not just the final merged filesystem) grepping for
+  `.env`/`credential`/`secret`/`.parquet`/`.feather`. Only hits: our own
+  intentionally-baked `app/data/mock/panel.parquet` (the seeded synthetic
+  panel, generated inside the builder stage, never copied from the host),
+  Python's stdlib `secrets.py`, and `boto3`/`pyarrow`'s own bundled SDK code
+  and test fixtures (`botocore/credentials.py`,
+  `botocore/data/secretsmanager/...`, `pyarrow/tests/data/*.parquet`) — none
+  of which are real secrets or real data. No `.env` file, no credential
+  file, and no host-originated data file appeared in any layer.
+- **AC6 (no build toolchain/test deps in runtime)**: inside the running
+  container, `which gcc cc g++ make` found nothing, `dpkg -l | grep
+  build-essential` found nothing, and `import pytest` raised
+  `ModuleNotFoundError`. Confirms the multi-stage copy and `--no-dev` kept
+  both out of the runtime image.
+- **AC7 (non-root)**: `docker exec <container> id` → `uid=999(app)
+  gid=999(app)`; `docker run --rm <image> id -u` → `999`.
+- **AC8 (layer-cached deps)**: two builds, both timed. Build 1:
+  `docker build --no-cache` (cold) — the dependency layer (`uv sync
+  --frozen --no-install-project --no-dev`) downloaded and installed all 42
+  packages (pandas, pyarrow, numpy, botocore, ...) in ~4.5s, total build
+  ~33s. Then appended a one-line comment to `main.py` only (no dependency
+  file touched) and rebuilt: `docker build` (warm cache) — BuildKit reported
+  the dependency-install step (`#10`) as `CACHED` (0s, no download), while
+  `COPY . .` and everything after it re-ran; total build ~14.8s. The
+  `main.py` change was reverted after the timing test (not part of this
+  commit's diff).
+
+No Dockerfile or `.dockerignore` change was required — the existing
+Solution Approach held up under a real build. Verification image was
+discarded after testing (not pushed); T-0016-6 builds and pushes the image
+that goes to ECR.
