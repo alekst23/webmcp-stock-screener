@@ -62,8 +62,10 @@ message rather than a half-applied table.
 - `docs/design/results-and-explain/spec.md` — "Configure the results
   table" scenarios; Open Questions 3 and 4 for the evaluation-scope and
   page-size assumptions this ticket encodes.
-- `docs/reference/tool-spec.md` — the `configure_results_table` row and the
-  stable-ID rule in the common contract.
+- `docs/reference/tool-spec.md` — the `configure_panel_view` row (this
+  epic's table-renderer contract is what that tool validates against for
+  a `table`-rendered panel) and the stable-ID rule in the common
+  contract.
 - `src/lib/webmcp/tools.ts` — the existing expression-error handling
   pattern that returns the function catalog to the agent for one-turn
   self-correction; the computed-column rejection follows the same idea.

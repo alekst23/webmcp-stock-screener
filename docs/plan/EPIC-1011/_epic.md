@@ -9,18 +9,29 @@
 The new WebMCP surface described in `docs/reference/tool-spec.md` gives an
 agent a real chart to drive: it can set what the chart shows, put studies
 on it, read a bounded slice of what is visible, mark it up, and capture
-the whole configuration as a reusable reference setup. This epic delivers
-the five `Chart` tools from that spec — `configure_chart`,
-`edit_chart_studies`, `get_chart_data`, `add_chart_annotation`, and
-`capture_chart_setup` — plus the `chart` panel kind that renders their
-effect, entirely in new files alongside the existing 11-tool pattern
-research surface, which keeps working untouched.
+the whole configuration as a reusable reference setup. This epic
+registers three `Chart` tools directly — `get_chart_data`,
+`add_chart_annotation`, and `capture_chart_setup` — plus the `chart` panel
+kind that renders their effect. What was `configure_chart`'s
+instrument/timeframe/range/comparisons responsibility now folds into
+EPIC-1007's `bind_panel_source` (a chart panel's source becomes an
+instrument + timeframe + range reference); its candle
+type/scale/session/price-adjustment-policy responsibility, and everything
+`edit_chart_studies` did, folds into EPIC-1007's `configure_panel_view`.
+This epic contributes the **chart-renderer contract** — the schema and
+validation those two EPIC-1007 tools apply for a `chart`-rendered panel —
+into EPIC-1007's source/renderer registry (T-1007-7), the same way
+EPIC-1010 contributes the table-renderer contract. Everything is built
+entirely in new files alongside the existing 11-tool pattern research
+surface, which keeps working untouched.
 
-Done looks like: an agent configures a chart panel by instrument ID,
-adds an RSI and a 50/200 MA, reads back 200 bars of OHLCV and study
-output with full provenance, marks the breakout with a trendline and a
-highlighted window, and captures the result as a reference setup that
-EPIC-1012's similarity search can consume by ID.
+Done looks like: an agent points a chart panel at an instrument via
+`bind_panel_source`, adds an RSI and a 50/200 MA via `configure_panel_view`,
+reads back 200 bars of OHLCV and study output with full provenance via
+`get_chart_data`, marks the breakout with a trendline and a highlighted
+window via `add_chart_annotation`, and captures the result as a reference
+setup via `capture_chart_setup` that EPIC-1012's similarity search can
+consume by ID.
 
 ## User Story
 
@@ -37,8 +48,8 @@ fully specified setup back and forth without describing it in prose.
 | 1 | T-1011-1 | Chart domain model, stable IDs, and captured-setup contract | — | Open |
 | 2 | T-1011-2 | Study calculation engine with declared engine version | — | Open |
 | 3 | T-1011-3 | Chart series port and market-data provenance envelope | — | Open |
-| 4 | T-1011-4 | `configure_chart` tool | T-1011-1, T-1011-3 | Open |
-| 5 | T-1011-5 | `edit_chart_studies` tool | T-1011-1, T-1011-2 | Open |
+| 4 | T-1011-4 | Chart source and view contract (symbol, timeframe, range, display settings) | T-1011-1, T-1011-3 | Open |
+| 5 | T-1011-5 | Chart studies contract (add/update/reorder/toggle/remove) | T-1011-1, T-1011-2 | Open |
 | 6 | T-1011-6 | `get_chart_data` bounded read | T-1011-1, T-1011-2, T-1011-3 | Open |
 | 7 | T-1011-7 | `add_chart_annotation` tool | T-1011-1 | Open |
 | 8 | T-1011-8 | `capture_chart_setup` tool | T-1011-4, T-1011-5, T-1011-7 | Open |
@@ -78,19 +89,27 @@ T-1011-7 ─┘
   `warnings`, `undo_token`), undo tokens, and the provenance type. Every
   chart mutation in this epic accepts and returns those; none of them are
   defined here.
-- **EPIC-1007** owns the panel container and the panel-kind registry.
-  The `chart` panel kind delivered by T-1011-9 plugs into that registry;
-  panel creation, layout, linking, and removal are not in this epic.
-- **EPIC-1008** owns the catalog registry. `edit_chart_studies` resolves
-  every study through the catalog (parameters, units, valid ranges,
-  defaults, outputs, pane placement) rather than hard-coding a study list
-  in the tool.
+- **EPIC-1007** owns the panel container, the panel-kind registry, and
+  the source/renderer contract registry. The `chart` panel kind delivered
+  by T-1011-9 plugs into the kind registry; this epic's chart-renderer
+  contract (T-1011-4, T-1011-5) plugs into the source/renderer registry
+  under the `chart` renderer name; panel creation, layout, linking, and
+  removal, and the `bind_panel_source`/`configure_panel_view` tool calls
+  themselves, are not in this epic.
+- **EPIC-1008** owns the catalog registry. This epic's chart-studies
+  contract (T-1011-5) resolves every study through the catalog
+  (parameters, units, valid ranges, defaults, outputs, pane placement)
+  rather than hard-coding a study list.
 
 ## Acceptance Criteria
 
-1. All five chart tools are registered on the new WebMCP surface and
-   callable, with the existing 11 pattern-research tools still registered
-   and working unchanged.
+1. All three directly-registered chart tools (`get_chart_data`,
+   `add_chart_annotation`, `capture_chart_setup`) are registered on the
+   new WebMCP surface and callable, and the chart-renderer contract is
+   registered into EPIC-1007's source/renderer registry so
+   `bind_panel_source` and `configure_panel_view` resolve to this epic's
+   behavior for a `chart`-rendered panel — with the existing 11
+   pattern-research tools still registered and working unchanged.
 2. Every chart resource — panel, study instance, annotation, captured
    setup, instrument — is addressed by a stable ID. A bare ticker is
    never accepted as an identifier.

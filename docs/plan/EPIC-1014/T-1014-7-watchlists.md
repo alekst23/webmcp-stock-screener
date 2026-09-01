@@ -71,7 +71,7 @@ tell what screen these names came off.
   scenario table.
 - `docs/reference/tool-spec.md` — `upsert_watchlist` and
   `save_results_to_watchlist` ("create dynamic or static watchlists from
-  results"); the `watchlist` panel kind in `add_panel`; watchlists as a
+  results"); the `watchlist` panel kind in `create_panel`; watchlists as a
   universe input to `set_screener_universe`.
 - `docs/plan/EPIC-1007/_epic.md` — the `watchlist` panel kind and how a
   panel binds to a resource.

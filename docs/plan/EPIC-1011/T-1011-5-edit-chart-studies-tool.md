@@ -1,4 +1,4 @@
-# T-1011-5: `edit_chart_studies` tool
+# T-1011-5: Chart studies contract (add/update/reorder/toggle/remove)
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
@@ -8,12 +8,15 @@
 
 ## Description
 
-`edit_chart_studies` is how an agent puts indicators on a chart and
-keeps them tidy: adding, updating, reordering, toggling, and removing
-study instances such as moving averages, RSI, MACD, Bollinger Bands,
-VWAP, and ATR. Every study is resolved through EPIC-1008's catalog, so
-parameters are validated against real metadata instead of a hard-coded
-list inside the tool.
+This is how an agent puts indicators on a chart and keeps them tidy:
+adding, updating, reordering, toggling, and removing study instances such
+as moving averages, RSI, MACD, Bollinger Bands, VWAP, and ATR. It is no
+longer a standalone `edit_chart_studies` tool — it is the study-editing
+half of the chart-renderer contract this ticket registers into EPIC-1007's
+source/renderer registry, reached through EPIC-1007's generic
+`configure_panel_view` for a `chart`-rendered panel. Every study is
+resolved through EPIC-1008's catalog, so parameters are validated against
+real metadata instead of a hard-coded list.
 
 ## User Story
 
@@ -21,9 +24,14 @@ As an agent building a chart for a specific thesis,
 I want to add and adjust several studies in one revision-checked call
 and get their stable IDs back,
 so that I can refer to exactly the RSI I added when I later change its
-period or read its values.
+period or read its values — through the same `configure_panel_view` tool
+I use to configure any other panel's view.
 
 ## Acceptance Criteria
+
+The following criteria describe the contract's behavior; "the call" means
+a study-editing operation reached through EPIC-1007's
+`configure_panel_view` for a `chart`-rendered panel.
 
 1. A study can be added by catalog item ID with explicit parameters, or
    with parameters omitted, in which case the catalog's defaults are
@@ -61,8 +69,10 @@ period or read its values.
 
 - `docs/design/chart-tools/spec.md` — "Manage studies" scenarios
 - `docs/design/chart-tools/technical.md` — study instance contract
-- `docs/reference/tool-spec.md` — the `edit_chart_studies` and
+- `docs/reference/tool-spec.md` — the `configure_panel_view` and
   `describe_catalog_item` rows
+- `docs/plan/EPIC-1007/T-1007-7-panel-source-renderer-registry.md` — the
+  registry interface this contract implements
 - `src/lib/webmcp/tools.ts` — the existing convention of returning the
   available catalog on a resolution failure so a bad call becomes a
   one-turn self-correction rather than a retry loop
@@ -71,12 +81,18 @@ period or read its values.
 
 - EPIC-1008 owns the catalog. Resolve parameters, ranges, defaults,
   outputs, and pane placement through it; do not embed a study catalog
-  in this tool.
+  in this contract.
 - T-1011-2 owns the arithmetic and is keyed by catalog item ID, so this
-  tool maps instance -> calculator without a growing switch statement.
+  contract maps instance -> calculator without a growing switch statement.
 - AC6's atomicity matters because agents batch study edits; a partially
   applied batch leaves a chart no one asked for and an undo token that
   cannot describe it.
+- This ticket does not register a WebMCP tool of its own — EPIC-1007's
+  `configure_panel_view` is the tool an agent calls; it resolves to this
+  contract's logic for a `chart`-rendered panel via EPIC-1007's
+  source/renderer registry (T-1007-7). If T-1007-7 has not landed when
+  this starts, code against the agreed contract shape and use a test
+  double.
 
 ## Out of Scope
 

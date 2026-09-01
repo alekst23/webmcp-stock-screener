@@ -1,17 +1,23 @@
-# T-1010-6: Table configuration and selection mutations (`configure_results_table`, `select_result`)
+# T-1010-6: Table renderer contract (columns, sort, grouping, formatting, selection semantics)
 
 **Epic**: EPIC-1010 (Results & Explain)
 **Design**: docs/design/results-and-explain/spec.md
 **Status**: Open
-**Depends on**: T-1010-1
+**Depends on**: T-1010-1, EPIC-1007's T-1007-7 (source/renderer registry shape)
 **Blocks**: T-1010-7
 
 ## Description
 
-The two write operations of the Results area: applying a validated
-results-table configuration to a panel, and setting a panel's selected
-results so linked chart and details panels follow. Both go through
-EPIC-1006's workspace revision pipeline and return its mutation envelope.
+The two write behaviors of the Results area, now delivered as a
+**contract this epic registers** rather than as standalone WebMCP tools:
+applying a validated results-table configuration to a panel, and setting
+a panel's selected results so linked chart and details panels follow.
+Both are invoked through EPIC-1007's generic `configure_panel_view` and
+`set_panel_selection` tools, which resolve to this ticket's validation and
+application logic when the target panel's renderer is `table`; both still
+go through EPIC-1006's workspace revision pipeline and return its
+mutation envelope. This ticket owns the *behavior*; EPIC-1007 owns the
+*tool call* that reaches it.
 
 ## User Story
 
@@ -20,11 +26,14 @@ I want to change how results are presented and pick out the rows worth
 looking at,
 so that the person I am working with sees the columns that matter and the
 chart follows what I selected — with every change revisioned and
-undoable.
+undoable, through the same generic panel tools I use for every other
+panel.
 
 ## Acceptance Criteria
 
-1. Applying a results-table configuration to a panel updates the panel's
+1. This ticket exposes a table-configuration apply function that
+   EPIC-1007's `configure_panel_view` calls for a `table`-rendered panel;
+   applying a results-table configuration updates the panel's
    configuration and returns the common mutation envelope: `change_id`,
    `new_revision`, `affected_ids`, `diff_summary`, `warnings`,
    `undo_token`.
@@ -37,9 +46,10 @@ undoable.
 4. Validation warnings (such as a sort key that is not a visible column)
    are returned in the envelope's `warnings` while the mutation still
    applies.
-5. Setting a selection replaces the panel's selected result IDs and
-   returns the mutation envelope; selecting an empty set clears the
-   selection.
+5. This ticket exposes a selection apply function that EPIC-1007's
+   `set_panel_selection` calls for a `table`-rendered panel; setting a
+   selection replaces the panel's selected result IDs and returns the
+   mutation envelope; selecting an empty set clears the selection.
 6. A result ID that is not part of the run the panel is showing is
    rejected, naming the unknown ID, and the previous selection is
    unchanged.
@@ -78,6 +88,12 @@ undoable.
   and use a test double.
 - Panel linking itself is EPIC-1007's `link_panels`. This ticket only
   propagates along links that already exist.
+- This ticket does not register a WebMCP tool. It exposes apply functions
+  that satisfy EPIC-1007's T-1007-7 renderer-contract interface (an
+  apply function plus a validator, keyed to the `table` renderer name);
+  EPIC-1007's `configure_panel_view` and `set_panel_selection` tools call
+  into it. If T-1007-7 has not landed when this starts, code against the
+  contract shape this epic and EPIC-1007 agreed on and use a test double.
 - AC9's idempotency test must be able to detect a duplicate write — assert
   on the resulting state and revision count, not merely on the returned
   value.

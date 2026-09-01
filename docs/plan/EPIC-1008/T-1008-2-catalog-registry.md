@@ -13,7 +13,8 @@ knows how to name: fields, operators, studies, indicators, patterns,
 intervals, universes, and templates. It is the single source of truth that
 `search_catalog` and `describe_catalog_item` read from, that EPIC-1009's
 `edit_filter_tree` validates conditions against, and that EPIC-1011's
-`edit_chart_studies` resolves study IDs through. Done looks like: a
+chart-renderer contract (reached through `configure_panel_view`) resolves
+study IDs through. Done looks like: a
 read-only, well-typed export that answers "what exists", "what is item X",
 "is operator O valid on field F", and "what does study S take and produce".
 
@@ -77,7 +78,8 @@ instead of hard-coded string lists scattered across tools.
 - `docs/reference/tool-spec.md` — the eight catalog kinds `search_catalog`
   must cover; the eight `edit_filter_tree` condition types the operator
   entries must span; the study examples (MA, RSI, MACD, Bollinger Bands,
-  VWAP, ATR) `edit_chart_studies` names; the `set_screener_universe`
+  VWAP, ATR) EPIC-1011's chart-renderer contract names; the
+  `set_screener_universe`
   dimensions the universe entries must cover.
 - `docs/design/discovery-and-catalog/technical.md` — the catalog item type
   model and query surface.

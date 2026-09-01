@@ -10,15 +10,16 @@
 
 The integration ticket. Everything before it is testable but invisible:
 this one renders the panel workspace on the logical grid, delegates each
-panel's body to whatever its kind registered, honours hidden and
-collapsed state, propagates linked-channel changes to the right panels,
-and registers the five tools so an agent can drive all of it live in the
-browser.
+panel's body to whatever its kind and active renderer registered, honours
+hidden, collapsed, and maximized state, propagates linked-channel changes
+to the right panels, and registers the fourteen tools so an agent can
+drive all of it live in the browser.
 
-Done looks like: an agent adds a chart and a results table, links them on
-result selection, arranges them side by side, collapses one, removes the
-other, and undoes that — and a human watching the page sees each step
-happen.
+Done looks like: an agent creates a chart and a results table, links them
+on result selection, arranges them side by side with `apply_layout_template`,
+collapses one, switches the chart to `chart_grid` and back, maximizes and
+un-maximizes the table, removes the chart, and undoes that — and a human
+watching the page sees each step happen.
 
 ## User Story
 
@@ -32,18 +33,23 @@ than a description I have to take on faith.
 
 1. The workspace renders every visible panel at its stored grid position
    and size, mapping logical grid cells onto the viewport.
-2. A panel's body is rendered by the component its kind registered; the
-   container itself contains no knowledge of any specific panel kind.
+2. A panel's body is rendered by the component its kind and active
+   renderer registered; the container itself contains no knowledge of any
+   specific panel kind or renderer.
 3. A panel renders its title, and a collapsed panel renders as a header
-   only while retaining its stored size, restored on expand.
+   only while retaining its stored size, restored on expand. A maximized
+   panel renders at full grid size without altering any panel's stored
+   footprint, and un-maximizing restores the prior rendered arrangement
+   exactly.
 4. A hidden panel is not rendered and leaves no gap in the layout, while
    keeping its position for when it is shown again.
-5. Adding, updating, laying out, linking, and removing panels through the
-   agent-facing tools is reflected on the page without a reload.
+5. Creating, duplicating, configuring, laying out, splitting, linking,
+   selecting, and removing panels through the agent-facing tools is
+   reflected on the page without a reload.
 6. A change on a linked channel updates every other panel in that
    channel's group and no panel outside it, with the receiving panel's
    kind — not the container — deciding how to apply the value.
-7. The five panel tools are registered against the browser's WebMCP
+7. The fourteen panel tools are registered against the browser's WebMCP
    bridge and are reported as available to the agent.
 8. Undoing a mutation through its undo token restores the rendered
    workspace to its prior appearance.

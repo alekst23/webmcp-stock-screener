@@ -69,7 +69,7 @@ silently corrupting the arrangement.
   single most likely off-by-one in the epic — test the touching-edges
   case explicitly.
 - Auto-placement must be deterministic so that a replayed idempotent
-  `add_panel` yields the identical layout.
+  `create_panel` yields the identical layout.
 - New files only.
 
 ## Out of Scope

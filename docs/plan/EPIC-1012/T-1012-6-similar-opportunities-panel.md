@@ -53,8 +53,8 @@ response I never see.
 
 ## Design References
 
-- `docs/reference/tool-spec.md` — `add_panel`'s `similar_opportunities` panel
-  kind, and the market-data provenance rule
+- `docs/reference/tool-spec.md` — `create_panel`'s `similar_opportunities`
+  panel kind, and the market-data provenance rule
 - `docs/plan/EPIC-1012/T-1012-1-similarity-contract.md` — the candidate,
   run, normalization, and provenance shapes this renders
 - `src/lib/workspace/GridPanel.svelte` — the existing panel component

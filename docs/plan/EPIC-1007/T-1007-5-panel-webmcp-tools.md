@@ -1,22 +1,27 @@
-# T-1007-5: The five panel WebMCP tools
+# T-1007-5: The fourteen panel WebMCP tools
 
 **Epic**: EPIC-1007 (Panel System)
 **Design**: docs/design/panel-system/
 **Status**: Open
-**Depends on**: T-1007-4
+**Depends on**: T-1007-4, T-1007-7
 **Blocks**: T-1007-6
 
 ## Description
 
-Expose the panel use cases as the five tools the agent actually calls:
-`add_panel`, `update_panel`, `set_panel_layout`, `link_panels`, and
-`remove_panel`. The value of this ticket is almost entirely in the
-schemas and the error text — an agent that cannot see which panel kinds
-exist, which configuration a kind takes, or why a placement was refused
-will loop instead of self-correcting.
+Expose the panel use cases as the fourteen tools the agent actually
+calls: `create_panel`, `duplicate_panel`, `remove_panel`,
+`set_panel_layout`, `apply_layout_template`, `split_panel`,
+`maximize_panel`, `bind_panel_source`, `set_panel_renderer`,
+`configure_chart_grid`, `configure_panel_view`, `link_panels`,
+`unlink_panels`, and `set_panel_selection`. The value of this ticket is
+almost entirely in the schemas and the error text — an agent that cannot
+see which panel kinds exist, which source and renderer types are
+compatible, which configuration a renderer takes, or why a placement was
+refused will loop instead of self-correcting.
 
-Done looks like: five tool definitions with complete, discoverable input
-schemas and self-correcting error results, tested without a browser.
+Done looks like: fourteen tool definitions with complete, discoverable
+input schemas and self-correcting error results, tested without a
+browser.
 
 ## User Story
 
@@ -28,41 +33,60 @@ loop.
 
 ## Acceptance Criteria
 
-1. Five tools are defined — `add_panel`, `update_panel`,
-   `set_panel_layout`, `link_panels`, `remove_panel` — each with a
+1. Fourteen tools are defined — `create_panel`, `duplicate_panel`,
+   `remove_panel`, `set_panel_layout`, `apply_layout_template`,
+   `split_panel`, `maximize_panel`, `bind_panel_source`,
+   `set_panel_renderer`, `configure_chart_grid`, `configure_panel_view`,
+   `link_panels`, `unlink_panels`, `set_panel_selection` — each with a
    description that states what it does and what it returns.
-2. Every tool's input schema accepts `expected_revision` and
+2. Every revisioned tool's input schema accepts `expected_revision` and
    `idempotency_key`, and every successful result carries the full
-   mutation envelope.
-3. `add_panel`'s schema enumerates the registered panel kinds, and its
-   per-kind configuration is described from each kind's own declared
-   configuration schema rather than being hardcoded — adding a kind to
-   the registry changes the schema with no edit to this tool.
+   mutation envelope; `maximize_panel` is documented as the one exception
+   (rendering-only, no revision consumed) per T-1007-4 AC10.
+3. `create_panel`'s schema enumerates the registered panel kinds and the
+   registered source and renderer types, and its per-kind configuration
+   is described from each kind's own declared configuration schema and
+   each renderer's own declared configuration schema (T-1007-7) rather
+   than being hardcoded — adding a kind, source type, or renderer type to
+   either registry changes the schema with no edit to this tool.
 4. `set_panel_layout` accepts a batch of panel IDs with grid positions
    and sizes, and its schema contains no pixel, percentage, or viewport
-   unit.
-5. `link_panels` accepts a channel, the panel IDs to link, and whether to
-   join or leave that channel's group.
-6. `update_panel` accepts title, configuration, visibility, collapsed
-   state, and bound resource, each optional, and applies only the fields
-   supplied.
-7. `remove_panel` accepts a single stable panel ID.
+   unit. `apply_layout_template` accepts a template name from the
+   registered set. `split_panel` accepts a panel ID and a horizontal or
+   vertical direction. `maximize_panel` accepts a panel ID, or no ID to
+   clear the maximized state.
+5. `link_panels` and `unlink_panels` each accept a channel and the panel
+   IDs to join or remove from that channel's group.
+6. `configure_panel_view` accepts title, visibility, collapsed state, and
+   renderer-specific view configuration, each optional, and applies only
+   the fields supplied. `bind_panel_source` accepts a source reference.
+   `set_panel_renderer` accepts a renderer name and, optionally,
+   renderer-specific configuration. `configure_chart_grid` accepts rows,
+   columns, item count, pagination, shared studies, and chart settings.
+   `set_panel_selection` accepts one or more result IDs, or an empty set
+   to clear the selection.
+7. `remove_panel` and `duplicate_panel` each accept a single stable panel
+   ID; `duplicate_panel` additionally accepts an optional symbol or
+   source override.
 8. Every panel is addressed by stable ID; no tool accepts a positional or
    ordinal reference to a panel.
 9. A failed call returns an error result — never a success envelope —
    whose text names the cause and, where a closed set exists, lists the
-   valid options: registered kinds for an unknown kind, the grid bounds
-   or occupying panel for a bad placement, the kind's supported channels
-   for an unsupported link, the rejected fields for invalid
-   configuration.
+   valid options: registered kinds for an unknown kind, registered source
+   or renderer types for an unsupported binding or renderer change, the
+   grid bounds or occupying panel for a bad placement, the kind's
+   supported channels for an unsupported link, the rejected fields for
+   invalid configuration.
 10. A revision conflict and a replayed idempotency key are each
     distinguishable by the agent from a validation failure.
-11. The five tools are exposed through a factory that can be built and
-    invoked in a unit test with no browser and no `document.modelContext`.
+11. The fourteen tools are exposed through a factory that can be built
+    and invoked in a unit test with no browser and no
+    `document.modelContext`.
 
 ## Design References
 
-- `docs/reference/tool-spec.md` — the five tools' purposes and the common
+- `docs/reference/tool-spec.md` — the fourteen tools' purposes, the
+  "Panels: source and renderer are separate" section, and the common
   contract every tool returns
 - `docs/design/panel-system/spec.md` — the failure scenarios each error
   message must serve
@@ -83,9 +107,10 @@ loop.
 - The self-correcting-error pattern already exists in this codebase —
   `ExpressionError` returns the function catalog alongside the failure.
   Reuse the idea, not the class.
-- `add_panel`'s schema must be generated from the registry at build time,
-  not written out by hand, or AC3 fails the moment a sibling epic
-  registers its kind.
+- `create_panel`'s schema must be generated from the panel-kind and
+  source/renderer registries at build time, not written out by hand, or
+  AC3 fails the moment a sibling epic registers its kind, source type, or
+  renderer type.
 
 ## Out of Scope
 

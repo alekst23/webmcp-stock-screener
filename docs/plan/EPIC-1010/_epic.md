@@ -9,11 +9,17 @@ container and panel-kind registry), EPIC-1009 (screeners and the pinned
 ## Description
 
 Delivers the Results area of the new ~33-tool WebMCP surface described in
-`docs/reference/tool-spec.md`: `configure_results_table`,
-`get_screener_results`, `select_result`, and `explain_result`. Together
-they turn a screener run from an opaque count into something a person and
-an agent can read, page through, select from, and audit. The defining
-guarantee of this epic is transparency: results are read from an
+`docs/reference/tool-spec.md`. This epic registers two WebMCP tools
+directly — `get_screener_results` and `explain_result` — and contributes
+the **table-renderer contract** (columns, computed columns, sort,
+grouping, conditional formatting, pagination, and selection semantics)
+into EPIC-1007's source/renderer registry (T-1007-7), so that EPIC-1007's
+own `configure_panel_view` and `set_panel_selection` tools validate and
+apply table configuration and selection without this epic registering
+separate `configure_results_table` / `select_result` tools of its own.
+Together they turn a screener run from an opaque count into something a
+person and an agent can read, page through, select from, and audit. The
+defining guarantee of this epic is transparency: results are read from an
 already-pinned `run_id` and are never silently recomputed, and
 `explain_result` exposes the actual value and pass/fail state of *every*
 filter plus each ranking field's contribution, so a screener's verdict on
@@ -42,7 +48,7 @@ without re-running anything or trusting a number whose origin I can't see.
 | 3 | T-1010-3 | Filter explanation and ranking contribution domain model | — | Open |
 | 4 | T-1010-4 | Paged results projection use case (`get_screener_results`) | T-1010-1, T-1010-2 | Open |
 | 5 | T-1010-5 | Result explanation use case (`explain_result`) | T-1010-2, T-1010-3 | Open |
-| 6 | T-1010-6 | Table configuration and selection mutations (`configure_results_table`, `select_result`) | T-1010-1 | Open |
+| 6 | T-1010-6 | Table renderer contract (columns, sort, grouping, formatting, selection semantics) | T-1010-1, EPIC-1007's T-1007-7 (contract shape) | Open |
 | 7 | T-1010-7 | `results_table` panel kind with selection and explain view | T-1010-4, T-1010-5, T-1010-6 | Open |
 | 8 | T-1010-8 | WebMCP registration and end-to-end wiring for the four Results tools | T-1010-7 | Open |
 
@@ -69,11 +75,14 @@ T-1010-1 ────> T-1010-6 ───┘
 
 ## Acceptance Criteria
 
-1. `configure_results_table` sets a results panel's columns, computed
+1. This epic registers the table-renderer contract — columns, computed
    columns, sort, grouping, conditional formatting, page size, and linked
-   chart panel, and returns the common mutation envelope
-   (`change_id`, `new_revision`, `affected_ids`, `diff_summary`,
-   `warnings`, `undo_token`).
+   chart panel — into EPIC-1007's source/renderer registry; a results
+   panel's configuration set through EPIC-1007's `configure_panel_view`
+   validates against this contract and, once applied, returns the common
+   mutation envelope (`change_id`, `new_revision`, `affected_ids`,
+   `diff_summary`, `warnings`, `undo_token`) exactly as any other
+   `configure_panel_view` call does.
 2. `get_screener_results` returns a bounded page of an existing run's
    results, with the total count and a next-page cursor, projected
    through the panel's configured columns and sort.
@@ -82,7 +91,9 @@ T-1010-1 ────> T-1010-6 ───┘
    explicit error naming the run and directing the caller to re-run,
    never an implicit execution. This is verified by a test that fails if
    the run-execution path is reached.
-4. `select_result` sets a panel's selected results by stable result ID,
+4. This epic also registers the table's selection semantics into the same
+   contract: EPIC-1007's `set_panel_selection` sets a results panel's
+   selected results by stable result ID against this epic's rules —
    propagates the selection to linked chart and details panels, rejects
    IDs that are not part of the run, and supports clearing the selection.
 5. `explain_result` returns, for one instrument in a pinned run, every
@@ -136,7 +147,7 @@ test double — do not re-implement it.
 | Contract | Owner |
 |----------|-------|
 | Workspace/revision model, stable IDs, mutation envelope, `expected_revision`, `idempotency_key`, undo tokens, provenance type | EPIC-1006 |
-| Panel container, panel-kind registry, `link_panels` | EPIC-1007 |
+| Panel container, panel-kind registry, `link_panels`, source/renderer contract registry (this epic registers into it rather than consuming a value from it) | EPIC-1007 |
 | Catalog fields and instrument resolution; reference/fundamental data ports | EPIC-1008 |
 | Screener definition, filter tree, ranking configuration, run execution and the pinned `run_id` | EPIC-1009 |
 

@@ -91,7 +91,7 @@ T-1006-3 ───────────────────────�
    registry's own source.
 10. Multiple operations applied together either all commit as one revision
     or none do.
-11. `get_app_context`, `get_workspace`, `create_workspace`,
+11. `get_app_context`, `get_canvas_state`, `create_workspace`,
     `save_workspace`, `undo_change`, `get_change_history` and
     `restore_workspace_revision` are callable through the WebMCP surface
     and obey criteria 1-7.

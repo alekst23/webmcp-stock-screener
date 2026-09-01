@@ -4,7 +4,7 @@
 **Design**: docs/design/panel-system/
 **Status**: Open
 **Depends on**: —
-**Blocks**: T-1007-4
+**Blocks**: T-1007-4, T-1007-7
 
 ## Description
 
@@ -23,6 +23,13 @@ any sibling epic lands.
 
 Done looks like: a pure, unit-tested registry plus panel entity, with no
 knowledge of the grid, the link graph, or WebMCP.
+
+A panel's kind (what it *is*) and its source/renderer (what it *shows*
+and *how*) are separate registries — T-1007-7 owns the latter. This
+ticket's kind definition should leave room for a panel to carry an
+active source and renderer reference, but does not itself validate
+source or renderer compatibility; that is T-1007-7's contract, consumed
+by T-1007-4's use cases.
 
 ## User Story
 

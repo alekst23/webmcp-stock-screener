@@ -8,12 +8,13 @@
 
 ## Description
 
-`edit_chart_studies` puts studies on the chart and `get_chart_data`
-returns their outputs, so both need the same arithmetic to produce the
-same numbers. This ticket delivers the pure calculators for the studies
-the spec names — moving averages, RSI, MACD, Bollinger Bands, VWAP, ATR —
-over a bar series, together with the calculation-engine version string
-that every market-data payload in this epic has to state.
+T-1011-5's chart-studies contract puts studies on the chart (through
+EPIC-1007's `configure_panel_view`) and `get_chart_data` returns their
+outputs, so both need the same arithmetic to produce the same numbers.
+This ticket delivers the pure calculators for the studies the spec
+names — moving averages, RSI, MACD, Bollinger Bands, VWAP, ATR — over a
+bar series, together with the calculation-engine version string that
+every market-data payload in this epic has to state.
 
 ## User Story
 
@@ -53,8 +54,10 @@ changed underneath a saved setup.
 
 - `docs/design/chart-tools/spec.md` — "Manage studies" and "Read a
   bounded slice of the chart" behavioral sections
-- `docs/reference/tool-spec.md` — the `edit_chart_studies` row names the
-  study set; "Common contract" requires the calculation-engine version
+- `docs/reference/tool-spec.md` — `configure_panel_view` (this epic's
+  chart-renderer contract is what it validates studies against for a
+  `chart`-rendered panel) implies the study set; "Common contract"
+  requires the calculation-engine version
 - `src/lib/workspace/visualization.ts` — the existing convention of
   keeping numeric chart logic in a pure, DOM-free module with its own
   unit tests
