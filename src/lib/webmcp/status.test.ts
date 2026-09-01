@@ -4,38 +4,36 @@ import {
 	formatAgentToolsContext,
 	formatAvailableStatus,
 	formatBridgeStatus,
-	formatWebmcpStatus
+	formatDefinedStatus
 } from './status';
 
-describe('formatWebmcpStatus', () => {
+describe('formatDefinedStatus', () => {
 	// hotfix/webmcp-bridge-status: "available" used to be the word here, and
 	// it read as "callable" to a real agent that could not call anything.
 	// "defined" is what spec.md's prose already called this number.
 	it('formats as count and "WebMCP tools defined"', () => {
-		const result = formatWebmcpStatus({ toolCount: 11, toolNames: [] });
+		const result = formatDefinedStatus({ toolCount: 11, toolNames: [] });
 		expect(result).toBe('11 WebMCP tools defined');
 	});
 
 	it('reflects the exact tool count passed in, not a capped or rounded value', () => {
-		const result = formatWebmcpStatus({ toolCount: 42, toolNames: [] });
+		const result = formatDefinedStatus({ toolCount: 42, toolNames: [] });
 		expect(result).toContain('42');
 	});
 
 	// Still guards a real invariant: bridge state lives in formatBridgeStatus
 	// and a separate element, so this string must never imply callability.
 	it('never mentions connection state', () => {
-		const result = formatWebmcpStatus({ toolCount: 11, toolNames: [] });
+		const result = formatDefinedStatus({ toolCount: 11, toolNames: [] });
 		expect(result.toLowerCase()).not.toContain('connected');
 		expect(result.toLowerCase()).not.toContain('unavailable');
 	});
 
-	it('does not claim the tools are available', () => {
-		const result = formatWebmcpStatus({ toolCount: 11, toolNames: [] });
-		expect(result.toLowerCase()).not.toContain('available');
-	});
-
 	it('is unaffected by toolNames -- the name list is not folded into this string', () => {
-		const result = formatWebmcpStatus({ toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] });
+		const result = formatDefinedStatus({
+			toolCount: 2,
+			toolNames: ['defineStudy', 'getWorkspace']
+		});
 		expect(result).toBe('2 WebMCP tools defined');
 	});
 });
@@ -181,10 +179,70 @@ describe('formatAgentToolsContext', () => {
 		expect(result).toContain('showTickerCharts');
 	});
 
-	it('reports a failed connection as not callable too', () => {
-		const result = formatAgentToolsContext({ toolCount: 1, toolNames: ['getWorkspace'] }, 'failed');
+	// hotfix/webmcp-bridge-status: the connected branch used to label the full
+	// defined list "Available tools:" -- the exact word the header was moved
+	// off because an agent read it as "callable".
+	it('labels the list as defined, not available, even when connected', () => {
+		const result = formatAgentToolsContext(
+			{ toolCount: 1, toolNames: ['getWorkspace'] },
+			'connected'
+		);
 
-		expect(result.toLowerCase()).toContain('not callable');
+		expect(result, `the list label must not read as "callable", got: ${result}`).not.toContain(
+			'Available tools:'
+		);
+		expect(result).toContain('Defined tools:');
+	});
+
+	// This is the text on the DOM at first paint on a *working* WebMCP browser:
+	// connect() cannot have settled yet. Reporting a dead bridge here sent
+	// every agent to the UI fallback on every page load.
+	it('does not report a dead bridge while the connection is still in flight', () => {
+		const result = formatAgentToolsContext(
+			{ toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] },
+			'connecting'
+		);
+		const lower = result.toLowerCase();
+
+		expect(lower, `expected registration described as in progress, got: ${result}`).toContain(
+			'in progress'
+		);
+		expect(
+			lower,
+			'the unavailable-browser claim is false while a connect is in flight'
+		).not.toContain('is not connected here');
+		expect(
+			lower,
+			'a reader must be told to check document.modelContext rather than trust this snapshot'
+		).toContain('query document.modelcontext');
+		expect(result, 'the tool names are useful in every state').toContain('defineStudy');
+	});
+
+	// A bridge IS present when registration throws. Telling the reader
+	// document.modelContext is missing would be flatly false.
+	it('reports a failed connection as a present bridge whose registration failed', () => {
+		const result = formatAgentToolsContext({ toolCount: 1, toolNames: ['getWorkspace'] }, 'failed');
+		const lower = result.toLowerCase();
+
+		expect(lower).toContain('not callable');
+		expect(
+			lower,
+			`a failed registration must not claim the bridge is absent, got: ${result}`
+		).not.toContain('is not connected here');
+		expect(lower, 'the bridge is present -- say so').toContain('document.modelcontext is present');
+		expect(lower, `expected the UI fallback named, got: ${result}`).toContain('ui');
+	});
+
+	it('gives every bridge state its own wording', () => {
+		const states = ['connecting', 'connected', 'unavailable', 'failed'] as const;
+		const status = { toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] };
+
+		const rendered = states.map((state) => formatAgentToolsContext(status, state));
+
+		expect(
+			new Set(rendered).size,
+			'collapsing any pair asserts something untrue about callability for one of them'
+		).toBe(4);
 	});
 
 	// The caller wraps this in <!-- -->; a literal "--" would truncate the
