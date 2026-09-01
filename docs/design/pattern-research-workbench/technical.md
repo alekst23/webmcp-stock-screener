@@ -166,7 +166,8 @@ runs, for real WebMCP registration, it just no longer gates the header).
 | `toolNames` | `string[]` | new (hotfix/workbench-ui-refactor) — `buildTools(engine).map(t => t.name)`, same order `buildTools` returns them |
 
 `formatWebmcpStatus(status: WebmcpStatus) -> string` — always
-`"<toolCount> tools available"`, regardless of browser support or
+`"<toolCount> WebMCP tools available"` (hotfix/workbench-ui-refactor
+adds the "WebMCP" word for clarity), regardless of browser support or
 connection state. Unchanged by the `toolNames` addition — the name list
 is never rendered as visible UI (see below), so the existing exact-match
 tests stay valid.

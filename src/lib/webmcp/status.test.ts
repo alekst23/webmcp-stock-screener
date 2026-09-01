@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { buildWebmcpStatus, formatAgentToolsContext, formatWebmcpStatus } from './status';
 
 describe('formatWebmcpStatus', () => {
-	it('formats as count and "tools available"', () => {
+	it('formats as count and "WebMCP tools available"', () => {
 		const result = formatWebmcpStatus({ toolCount: 11, toolNames: [] });
-		expect(result).toBe('11 tools available');
+		expect(result).toBe('11 WebMCP tools available');
 	});
 
 	it('reflects the exact tool count passed in, not a capped or rounded value', () => {
@@ -20,7 +20,7 @@ describe('formatWebmcpStatus', () => {
 
 	it('is unaffected by toolNames -- the name list is not folded into this string', () => {
 		const result = formatWebmcpStatus({ toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] });
-		expect(result).toBe('2 tools available');
+		expect(result).toBe('2 WebMCP tools available');
 	});
 });
 

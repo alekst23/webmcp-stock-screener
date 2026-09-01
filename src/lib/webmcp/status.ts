@@ -9,7 +9,7 @@ export interface WebmcpStatus {
 // UI (see formatAgentToolsContext), so this string never folds it in
 // (hotfix/workbench-ui-refactor).
 export function formatWebmcpStatus(status: WebmcpStatus): string {
-	return `${status.toolCount} tools available`;
+	return `${status.toolCount} WebMCP tools available`;
 }
 
 // Pairs the tool count with the ordered list of tool names (hotfix/workbench-ui-refactor)
