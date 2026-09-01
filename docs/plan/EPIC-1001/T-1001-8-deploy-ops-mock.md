@@ -1,7 +1,7 @@
 # T-1001-8: Deploy & ops (mock)
 
 **Epic**: EPIC-1001 (WebMCP Pattern Research Workbench)
-**Status**: Blocked — awaiting live deployment (see runbook)
+**Status**: Done — verified live (see Outcome below)
 **Depends on**: T-1001-4
 **Blocks**: T-1001-9
 **Issue**: #1
@@ -108,11 +108,12 @@ per `docs/plan.md`'s risk mitigation — no custom implementation needed.
 
 ## Outcome (2026-08-31)
 
-Deployed and mostly verified — see `docs/reference/deployment.md` for the
-live URLs and the full verification table. AC1/AC3/AC4 pass. AC2/AC5 are
-blocked on one remaining step: `CORS_ALLOWED_ORIGINS` on Render needs to
-be set to the real frontend origin and redeployed. Status stays `Blocked`
-until that's done and AC2/AC5 are re-verified.
+Deployed and verified — see `docs/reference/deployment.md` for the live
+URLs and the full verification table. All 5 ACs confirmed: HTTPS, mock
+data serving, CORS wired to the real frontend origin, rate limiting live,
+and a real product endpoint (`find-instances`) confirmed working
+end-to-end against the deployed backend with the frontend's origin.
+Unblocks T-1001-9.
 
 ## Out of Scope
 

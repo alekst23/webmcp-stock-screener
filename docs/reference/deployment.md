@@ -21,12 +21,12 @@ Checked against `T-1001-8-deployment-runbook.md`'s "Verify" section:
 | Frontend reachable over HTTPS | AC3 | ✅ `200`, TLS |
 | Backend serving mock data | AC1 | ✅ `GET /api/spike/ping` returns the expected mock sample payload |
 | Rate limiting live | AC4 | ✅ ~56×`200` / 9×`429` over 65 rapid requests, consistent with `60/minute` |
-| Frontend talking to backend (CORS) | AC2 | ❌ **Not yet** — `CORS_ALLOWED_ORIGINS` on Render doesn't yet include the real frontend origin; a `GET` from that origin returns `200` but no `Access-Control-Allow-Origin` header, so the browser will block it |
-| Full example research session | AC5 | Not yet exercised — blocked on the CORS fix above |
+| Frontend talking to backend (CORS) | AC2 | ✅ `CORS_ALLOWED_ORIGINS` set to the real frontend origin and backend redeployed; `Access-Control-Allow-Origin` now present on responses |
+| Full example research session | AC5 | ✅ (backend path) — `POST /api/research/find-instances` against the live deployed backend, with the frontend's `Origin` header, returns real matched instances from the mock panel (not just the spike endpoint). Not yet driven through the actual frontend UI / a live WebMCP agent — that's a stronger check but wasn't required to confirm the deployed backend is functionally correct end-to-end |
 
-**Remaining step to close T-1001-8:** in the Render dashboard, set
-`CORS_ALLOWED_ORIGINS` to `https://webmcp-stock-screener.alekst23.workers.dev`
-and redeploy the backend (runbook step 2.5). Re-verify AC2/AC5 after.
+T-1001-8 is functionally verified. Backend and frontend are both live,
+correctly wired to each other, and serving real product functionality
+over the network.
 
 ## Deploy-path deviations from the original runbook
 

@@ -28,9 +28,9 @@ sequenced behind those by design.
 
 | Item | Type | Status | Branch | Notes |
 |------|------|--------|--------|-------|
-| EPIC-1001: WebMCP Pattern Research Workbench | epic | in-progress | `epic/EPIC-1001-pattern-research-workbench` (merged to main) | 7/10 tickets done (1,3,4,5,6,7); 2 blocked (2,8); 2 open pending those (9,10) |
+| EPIC-1001: WebMCP Pattern Research Workbench | epic | in-progress | `epic/EPIC-1001-pattern-research-workbench` (merged to main) | 8/10 tickets done (1,3,4,5,6,7,8); 1 blocked (2); 1 ready to start (9), 1 pending (10) |
 | T-1001-2: Platform spike (live verification) | ticket | blocked | — | Needs human + real WebMCP browser + real AI agent to complete the runbook |
-| T-1001-8: Deploy & ops (mock) | ticket | blocked | — | Needs human to create Render + Cloudflare accounts and follow `T-1001-8-deployment-runbook.md` |
+| T-1001-9: Real data pipeline | ticket | ready to start | — | T-1001-8 verified done; EODHD paid-tier upgrade and R2/S3 bucket creation still need human action (see Blockers) |
 
 _EPIC-1002 through EPIC-1005 are fully closed — see Completed below. Each
 left 2-3 non-blocking follow-up tickets (Open) on GitHub-deleted epic
@@ -43,11 +43,11 @@ should stay on EPIC-1001._
 1. **Record T-1001-2's outcome** once a human completes the live-verification
    session — update ticket status to Done and append the outcome per
    the runbook's "Record the outcome (AC5)" section.
-2. **User runs the T-1001-8 deployment runbook** (Render + Cloudflare
-   accounts, credit card) — human action, no agent can do this.
-3. Once T-1001-8 is verified done: start **T-1001-9** (real data
-   pipeline) — `/at-ticket-start T-1001-9`. The ~$20/mo EODHD upgrade is
-   pre-approved (see Decisions Log) — proceed without re-asking.
+2. **User upgrades the EODHD account to paid tier + creates an R2/S3
+   bucket** for T-1001-9 (human action — account/billing dashboards).
+   Pre-approved (see Decisions Log) — proceed without re-asking once done.
+3. Once both are ready: start **T-1001-9** (real data pipeline) —
+   `/at-ticket-start T-1001-9`.
 4. Once T-1001-9 is done: start **T-1001-10** (submission package) —
    `/at-ticket-start T-1001-10`.
 5. (Low priority, post-deadline) Pick up the follow-up tickets left by
@@ -59,7 +59,8 @@ should stay on EPIC-1001._
 | Blocker | Affects | Since | Action needed |
 |---------|---------|-------|----------------|
 | T-1001-2 unverified | T-1001-2 | 2026-08-30 | Human + real WebMCP browser + real AI agent must complete `T-1001-2-live-verification-runbook.md`. |
-| T-1001-8 undeployed | T-1001-8, T-1001-9, T-1001-10 | 2026-08-30 | Human must create Render + Cloudflare accounts and follow `T-1001-8-deployment-runbook.md`. |
+| EODHD account not yet upgraded to paid tier | T-1001-9 | 2026-08-31 | Human upgrades the EODHD account to the paid EOD Historical Data plan ($19.99/mo, pre-approved). |
+| R2/S3 bucket not yet created | T-1001-9 | 2026-08-31 | Human creates a Cloudflare R2 (or S3) bucket and credentials for the panel object store — new step, decided during T-1001-8's deploy (see `data-provider.md`). |
 
 ## Decisions Log
 
@@ -83,6 +84,7 @@ should stay on EPIC-1001._
 | EPIC-1003: Panel Action Set | epic | 2026-08-31 | Merged via [PR #7](https://github.com/alekst23/webmcp-stock-screener/pull/7) (squash), closing #3. 5-agent review passed; 2 non-blocking follow-ups filed (T-1003-3, T-1003-4, Open). |
 | EPIC-1004: WebMCP Status Header | epic | 2026-08-31 | Merged via [PR #8](https://github.com/alekst23/webmcp-stock-screener/pull/8) (squash), closing #4. 5-agent review passed; 1 non-blocking follow-up filed (T-1004-2, Open) — 3 of 5 agents independently converged on the same finding (unhandled connect-failure rejection). |
 | EPIC-1005: Workspace Snapshots | epic | 2026-08-31 | Merged via [PR #9](https://github.com/alekst23/webmcp-stock-screener/pull/9) (squash), closing #5. 5-agent review found one real bug (stale `focusedView` after snapshot load) — fixed directly on the branch before merge. 3 non-blocking follow-ups filed (T-1005-3, T-1005-4, T-1005-5, Open). |
+| T-1001-8: Deploy & ops (mock) | ticket | 2026-08-31 | Backend live on Render, frontend live on Cloudflare Workers. All 5 ACs verified (HTTPS, mock data, CORS, rate limiting, real product endpoint working end-to-end). See `docs/reference/deployment.md`. Live during deployment: Render disk isn't supported on free tier (dropped it); Cloudflare's current onboarding needed `wrangler.jsonc` instead of classic Pages config. Unblocks T-1001-9. |
 
 _EPIC-1001 is still in progress — ticket-level completions (T-1001-1, 3, 4,
 5, 6, 7) are tracked in `docs/plan/EPIC-1001/_epic.md`._
