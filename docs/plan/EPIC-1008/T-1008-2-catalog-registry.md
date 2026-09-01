@@ -50,8 +50,8 @@ instead of hard-coded string lists scattered across tools.
    a template item declares what it applies to.
 7. A data availability record states whether the item is available,
    partially available, or unavailable; the reason when it is not fully
-   available; and explicitly whether it depends on reference data supplied
-   by the separate live-data workstream.
+   available; and explicitly whether it depends on reference data this
+   project has no source for.
 8. Items that depend on reference data not yet supplied (sector, industry,
    index, country, exchange, fundamentals, and earnings-calendar fields and
    universes) are present in the registry and marked unavailable with a
@@ -105,9 +105,9 @@ instead of hard-coded string lists scattered across tools.
   the Open Questions in `docs/design/discovery-and-catalog/spec.md` for the
   assumption this ticket implements; if implementation reveals the split is
   not carrying its weight, record that rather than silently merging them.
-- Registry data and registry query logic should be separable, so the
-  live-data workstream can later contribute or override availability records
-  without touching the query surface.
+- Registry data and registry query logic should be separable, so a real
+  data source can later contribute or override availability records without
+  touching the query surface.
 
 ## Out of Scope
 
@@ -115,6 +115,6 @@ instead of hard-coded string lists scattered across tools.
   `create_custom_study`).
 - Actually evaluating a study or operator — the registry declares what
   exists and what it takes, not how it computes.
-- Sourcing real availability windows from the live-data workstream; this
-  ticket declares the availability shape and seeds honest placeholders that
-  say "unavailable, pending reference data".
+- Sourcing real availability windows — nothing supplies them and nobody
+  owns doing so; this ticket declares the availability shape and seeds
+  honest placeholders that say "unavailable, no reference-data source".

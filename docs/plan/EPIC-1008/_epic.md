@@ -85,10 +85,10 @@ T-1008-1 ──┬──> T-1008-2 ──┬──> T-1008-5 ──┐
    live/delayed status, timezone, and — where the payload is
    monetary/price/fundamental — currency, price-adjustment policy, and
    fundamentals reporting period, plus the calculation-engine version.
-5. When a catalog item or instrument search depends on reference data that
-   the separate live-data workstream has not yet supplied, the tool returns
-   a well-formed result that explicitly reports the data as unavailable and
-   why — it does not fail, and it does not present placeholder data as real.
+5. When a catalog item or instrument search depends on reference data this
+   project has no source for, the tool returns a well-formed result that
+   explicitly reports the data as unavailable and why — it does not fail,
+   and it does not present placeholder data as real.
 6. Requesting an unknown catalog item ID or an unknown instrument ID returns
    an explicit not-found result naming the ID, not an empty success.
 7. The catalog registry is exported as a typed, read-only inventory that

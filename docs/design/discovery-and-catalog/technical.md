@@ -6,8 +6,10 @@ epic and should be treated as published:
 - **The catalog registry query surface** — EPIC-1009 (`edit_filter_tree`)
   validates conditions against it; EPIC-1011 (`edit_chart_studies`)
   resolves study IDs through it.
-- **`InstrumentDirectory`** — the integration seam the separate
-  reference/fundamental-data workstream implements against.
+- **`InstrumentDirectory`** — the integration seam a future
+  reference/fundamental-data source implements against. Nothing supplies
+  that data today and nobody owns sourcing it; the port and its honest
+  no-source default are the deliverable.
 
 Everything here lives in **new files**. `src/lib/webmcp/tools.ts`,
 `src/lib/webmcp/types.ts`, `src/lib/webmcp/register.ts`, and
@@ -101,9 +103,9 @@ names.
 |-------|------|-------------|
 | `status` | `'available' \| 'partial' \| 'unavailable'` | |
 | `reason` | `string \| undefined` | required when not `available` |
-| `requiresReferenceData` | `boolean` | true when the live-data workstream must supply it |
+| `requiresReferenceData` | `boolean` | true when the item needs reference data this project has no source for |
 | `intervalIds` | `string[]` | intervals the item is available over |
-| `earliest` / `latest` | `string \| undefined` | ISO dates; unknown until the live-data workstream lands |
+| `earliest` / `latest` | `string \| undefined` | ISO dates; unknown until a real data source lands |
 
 Discriminated members:
 
@@ -145,12 +147,12 @@ enumValues?, required }`.
 
 Returned collections are `readonly`; the inventory is frozen at module
 load. Registry **data** and registry **query logic** are separate modules so
-the live-data workstream can later contribute availability records without
+a real data source can later contribute availability records without
 touching the query surface.
 
 ### `InstrumentDirectory` (`src/lib/discovery/ports.ts`, T-1008-3)
 
-**The integration seam for the reference/fundamental-data workstream.**
+**The integration seam for a future reference/fundamental-data source.**
 
 ```
 searchInstruments(query: InstrumentQuery)
@@ -177,7 +179,11 @@ getInstrument(instrumentId: string)
 | `listedFrom` / `listedTo` | `string \| undefined` | ISO dates |
 
 `InstrumentQuery`: `{ text, assetTypes?, exchangeIds?, countryCodes?,
-includeDelisted?, limit? }` — `limit` bounded by a documented maximum.
+includeDelisted?, limit? }` — `limit` bounded by `MAX_INSTRUMENT_RESULTS`
+(50), defaulting to `DEFAULT_INSTRUMENT_RESULTS` (10). `ports.ts` exports
+`clampInstrumentLimit(limit)`, returning `{ limit, clamped }`, so adapters
+and the tool layer clamp against the same number and both can warn when
+they clamped rather than truncating silently.
 `InstrumentMatch`: `{ instrument: Instrument, score: number, matchedOn:
 'symbol' | 'name' | 'alias' | 'isin' | 'figi' }`.
 
@@ -202,17 +208,24 @@ outcome, never a throw and never a fabricated record.
    results.
 8. Adapters live in infra. The port must stay free of I/O imports.
 
-The workstream may implement this over HTTP against the existing FastAPI
-backend; if so, the response body is the `DiscoveryEnvelope` shape above
-verbatim, so the choice does not reopen the port.
+An implementer may choose HTTP against the existing FastAPI backend; if so,
+the response body is the `DiscoveryEnvelope` shape above verbatim, so the
+choice does not reopen the port.
 
 ### `unavailableInstrumentDirectory` (`src/lib/discovery/unavailableDirectory.ts`, T-1008-3)
 
-Default when nothing is configured. Both methods resolve to a well-formed
-envelope with an empty payload, `sourceId: 'src.instruments.unconfigured'`,
-`delivery: 'static'`, and a warning naming the reference-data dependency.
-It never throws and never invents instruments. This is the deliberate
-alternative to a mock instrument dataset.
+Default when nothing is configured — which is every deployment today.
+`createUnavailableInstrumentDirectory()` is a factory, not a module-level
+singleton, so composition decides which adapter is in use. Both methods
+resolve to a well-formed envelope with an empty payload (`[]` and `null`
+respectively), `sourceId: 'src.instruments.unconfigured'`, `delivery:
+'static'`, and a warning stating that no reference-data source is
+configured. It never throws and never invents instruments. This is the
+deliberate alternative to a mock instrument dataset.
+
+A configurable test double, `createFakeInstrumentDirectory` in
+`src/lib/discovery/testSupport.ts`, is what other tickets' tests drive.
+It lives beside the tests, never in the shipped default path.
 
 ### `buildDiscoveryTools` (`src/lib/webmcp/discovery/group.ts`, T-1008-7)
 
