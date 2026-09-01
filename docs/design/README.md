@@ -11,3 +11,6 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+- [Screener Core](screener-core/spec.md) — create a screener, set its
+  universe, build a nested filter tree from typed conditions, rank and
+  validate it, and execute one revision into a pinned `run_id`.
