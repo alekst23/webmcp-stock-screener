@@ -1,7 +1,7 @@
-# T-0013-4: Streaming universe evaluation — bounded peak residency
+# T-0013-4 (CANCELLED): Streaming universe evaluation — bounded peak residency
 
 **Epic**: EPIC-0013 (Market Data Storage)
-**Status**: Deferred — not in EPIC-0013's scope
+**Status**: Cancelled — the 512 MB ceiling this addressed was removed by the AWS re-platform (#16)
 **Depends on**: T-0013-2, T-0013-3
 **Blocks**: —
 **Issue**: #13
@@ -59,3 +59,22 @@ so that growing the universe does not start killing the service.
 ## Out of Scope
 
 DuckDB-over-R2 (considered and deferred — see technical.md).
+
+
+## Cancelled — 2026-09-01
+
+This ticket existed to keep peak memory under Render's free-tier 512 MB by
+evaluating conditions per ticker instead of materializing whole-panel
+intermediates. The backend is moving to a large AWS container (#16), where
+the measured peak fits with headroom, so the constraint it was written
+against no longer exists.
+
+It is cancelled rather than deferred because leaving it open implies work
+that should happen eventually. It should not: if peak memory ever becomes a
+problem again, the answer is a real query engine against the database that
+is already provisioned, not a hand-rolled chunked scanner — which is what
+this epic's own `technical.md` argued from the start.
+
+The underlying observation stays true and stays recorded in
+`docs/plan/project.md`: peak memory grows with expression complexity, not
+just dataset size. It is simply no longer worth engineering around.
