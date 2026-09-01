@@ -7,11 +7,20 @@
 	// (actor: 'human') -- see activity.ts. No client-side sort needed: both
 	// call sites append via the same recordAction, so array order already is
 	// call order.
-	let { events }: { events: AgentActivityEvent[] } = $props();
+	let { events, onclear }: { events: AgentActivityEvent[]; onclear?: () => void } = $props();
+
+	function clear(): void {
+		if (confirm('Clear the entire activity log? This cannot be undone.')) {
+			onclear?.();
+		}
+	}
 </script>
 
 <section class="activity-feed">
-	<h2>Activity log ({events.length})</h2>
+	<div class="header-row">
+		<h2>Activity log ({events.length})</h2>
+		<button type="button" onclick={clear} disabled={events.length === 0}>Clear log</button>
+	</div>
 	{#if events.length === 0}
 		<p class="empty">No activity yet.</p>
 	{:else}
@@ -31,11 +40,36 @@
 
 <style>
 	.activity-feed {
-		margin-bottom: 1.5rem;
+		margin: 1rem 0 1.5rem;
+		padding: 0.75rem 0;
+		border-top: 1px solid #ddd;
+		border-bottom: 1px solid #ddd;
+	}
+	.header-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin-bottom: 0.25rem;
 	}
 	h2 {
 		font-size: 1rem;
-		margin-bottom: 0.25rem;
+		margin: 0;
+	}
+	.header-row button {
+		border: 1px solid #999;
+		border-radius: 4px;
+		padding: 0.3rem 0.6rem;
+		background: #fff;
+		color: #111;
+		font: inherit;
+		font-size: 0.8rem;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.header-row button:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 	.empty {
 		color: #888;

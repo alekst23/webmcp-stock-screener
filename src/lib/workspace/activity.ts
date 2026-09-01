@@ -109,6 +109,16 @@ export function actorLabel(actor: 'human' | 'agent'): 'Human' | 'Agent' {
 	return actor === 'human' ? 'Human' : 'Agent';
 }
 
+// The one exception to recordAction being the sole append-only mutator
+// (hotfix/workbench-ui-refactor) -- a deliberate, all-or-nothing wipe of
+// the whole log, not a per-entry edit/delete. The existing subscribe-based
+// persistence writes the cleared (empty) array to storage automatically.
+// nextActivityId is intentionally left unreset so ids keep incrementing
+// past the clear rather than risk colliding with entries rendered before it.
+export function clearActivity(activity: Writable<AgentActivityEvent[]>): void {
+	activity.set([]);
+}
+
 function parsePayload(result: ToolResult): unknown {
 	const text = result.content.map((c) => c.text).join('');
 	try {

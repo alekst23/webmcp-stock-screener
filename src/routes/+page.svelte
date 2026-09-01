@@ -2,11 +2,16 @@
 	import { onMount } from 'svelte';
 	import { env } from '$env/dynamic/public';
 	import { workspaceStore } from '$lib/workspace/store';
-	import { activityStore } from '$lib/workspace/activity';
+	import { activityStore, clearActivity } from '$lib/workspace/activity';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
 	import { connectWebmcp } from '$lib/webmcp/register';
 	import { buildTools } from '$lib/webmcp/tools';
-	import { formatWebmcpStatus, type WebmcpStatus } from '$lib/webmcp/status';
+	import {
+		buildWebmcpStatus,
+		formatAgentToolsContext,
+		formatWebmcpStatus,
+		type WebmcpStatus
+	} from '$lib/webmcp/status';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
@@ -31,7 +36,7 @@
 	let webmcpStatus = $state<WebmcpStatus | null>(null);
 
 	onMount(() => {
-		webmcpStatus = { toolCount: buildTools(engine).length };
+		webmcpStatus = buildWebmcpStatus(buildTools(engine));
 		void connectWebmcp(engine, activityStore);
 	});
 </script>
@@ -40,14 +45,15 @@
 	<h1>WebMCP Pattern Research Workbench</h1>
 	{#if webmcpStatus}
 		<p class="webmcp-status">{formatWebmcpStatus(webmcpStatus)}</p>
+		{@html `<!-- ${formatAgentToolsContext(webmcpStatus).replaceAll('--', '—')} -->`}
 	{/if}
 	<p>
-		This is the shared research session — the same workspace state an agent reads and writes through
-		WebMCP tools. It persists in this browser across reloads.
+		WebMCP Pattern Research Workbench lets a trader or researcher and an AI agent turn a vague chart
+		pattern into a tested hypothesis together, in the same browser tab. They share one visible
+		research session — defining patterns, searching price history, and measuring outcomes — that
+		persists in this browser across reloads.
 		<a href="/dev">Dev control surface →</a>
 	</p>
-
-	<ActivityFeed events={$activityStore} />
 
 	<SnapshotPicker store={workspaceStore} onload={() => (focusedView = null)} />
 
@@ -68,6 +74,8 @@
 	{#if focusedView && $workspaceStore.focus?.selected.length}
 		<FocusChart view={focusedView} />
 	{/if}
+
+	<ActivityFeed events={$activityStore} onclear={() => clearActivity(activityStore)} />
 </main>
 
 <style>

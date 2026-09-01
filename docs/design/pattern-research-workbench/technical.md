@@ -149,7 +149,7 @@ writes to `activityStore` any other way. It reuses the existing
 `ok`/`fail` `ToolResult` builders are exported so `ChartToolbar.svelte`
 can build the same result shape without re-implementing it.
 
-### `WebmcpStatus` / `formatWebmcpStatus` — header status contract (T-1004-1, hotfix/webmcp-tools-always-visible)
+### `WebmcpStatus` / `formatWebmcpStatus` / `buildWebmcpStatus` — header status contract (T-1004-1, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor)
 
 `src/lib/webmcp/status.ts`. Pure formatter backing the header's "WebMCP
 tool count always visible" scenario. `toolCount` is
@@ -160,13 +160,94 @@ feature #10's progressive availability. Computed synchronously in
 (dropped by hotfix/webmcp-tools-always-visible; `connectWebmcp()` still
 runs, for real WebMCP registration, it just no longer gates the header).
 
-| Field       | Type     | Description                 |
-| ----------- | -------- | --------------------------- |
-| `toolCount` | `number` | `buildTools(engine).length` |
+| Field       | Type       | Description                                                                                                      |
+| ----------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| `toolCount` | `number`   | `buildTools(engine).length`                                                                                      |
+| `toolNames` | `string[]` | new (hotfix/workbench-ui-refactor) — `buildTools(engine).map(t => t.name)`, same order `buildTools` returns them |
 
 `formatWebmcpStatus(status: WebmcpStatus) -> string` — always
-`"<toolCount> tools available"`, regardless of browser support or
-connection state.
+`"<toolCount> WebMCP tools available"` (hotfix/workbench-ui-refactor
+adds the "WebMCP" word for clarity), regardless of browser support or
+connection state. Unchanged by the `toolNames` addition — the name list
+is never rendered as visible UI (see below), so the existing exact-match
+tests stay valid.
+
+`buildWebmcpStatus(tools: { name: string }[]) -> WebmcpStatus` — new pure
+helper (hotfix/workbench-ui-refactor) so the count/name-list pairing is
+computed and tested in one place instead of inline in `+page.svelte`.
+Takes the minimal shape it needs (structurally compatible with
+`ToolSpec[]`) rather than depending on the full `ToolSpec` type.
+`+page.svelte` calls it as `buildWebmcpStatus(buildTools(engine))`.
+
+`formatAgentToolsContext(status: WebmcpStatus) -> string` — new pure
+helper (hotfix/workbench-ui-refactor). Produces the preface + tool-name
+listing for the agent-only HTML comment described below; kept separate
+from `formatWebmcpStatus` because the two have different audiences and
+must never be merged into one string. Any literal `--` in the output is
+replaced with an em dash (`—`) before the caller wraps it in `<!-- -->`,
+since `--` is illegal inside an HTML comment body and could otherwise
+truncate it early — defensive only, `toolNames` is a static, hardcoded
+list, not user input. The preface also tells the reader this is the full
+defined tool surface (per feature #10's Non-Goal), not necessarily
+what's currently unlocked, and to treat `document.modelContext` itself
+— not this static comment — as authoritative for live availability and
+schemas, so a page reload never leaves a stale snapshot in the comment
+that an agent could mistake for ground truth.
+
+**Human-visible vs. agent-visible tool surface (hotfix/workbench-ui-refactor):**
+The original redlined mockup called for a tool-name list that's
+"invisible in the UI" — i.e. present for an agent reading the page, not
+rendered for the human researcher. (An earlier revision of this change
+got this backwards and rendered the names as a visible `<ul>`; corrected
+here.) `+page.svelte` renders the list as a real HTML comment node via
+`{@html}` immediately after the `.webmcp-status` count line:
+
+```svelte
+{@html `<!-- ${formatAgentToolsContext(webmcpStatus).replaceAll('--', '—')} -->`}
+```
+
+A literal `<!-- -->` written directly in a `.svelte` template is stripped
+by the Svelte compiler by default and would never reach the shipped
+HTML — using `{@html}` to inject the comment string at runtime avoids
+that, since Svelte's template-comment stripping only applies to comments
+written statically in the template source, not to strings passed through
+`{@html}`. The result: no visible text, no accessibility-tree entry
+(comment nodes aren't exposed to a11y trees), but the comment is present
+in the page's rendered HTML for anything that reads page source —
+exactly the "invisible in the UI, visible to an agent" scenario in
+`spec.md`.
+
+### `clearActivity` — manual full-log clear (hotfix/workbench-ui-refactor)
+
+`src/lib/workspace/activity.ts`. The one exception to `recordAction`
+being the sole append-only mutator (see the amended Non-Goal in
+`spec.md`) — a whole-log wipe, not a per-entry edit/delete.
+
+| Signature                                                       | Description                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clearActivity(activity: Writable<AgentActivityEvent[]>): void` | `activity.set([])`. The existing `subscribe`-based persistence writes the cleared (empty) array to `localStorage` automatically — no separate storage call needed. `nextActivityId` is intentionally left unreset, so IDs after a clear keep incrementing rather than restart at 1; avoids any theoretical key collision with entries rendered before the clear. |
+
+`ActivityFeed.svelte` gains an `onclear?: () => void` callback prop,
+mirroring the `ChartToolbar`/`SnapshotPicker` convention, wired in
+`+page.svelte` as `onclear={() => clearActivity(activityStore)}`. The
+Clear-log button's click handler guards the call with a plain global
+`confirm()`, mirroring `SnapshotPicker.svelte`'s `load()` guard.
+
+### Page layout — activity log position and snapshot picker density (hotfix/workbench-ui-refactor)
+
+`src/routes/+page.svelte` moves `<ActivityFeed>` from directly after the
+intro paragraph to after `<FocusChart>` (last element in `<main>`),
+matching the new "Log is positioned at the bottom" scenario. No prop or
+store wiring changes from the move itself. `ActivityFeed.svelte` adopts
+the same `border-top`/`border-bottom` section-divider convention already
+shared by `ChartToolbar.svelte` and `SnapshotPicker.svelte`, for visual
+consistency now that it sits as a peer section rather than an
+intro-adjacent block.
+
+`SnapshotPicker.svelte`'s layout change is CSS-only (reduced `gap`,
+`padding`, and `margin` in its existing `<style>` block) — no markup,
+prop, or behavioral change, so `workspace-snapshots/spec.md` and
+`technical.md` are unaffected.
 
 ### `TickerMetadata` — universe classification (T-1001-9)
 

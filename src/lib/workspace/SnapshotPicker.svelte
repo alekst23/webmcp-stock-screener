@@ -10,10 +10,7 @@
 	} from './snapshots';
 	import { hasUnsavedChanges } from './snapshotGuard';
 
-	let {
-		store,
-		onload
-	}: { store: Writable<WorkspaceState>; onload?: () => void } = $props();
+	let { store, onload }: { store: Writable<WorkspaceState>; onload?: () => void } = $props();
 
 	let name = $state('');
 	let snapshots = $state<SnapshotSummary[]>(listSnapshots());
@@ -56,7 +53,7 @@
 
 		const loaded = loadSnapshot(snapshotName);
 		if (!loaded) {
-			error = `Snapshot "${snapshotName}" no longer exists.`;
+			error = `Workspace "${snapshotName}" no longer exists.`;
 			refresh();
 			return;
 		}
@@ -79,13 +76,17 @@
 	}
 </script>
 
-<section class="snapshot-picker" aria-label="Workspace snapshots">
+<details class="snapshot-picker">
+	<summary>
+		Workspaces {snapshots.length ? `(${snapshots.length})` : '(none saved)'}
+	</summary>
+
 	<div class="save-row">
 		<label>
-			<span>Snapshot name</span>
+			<span>Workspace name</span>
 			<input bind:value={name} placeholder="e.g. gap-fade-research" />
 		</label>
-		<button type="button" onclick={save}>Save snapshot</button>
+		<button type="button" onclick={save}>Save workspace</button>
 	</div>
 
 	{#if error}
@@ -103,7 +104,7 @@
 					<button
 						type="button"
 						class="delete"
-						aria-label={`Delete snapshot ${snapshot.name}`}
+						aria-label={`Delete workspace ${snapshot.name}`}
 						onclick={() => remove(snapshot.name)}
 					>
 						Delete
@@ -112,27 +113,35 @@
 			{/each}
 		</ul>
 	{:else}
-		<p class="empty">No saved snapshots yet.</p>
+		<p class="empty">No saved workspaces yet.</p>
 	{/if}
-</section>
+</details>
 
 <style>
 	.snapshot-picker {
-		display: grid;
-		gap: 0.75rem;
-		margin: 1rem 0 1.5rem;
-		padding: 0.75rem 0;
+		margin: 0.5rem 0 0.75rem;
+		padding: 0.3rem 0;
 		border-top: 1px solid #ddd;
 		border-bottom: 1px solid #ddd;
 	}
+	summary {
+		cursor: pointer;
+		font-size: 0.85rem;
+		color: #555;
+		user-select: none;
+	}
+	.snapshot-picker[open] summary {
+		margin-bottom: 0.4rem;
+	}
 	.save-row {
 		display: flex;
-		gap: 0.5rem;
+		gap: 0.4rem;
 		align-items: end;
+		margin-top: 0.4rem;
 	}
 	label {
 		display: grid;
-		gap: 0.25rem;
+		gap: 0.15rem;
 		font-size: 0.8rem;
 		color: #555;
 		flex: 1;
@@ -142,14 +151,14 @@
 		width: 100%;
 		border: 1px solid #bbb;
 		border-radius: 4px;
-		padding: 0.45rem 0.55rem;
+		padding: 0.3rem 0.45rem;
 		font: inherit;
 		color: #111;
 	}
 	button {
 		border: 1px solid #999;
 		border-radius: 4px;
-		padding: 0.45rem 0.65rem;
+		padding: 0.3rem 0.55rem;
 		background: #fff;
 		color: #111;
 		font: inherit;
@@ -161,12 +170,12 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		gap: 0.4rem;
+		gap: 0.2rem;
 	}
 	li {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.4rem;
 	}
 	.load {
 		flex: 1;
