@@ -223,11 +223,17 @@ Takes the minimal shape it needs (structurally compatible with
 — pure helper (hotfix/workbench-ui-refactor) producing the preface +
 tool-name listing for the agent-only HTML comment described below; kept
 separate from `formatWebmcpStatus` because the two have different
-audiences and must never be merged into one string. Any literal `--` in
-the output is replaced with an em dash (`—`) before the caller wraps it
-in `<!-- -->`, since `--` is illegal inside an HTML comment body and
-could otherwise truncate it early — defensive only, `toolNames` is a
-static, hardcoded list, not user input. The preface tells the reader
+audiences and must never be merged into one string.
+
+`--` is illegal inside an HTML comment body and would truncate the
+comment early, exposing its tail as rendered page text. That escaping
+now lives **inside this function** (hotfix/webmcp-bridge-status) rather
+than at the `+page.svelte` call site where hotfix/workbench-ui-refactor
+put it: producing comment-safe content is this function's entire job, so
+a second call site should not be able to forget the `.replaceAll`. The
+caller's escaping is removed rather than kept as belt-and-braces — one
+owner for the invariant, tested directly against every bridge state. The
+preface tells the reader
 this is the full defined tool surface (per feature #10's Non-Goal), not
 necessarily what's currently unlocked, and to treat
 `document.modelContext` itself — not this static comment — as
