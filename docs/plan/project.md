@@ -39,6 +39,7 @@ fan out behind it.
 | EPIC-1014: High-value follow-up tools | epic | specced | `epic/EPIC-1014-…` merged to main | 11 tickets. backtest, watchlists, alerts, computed fields, export |
 | EPIC-1015: Legacy surface cutover | epic | specced | `epic/EPIC-1015-…` merged to main | 8 tickets. Gated on user approval; runs last |
 | EPIC-1001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-1001-pattern-research-workbench` | 8/10 tickets done; T-1001-2 blocked, T-1001-9/10 deprioritized |
+| EPIC-1016: Market data storage | epic | in-flight (another session) | `epic/EPIC-1016-market-data-storage` | Triaging issue #13 (13GB peak-memory bug loading the panel). Uncommitted `docs/design/market-data-storage/spec.md` sits in worktree `.worktrees/triage-13` as of this session's close — not touched, not reviewed. Owned by a session outside this one; do not edit `project.md` for it until that session reports back or the user says otherwise. |
 
 ## Implementation wave order
 
@@ -73,6 +74,7 @@ Dependencies only — everything within a wave runs in parallel.
 | Multi-step temporal setup matching may be only partially covered by the new filter tree | EPIC-1015 | 2026-09-01 | User sign-off needed at T-1015-2 on partial parity. |
 | T-1001-2 unverified | T-1001-2 | 2026-08-30 | Human + real WebMCP browser + real AI agent must complete `T-1001-2-live-verification-runbook.md`. Deprioritized. |
 | EODHD paid tier / R2/S3 bucket | T-1001-9 | 2026-08-31 | Deprioritized along with T-1001-9. |
+| EPIC-1016 (market data storage, still being triaged) rearchitects the same OHLCV panel that EPIC-1008/EPIC-1011 read from — overlaps cross-epic reconciliation #4 below (bars-port ownership) | EPIC-1008, EPIC-1011, EPIC-1016 | 2026-09-01 | Once EPIC-1016 lands a spec, reconcile its storage interface against EPIC-1008's/EPIC-1011's port assumptions before Wave 1 (EPIC-1008) implements against a port that EPIC-1016 might reshape. |
 
 ## Cross-epic reconciliations pending
 
@@ -95,6 +97,7 @@ authoritative)._
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-01 | Hardened `at-project-go`, `at-epic-new`, `at-epic-run` (global skills, not project-specific) after this session's Step-6 cleanup deleted a live worktree belonging to a different, concurrently-running session | The user asked "did you destroy any work on main?" — investigation found no `main` damage, but found the actual cause: cleanup deleted-by-glob-pattern instead of by provenance. Fixed: a run manifest scopes cleanup to only what the current run launched; `git worktree remove` no longer forces past uncommitted changes; epic numbering can be caller-pinned to avoid concurrent-scan collisions; agents in a fan-out no longer edit shared index files. See `~/.claude/skills/{at-project-go,at-epic-new,at-epic-run}/SKILL.md`. |
 | 2026-08-30 | Pre-approved the ~$20/mo EODHD paid-tier upgrade for T-1001-9, to proceed automatically once T-1001-8 unblocks it | Deadline is 2026-09-03 1pm PT; avoids re-asking mid-crunch |
 | 2026-08-30 | Uncommitted ticker-charts/instance-cache work (started by ChatGPT Codex) was finished rather than discarded | User confirmed this is live in-progress work worth keeping, not scratch — landed in commit `2b039af` |
 | 2026-08-31 | Ran EPIC-1002 through EPIC-1005 (all triaged from #2-#5, specs already written) through design/tests/implementation this run, per explicit user instruction via `/loop`, despite autonomous-mode's normal "no new initiatives" restriction | User's `/at-project-go` argument explicitly named these four epics; they were already triaged with specs, not brand-new scope |
@@ -167,3 +170,46 @@ _EPIC-1001 is still in progress — ticket-level completions (T-1001-1, 3, 4,
   T-1004-2, T-1005-3/4/5) are all non-blocking and low priority relative to
   the 2026-09-03 deadline — pick up post-submission unless one becomes
   relevant to a judge-visible flow.
+
+## Last Run (2026-09-01, session closed via /at-project-sleep)
+
+- **Trigger:** User asked to implement `docs/reference/tool-spec.md`
+  (formerly `.dev/design/tool-spec.md`), then explicitly closed the session
+  ("let's save this for next run").
+- **Shipped:** Nothing to production — this session was planning-only.
+  Landed on `main`: the page-owned WebMCP bridge fallback (`7e6f4a6`, PRs
+  #10-#12 also backfilled into the plan); the objective rewrite to the
+  tool-spec full-replacement program; ten epics (EPIC-1006 through
+  EPIC-1015, 81 tickets total) specced and merged; the tool spec moved from
+  gitignored `.dev/` to tracked `docs/reference/tool-spec.md` with 73
+  references repointed; three global skills
+  (`at-project-go`/`at-epic-new`/`at-epic-run`) hardened against the
+  worktree-deletion bug this session surfaced.
+- **Scaffolded, not launched:** All 81 tickets across EPIC-1006-1015 are
+  planned but zero implementation code has been written. Wave 1
+  (EPIC-1006 + EPIC-1008, 15 tickets) is ready to launch on command.
+  EPIC-1015 (legacy cutover) stays gated on explicit user approval and two
+  open capability-drop sign-offs (`measure`/`splitInstances`, partial
+  temporal-pattern parity).
+- **Filed:** Issue #13 (bug: panel load path materializes as Pydantic
+  objects, 13GB peak memory) — filed outside this session.
+- **Deferred:** Four cross-epic reconciliations need one decision each
+  before Wave 1 (see "Cross-epic reconciliations pending" above):
+  `expected_revision` strictness, operation-handler purity, pinned-run
+  retention, OHLCV-bars-port ownership. Two EPIC-1015 capability-drop
+  sign-offs. EPIC-1001's remaining tickets (T-1001-2/9/10) stay
+  deprioritized but open.
+- **In-flight at close:** A *different, concurrently-running session* is
+  triaging issue #13 into EPIC-1016 (market data storage) — worktree
+  `.worktrees/triage-13` on branch `epic/EPIC-1016-market-data-storage`,
+  one uncommitted file (`docs/design/market-data-storage/spec.md`), not
+  reviewed or touched by this session. Do not clean up that worktree or
+  branch; it is not this session's to manage.
+- **Next session should:** Check whether EPIC-1016's triage has landed
+  (`git log epic/EPIC-1016-market-data-storage`, `git worktree list`) before
+  doing anything else, since it overlaps EPIC-1008/EPIC-1011's OHLCV-bars
+  port ownership question. If clear, resolve the four cross-epic
+  reconciliations (recommend: required-and-reject for `expected_revision`,
+  pure handlers required), then launch Wave 1 (`/at-epic-run EPIC-1006` and
+  `/at-epic-run EPIC-1008` in parallel). Do not launch EPIC-1015 without
+  explicit user sign-off on its two capability drops.
