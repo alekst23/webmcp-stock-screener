@@ -11,3 +11,6 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+- [Chart Tools](chart-tools/spec.md) — the agent-drivable chart:
+  configure what it shows, manage studies, read a bounded slice of the
+  underlying numbers, annotate it, and capture a reference setup.
