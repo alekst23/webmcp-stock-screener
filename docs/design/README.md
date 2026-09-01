@@ -11,3 +11,10 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+
+## Program
+
+- [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — retiring the
+  original 11-tool pattern-research surface once its ~33-tool replacement
+  is in place: inventory, capability-parity check, migration, deletion,
+  and live-deployment verification.
