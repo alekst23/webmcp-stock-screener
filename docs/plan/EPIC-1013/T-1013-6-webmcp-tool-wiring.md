@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1013 (Safety layer (preview & apply))
 **Design**: docs/design/safety-preview-apply/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1013-5
 **Blocks**: —
 
@@ -76,3 +76,80 @@ do not add them to the existing `buildTools` list, which EPIC-1015 retires.
 
 Any UI for reviewing a pending preview; retiring the old tool surface
 (EPIC-1015).
+
+## Implementation Plan
+
+**New file `src/lib/workbench/tools/safetyTools.ts`** — mirrors the shape of
+`tools/index.ts` but wraps `previewWorkspaceChanges`/`applyPreviewedChanges`
+from `application/safetyUseCases.ts` instead of reimplementing anything:
+
+- `SafetyToolDeps` is `SafetyDeps` re-exported under the tools-layer name the
+  ticket asks for (`export interface SafetyToolDeps extends SafetyDeps {}`).
+- `buildSafetyTools(deps)` builds both tool descriptions/schemas by calling
+  `deps.registry.kinds()` at call time — never at module load — so a
+  registry populated after this module is imported (sibling epics importing
+  later, or a fresh registry built for a test) is reflected. No kind string
+  is hard-coded anywhere in the file; a source-scan test enforces this the
+  same way `batchEvaluation.test.ts` does with `?raw`.
+- `preview_workspace_changes`: input `{ operations: [{ kind, arguments }],
+  workspace_id? }`. A small mapper turns wire `arguments` into
+  `ProposedOperation.input` and builds a `ChangeBatch`; malformed shape
+  (non-array, missing `kind`) raises `SafetyError.invalidInput` through the
+  same error path as everything else — never forwarded to a handler. An
+  unregistered kind is *not* special-cased here: `evaluateBatch` (via
+  `previewWorkspaceChanges`) already turns it into a per-operation failure
+  inside an otherwise-successful preview result (AC5), so this file must not
+  duplicate or defeat that. Success path: `ok(toWirePreviewResult(result))`.
+- `apply_previewed_changes`: input `{ preview_id, expected_revision?,
+  idempotency_key? }`, mapped straight into `applyPreviewedChanges`'s input
+  shape. Success path: `ok(toWireEnvelope(envelope))`.
+- Error mapping: a local `toErrorResult` (not imported from `tools/index.ts`,
+  which this ticket must touch minimally) catches `SafetyError` plus
+  EPIC-1006's `RevisionConflictError`, `IdempotencyConflictError`,
+  `StorageWriteError`, `OperationValidationError`, `UndoTokenError` and
+  returns `fail(err.message, err.toWireError())`; anything else falls back to
+  `fail(message)`. This covers all seven `SafetyErrorReason` values because
+  every `SafetyError` factory sets `.reason` and `.toWireError().error`
+  echoes it.
+- No `state`/code/SQL/JS/DOM field anywhere in either schema (AC9) — the only
+  inputs are the typed operation batch and a preview id.
+
+**Modify `registerWorkbenchTools.ts`** — minimally:
+
+- Import `createPreviewStore` (`infra/previewStore`) and `buildSafetyTools`,
+  `type SafetyToolDeps` (`./safetyTools`).
+- `createDefaultWorkbenchDeps()`'s return type becomes
+  `WorkbenchDeps & Pick<SafetyToolDeps, 'previews'>` (a local intersection,
+  not an edit to `WorkbenchDeps` itself in `tools/index.ts`), and the
+  function body adds `previews: createPreviewStore({ clock })` using the
+  same `clock` already built for the rest of the deps. `WorkbenchDeps`
+  already carries every other field `SafetyDeps` needs (repository,
+  revisions, history, registry, idempotency, clock, ids), so the
+  intersection satisfies both `WorkbenchDeps` and `SafetyDeps` structurally.
+- `registerWorkbenchTools()`'s parameter type and default follow the same
+  intersection type, and the tool loop registers
+  `[...buildWorkbenchTools(deps), ...buildSafetyTools(deps)]` instead of only
+  `buildWorkbenchTools(deps)`. `WORKBENCH_TOOLS_ENABLED` is untouched.
+
+**Tests (`safetyTools.test.ts`)** — build fresh deps per test the same way
+`safetyUseCases.test.ts` does (`createOperationRegistry()`,
+`createLocalWorkspaceRepository(memoryStorage())`, `createPreviewStore({
+clock, randomToken: sequentialToken() })`, fixed `Clock`), drive tools only
+through `execute()`, and parse `JSON.parse(result.content[0].text)`. Covers:
+AC1 (both names present), AC2/AC7 (end-to-end honesty: preview then apply,
+diff/affected_ids/diff_summary match), AC3 (apply's optional fields), AC4
+(two registries with different kinds produce different descriptions/schemas,
+plus the `?raw` source-scan asserting no operation-kind literal), AC5
+(unknown kind → successful preview with `applicable:false`, identity-keyed
+spy handler never invoked), AC6 (one test per `SafetyErrorReason`, seven
+total), AC8 (a kind registered inside the test only, named nowhere in
+`safetyTools.ts`, driven through both tools), AC9 (schema shape assertion),
+AC10 (`buildTools` from `webmcp/tools.ts` unchanged + full suite green).
+
+Mutation-check: after tests are green, temporarily break the implementation
+in 5+ ways (drop the registry-kinds call and hardcode a schema, skip the
+`SafetyError` branch in `toErrorResult`, forward an unknown kind's input to
+`deps.registry.get` without going through `evaluateBatch`, swap
+`toWirePreviewResult`/`toWireEnvelope` for a hand-rolled object, remove the
+`workspace_id`/`expected_revision`/`idempotency_key` passthrough) and confirm
+each break fails the relevant test, then restore.
