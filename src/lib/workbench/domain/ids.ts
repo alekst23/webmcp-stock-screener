@@ -21,7 +21,8 @@ export type ResourceKind =
 	| 'alert'
 	| 'preview'
 	| 'column'
-	| 'rule';
+	| 'rule'
+	| 'backtest';
 
 const RESOURCE_KINDS: ReadonlySet<string> = new Set<ResourceKind>([
 	'workspace',
@@ -40,7 +41,8 @@ const RESOURCE_KINDS: ReadonlySet<string> = new Set<ResourceKind>([
 	'alert',
 	'preview',
 	'column',
-	'rule'
+	'rule',
+	'backtest'
 ]);
 
 // Opaque wire type. Grammar: '<kind>_<discriminator?>_<seq>', e.g.
