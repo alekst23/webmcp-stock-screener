@@ -76,6 +76,80 @@ so that pattern research runs against current data with no manual step.
 9. Exactly one scheduled writer is active at a time across Render and AWS,
    so the two deployments cannot append to diverging copies of the panel.
 
+## Solution Approach
+
+A new `terraform/modules/nightly_job` module, composed alongside (not
+inside) `modules/apprunner_service`, adds:
+
+- **ECS cluster** `webmcp-<env>-nightly`, Fargate capacity provider only —
+  no service, no load balancer. An empty cluster and an unused task
+  definition are free; idle cost is $0.
+- **Task definition** `webmcp-<env>-nightly-delta`, `awsvpc` network mode,
+  running the *same* ECR image the App Runner service runs
+  (`var.image_identifier`, wired from the root module's existing
+  `module.registry` / `var.apprunner_image_tag`, so one apply can never
+  point the two platforms at different digests). Container command is the
+  ordinary run, `["python", "scripts/nightly_delta.py"]` — no `uv run`
+  needed, since the runtime image's `PATH` already activates `/opt/venv`
+  (`backend/Dockerfile`). `--catch-up` is never baked into the task
+  definition; it is supplied per-invocation via an ECS `RunTask`
+  container override (AC6), so the recovery path and the ordinary path
+  share one task definition and one role, not two.
+- **Roles reused unchanged, zero edits to `modules/iam`:** `pull_log_role_arn`
+  becomes the ECS *execution* role (image pull + log write — its trust
+  policy already lists `ecs-tasks.amazonaws.com` and its log-group ARN
+  pattern is already `/ecs/webmcp-*`), `app_role_arn` becomes the ECS *task*
+  role (same S3 `GetObject`/`PutObject`/`ListBucket` and SSM
+  `GetParameter`/`GetParameters`/KMS `Decrypt`/`DescribeKey` grants the API
+  already has). This is AC8 and AC2 together: same image, same identity,
+  same argument parsing, same failure messages, no separately managed
+  credential — and it means T-0016-6's two hard-won IAM lessons (HeadBucket
+  needs `ListBucket`; secret resolution needs the plural `GetParameters` +
+  `kms:DescribeKey`) are inherited for free rather than rediscovered.
+- **Networking:** the task launches into T-0016-4's two existing public
+  subnets with `assign_public_ip = ENABLED`, behind a task-scoped security
+  group with egress-only `0.0.0.0/0` (S3 and EODHD are both outbound HTTPS)
+  and no ingress rule at all. No NAT gateway, matching the epic's decision.
+- **Scheduling:** `aws_scheduler_schedule` (EventBridge Scheduler, not a
+  legacy CloudWatch Events rule) with `schedule_expression` as a module
+  input, default `cron(30 6 * * ? *)` — Render's `30 6 * * *` translated to
+  EventBridge's 6-field cron (`?` for day-of-week since day-of-month is a
+  literal `*`... concretely: minute=30 hour=6 every day). `flexible_time_window
+  { mode = "OFF" }` keeps the same exact-time semantics Render's cron has.
+  The target is the ECS cluster ARN with `ecs_parameters` naming the task
+  definition, `FARGATE` launch type, and the same subnets/security group.
+  A minimal new IAM role trusted only by `scheduler.amazonaws.com`, scoped
+  to `ecs:RunTask` on this one task-definition family and `iam:PassRole` on
+  exactly the execution/task role ARNs (condition
+  `iam:PassedToService = ecs-tasks.amazonaws.com`), lives *inside this new
+  module* — not appended to `modules/iam` — so the shared IAM module used by
+  the live App Runner service is never touched by this ticket.
+- **Logs:** `/ecs/webmcp-<env>-nightly-delta`, matching the ARN pattern the
+  execution role's policy already authorizes, explicit retention (default
+  30 days, mirroring the App Runner service).
+- **Failure visibility (AC7):** `nightly_delta.py` already `sys.exit()`s
+  with a non-zero code on `PanelStoreError`/`PriceSourceError`, so a failed
+  run shows up as an ECS task with `lastStatus = STOPPED` and a non-zero
+  `exitCode` — visible via `aws ecs describe-tasks`, the ECS console's task
+  history, or the EventBridge Scheduler invocation history, with no log
+  scraping required. The job never partially writes (Technical
+  Considerations: download → append → re-upload the whole object), so a
+  failed run leaves the previous panel object intact either way. Alerting
+  beyond "visible in the platform's own surfaces" is Out of Scope.
+- **AC9 — the cutover hazard, decided explicitly:** the Render cron
+  (`webmcp-panel-nightly-delta`) keeps running unchanged through this
+  ticket; turning it off is T-0016-11's job, gated on the user. To make
+  "exactly one scheduled writer is active at a time" true by construction
+  rather than by coincidence, the EventBridge Scheduler rule this module
+  creates is applied in **`state = "DISABLED"`**. This ticket proves the
+  AWS path end-to-end — ordinary run, catch-up, idempotency, holiday no-op
+  — entirely through on-demand `aws ecs run-task` invocations (steps
+  4–6 below), never by letting the rule fire. The rule is left wired,
+  correctly scheduled, and provably working, but inert. T-0016-10/T-0016-11
+  flips it to `ENABLED` in the same breath that Render's cron is retired,
+  which is the only point at which two enabled schedules would ever be a
+  live hazard.
+
 ## Design References
 
 - `render.yaml` — the cron service being replaced: plan, schedule, start
