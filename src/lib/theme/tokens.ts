@@ -25,9 +25,6 @@ export type SemanticRole =
 	| 'accent'
 	| 'accentHover'
 	| 'focusRing'
-	// Market direction
-	| 'positive'
-	| 'negative'
 	// Status -- synthetic/degraded/error are distinct roles, not aliases,
 	// because the spec requires no two of them ever render the same colour.
 	| 'warning'
@@ -54,9 +51,13 @@ export type SemanticRole =
 export interface ThemeTokens {
 	colors: Record<SemanticRole, string>;
 	space: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', string>;
-	radius: Record<'sm' | 'md' | 'lg', string>;
+	radius: Record<'sm' | 'md', string>;
 	fontSize: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', string>;
 	fontFamily: Record<'ui' | 'mono', string>;
+	// Two tracking treatments, not five hand-tuned values: `label` is the
+	// uppercase micro-label the interface uses everywhere for a section or
+	// control name, `heading` is the much subtler widening on real headings.
+	tracking: Record<'heading' | 'label', string>;
 }
 
 export const theme: ThemeTokens = {
@@ -85,9 +86,6 @@ export const theme: ThemeTokens = {
 		accent: '#4c9df5',
 		accentHover: '#7bb8ff',
 		focusRing: '#5aa9ff',
-
-		positive: '#3fd68b',
-		negative: '#ff6b6b',
 
 		warning: '#e3b341',
 		// Violet, amber and red respectively: three well-separated hues, so no
@@ -123,8 +121,7 @@ export const theme: ThemeTokens = {
 	},
 	radius: {
 		sm: '3px',
-		md: '5px',
-		lg: '8px'
+		md: '5px'
 	},
 	fontSize: {
 		xs: '0.6875rem',
@@ -136,6 +133,10 @@ export const theme: ThemeTokens = {
 	fontFamily: {
 		ui: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
 		mono: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace'
+	},
+	tracking: {
+		heading: '0.01em',
+		label: '0.08em'
 	}
 };
 
@@ -161,6 +162,9 @@ function declarations(t: ThemeTokens): string[] {
 	}
 	for (const [key, value] of Object.entries(t.fontFamily)) {
 		lines.push(`--font-${key}: ${value};`);
+	}
+	for (const [key, value] of Object.entries(t.tracking)) {
+		lines.push(`--tracking-${key}: ${value};`);
 	}
 	return lines;
 }

@@ -37,7 +37,7 @@
 	:global(h1, h2, h3, h4) {
 		color: var(--text-primary);
 		font-weight: 600;
-		letter-spacing: 0.01em;
+		letter-spacing: var(--tracking-heading);
 	}
 
 	:global(a) {

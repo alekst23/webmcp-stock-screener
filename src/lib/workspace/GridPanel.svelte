@@ -148,7 +148,7 @@
 	h3 {
 		margin: 0;
 		font-size: var(--font-size-sm);
-		letter-spacing: 0.08em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		color: var(--text-secondary);
 	}
@@ -165,7 +165,7 @@
 		color: var(--text-secondary);
 		font: inherit;
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.06em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		cursor: pointer;
 		white-space: nowrap;

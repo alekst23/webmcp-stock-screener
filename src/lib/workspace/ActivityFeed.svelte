@@ -52,7 +52,7 @@
 	h2 {
 		margin: 0;
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.1em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		color: var(--text-secondary);
 	}
@@ -64,7 +64,7 @@
 		color: var(--text-secondary);
 		font: inherit;
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.06em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		cursor: pointer;
 		white-space: nowrap;
@@ -122,7 +122,7 @@
 		font-family: var(--font-ui);
 		font-size: var(--font-size-xs);
 		font-weight: 600;
-		letter-spacing: 0.06em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		text-align: center;
 		color: var(--actor-agent);

@@ -128,7 +128,7 @@
 	summary {
 		cursor: pointer;
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.08em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		color: var(--text-secondary);
 		user-select: none;
@@ -148,7 +148,7 @@
 		display: grid;
 		gap: var(--space-xs);
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.08em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		color: var(--text-muted);
 		flex: 1;

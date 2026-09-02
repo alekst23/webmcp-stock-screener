@@ -91,7 +91,7 @@
 	.partial-tag {
 		font-family: var(--font-ui);
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.06em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		color: var(--warning);
 		border: 1px solid var(--warning);
@@ -111,7 +111,7 @@
 		background: none;
 		font: inherit;
 		font-size: var(--font-size-sm);
-		letter-spacing: 0.06em;
+		letter-spacing: var(--tracking-label);
 		color: var(--text-muted);
 		padding: var(--space-xs) var(--space-xs) var(--space-sm);
 		cursor: pointer;

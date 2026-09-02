@@ -249,13 +249,17 @@ describe('restyle-sensitive page invariants', () => {
 	});
 
 	it('test_both_tool_counts_are_still_rendered_in_the_top_bar', () => {
-		const snippets = [...page.matchAll(/\{#snippet\s+(\w+)\(\)\}([\s\S]*?)\{\/snippet\}/g)];
+		const snippets = [...page.matchAll(/\{#snippet\s+(\w+)\(\)\}([\s\S]*?)\{\/snippet\}/g)].map(
+			(match) => ({ region: match[1] ?? '', body: match[2] ?? '' })
+		);
 		expect(snippets.length, 'the page composes nothing through the shell').toBeGreaterThan(0);
-		const topBar = snippets.find((match) => match[2].includes('formatDefinedStatus('));
+		const topBar = snippets.find((snippet) => snippet.body.includes('formatDefinedStatus('));
 		expect(topBar, 'the defined-tool count is not rendered in any shell region').toBeDefined();
-		expect(topBar![2], 'the callable-tool count left the top bar').toContain(
+		expect(topBar!.body, 'the callable-tool count left the top bar').toContain(
 			'formatAvailableStatus('
 		);
-		expect(SHELL, `the shell has no ${topBar![1]} region to render it in`).toContain(topBar![1]);
+		expect(SHELL, `the shell has no ${topBar!.region} region to render it in`).toContain(
+			topBar!.region
+		);
 	});
 });

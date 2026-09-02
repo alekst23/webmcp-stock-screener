@@ -110,7 +110,7 @@
 	}
 	h2 {
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.1em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		color: var(--text-secondary);
 		margin: 0 0 var(--space-sm);

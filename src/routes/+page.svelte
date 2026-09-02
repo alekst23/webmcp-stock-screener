@@ -207,7 +207,7 @@
 	.protocol {
 		font-family: var(--font-mono);
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.12em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		color: var(--text-muted);
 		border: 1px solid var(--border);
@@ -278,7 +278,7 @@
 	.bridge {
 		font-family: var(--font-mono);
 		font-size: var(--font-size-xs);
-		letter-spacing: 0.04em;
+		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
 		color: var(--text-muted);
 		white-space: nowrap;

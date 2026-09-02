@@ -10,18 +10,29 @@ const ROLES = Object.keys(theme.colors) as SemanticRole[];
 const GROUNDS: SemanticRole[] = ['bgApp', 'bgPanel', 'bgElevated', 'bgHover'];
 const BODY_TEXT: SemanticRole[] = ['textPrimary', 'textSecondary', 'textMuted'];
 
+// Roles rendered as body-sized text somewhere in the interface, and so held
+// to the 4.5:1 floor. `warning` is here rather than with the non-text roles
+// because FocusChart renders it as a label at --font-size-xs, which is body
+// text by size whatever else the colour also does.
+const BODY_TEXT_ROLES: SemanticRole[] = [...BODY_TEXT, 'warning', 'accent', 'accentHover'];
+
 // Colours that carry meaning without text: control boundaries, the focus
-// indicator, and the state indicators. `border`, `separator` and `chartGrid`
-// are deliberately absent -- the spec exempts purely decorative rules.
+// indicator, and the state indicators. The three status colours are here
+// because they are drawn as 1px borders as well as text, and the chart
+// anchor and crosshair because they indicate state with no label at all.
+// `border`, `separator` and `chartGrid` are deliberately absent -- the spec
+// exempts purely decorative rules.
 const MEANINGFUL_NON_TEXT: SemanticRole[] = [
 	'borderStrong',
 	'focusRing',
 	'accent',
-	'positive',
-	'negative',
 	'warning',
+	'synthetic',
+	'degraded',
+	'error',
 	'chartLine',
-	'chartAnchor'
+	'chartAnchor',
+	'chartCrosshair'
 ];
 
 const STATUS_PAIRS: [SemanticRole, SemanticRole][] = [
@@ -66,8 +77,6 @@ describe('theme tokens', () => {
 			'accent',
 			'accentHover',
 			'focusRing',
-			'positive',
-			'negative',
 			'warning',
 			'synthetic',
 			'syntheticBg',
@@ -102,14 +111,16 @@ describe('theme tokens', () => {
 
 	it('test_space_radius_and_font_scales_are_populated', () => {
 		expect(Object.keys(theme.space).sort()).toEqual(['lg', 'md', 'sm', 'xl', 'xs']);
-		expect(Object.keys(theme.radius).sort()).toEqual(['lg', 'md', 'sm']);
+		expect(Object.keys(theme.radius).sort()).toEqual(['md', 'sm']);
 		expect(Object.keys(theme.fontSize).sort()).toEqual(['lg', 'md', 'sm', 'xl', 'xs']);
 		expect(Object.keys(theme.fontFamily).sort()).toEqual(['mono', 'ui']);
+		expect(Object.keys(theme.tracking).sort()).toEqual(['heading', 'label']);
 		const scales = {
 			...theme.space,
 			...theme.radius,
 			...theme.fontSize,
-			...theme.fontFamily
+			...theme.fontFamily,
+			...theme.tracking
 		} as Record<string, string>;
 		for (const [key, value] of Object.entries(scales)) {
 			expect(value, `scale entry ${key} is empty`).toBeTruthy();
@@ -118,12 +129,15 @@ describe('theme tokens', () => {
 		// A scale is only a scale if its steps differ.
 		expect(new Set(Object.values(theme.space)).size, 'space steps are not distinct').toBe(5);
 		expect(new Set(Object.values(theme.fontSize)).size, 'font sizes are not distinct').toBe(5);
+		// Two tracking treatments that are actually the same value would be one
+		// treatment spelled twice.
+		expect(new Set(Object.values(theme.tracking)).size, 'tracking steps are not distinct').toBe(2);
 	});
 });
 
 describe('theme contrast compliance', () => {
 	it('test_body_text_roles_meet_aa_on_their_grounds', () => {
-		for (const text of BODY_TEXT) {
+		for (const text of BODY_TEXT_ROLES) {
 			for (const ground of GROUNDS) {
 				const ratio = contrastRatio(theme.colors[text], theme.colors[ground]);
 				expect(
@@ -134,15 +148,13 @@ describe('theme contrast compliance', () => {
 		}
 	});
 
-	it('test_accent_and_market_colours_meet_aa_on_panel', () => {
-		const panel = theme.colors.bgPanel;
-		for (const role of ['accent', 'accentHover', 'positive', 'negative'] as SemanticRole[]) {
-			const ratio = contrastRatio(theme.colors[role], panel);
-			expect(
-				meetsAA(theme.colors[role], panel),
-				`${role} on bgPanel is ${ratio.toFixed(2)}:1`
-			).toBe(true);
-		}
+	it('test_chart_tooltip_text_meets_aa_on_the_tooltip_ground', () => {
+		// The tooltip carries its own ground, so no other pairing covers it.
+		const ratio = contrastRatio(theme.colors.chartTooltipText, theme.colors.chartTooltipBg);
+		expect(
+			meetsAA(theme.colors.chartTooltipText, theme.colors.chartTooltipBg),
+			`chartTooltipText on chartTooltipBg is ${ratio.toFixed(2)}:1`
+		).toBe(true);
 	});
 
 	it('test_meaningful_non_text_roles_meet_3_to_1', () => {
@@ -169,9 +181,9 @@ describe('theme contrast compliance', () => {
 });
 
 // The spec requires these three states never be confusable with each other
-// or with ordinary body text -- the exact guarantee the old light-theme
-// backgrounds (#fdf8e6, #fdf0f0) provided and that a dark ground would
-// otherwise quietly destroy.
+// or with ordinary body text. A dark ground makes that easy to lose: tinted
+// grounds all collapse toward the panel colour, so the separation has to be
+// carried by the foreground and measured rather than eyeballed.
 describe('status states stay distinguishable', () => {
 	it('test_synthetic_degraded_and_error_are_pairwise_distinct', () => {
 		const pairs: [SemanticRole, SemanticRole][] = [
@@ -216,8 +228,9 @@ describe('status states stay distinguishable', () => {
 				meetsAA(theme.colors[fg], theme.colors[bg]),
 				`${fg} on ${bg} is ${ratio.toFixed(2)}:1`
 			).toBe(true);
-			// The state's ground must also read as a distinct patch against the
-			// surface it sits on, or the state is invisible when its text is short.
+			// The status border is drawn in the foreground colour, so this is the
+			// control-boundary check: the patch's edge has to hold up against the
+			// panel it sits on even when the state's text is short.
 			expect(meetsAALarge(theme.colors[fg], theme.colors.bgPanel), `${fg} on bgPanel`).toBe(true);
 		}
 	});
@@ -229,18 +242,14 @@ describe('status states stay distinguishable', () => {
 			DISTINCT_ENOUGH
 		);
 		for (const role of ['actorHuman', 'actorAgent'] as SemanticRole[]) {
-			expect(meetsAA(theme.colors[role], theme.colors.bgElevated), `${role} on bgElevated`).toBe(
-				true
-			);
+			for (const ground of GROUNDS) {
+				const ratio = contrastRatio(theme.colors[role], theme.colors[ground]);
+				expect(
+					meetsAA(theme.colors[role], theme.colors[ground]),
+					`${role} on ${ground} is ${ratio.toFixed(2)}:1`
+				).toBe(true);
+			}
 		}
-	});
-
-	it('test_positive_and_negative_are_distinguishable_from_each_other', () => {
-		const distance = colourDistance(theme.colors.positive, theme.colors.negative);
-		expect(theme.colors.positive).not.toBe(theme.colors.negative);
-		expect(distance, `positive and negative are only ${distance.toFixed(0)} apart`).toBeGreaterThan(
-			DISTINCT_ENOUGH
-		);
 	});
 });
 
@@ -266,6 +275,7 @@ describe('themeCss emission', () => {
 		expect(css).toContain(`--radius-md: ${theme.radius.md};`);
 		expect(css).toContain(`--font-size-sm: ${theme.fontSize.sm};`);
 		expect(css).toContain(`--font-mono: ${theme.fontFamily.mono};`);
+		expect(css).toContain(`--tracking-label: ${theme.tracking.label};`);
 	});
 
 	it('test_css_var_name_is_stable_and_kebab_cased', () => {
@@ -282,5 +292,3 @@ describe('themeCss emission', () => {
 		expect(new Set(names).size, 'two roles share a custom-property name').toBe(names.length);
 	});
 });
-
-export type { SemanticRole };
