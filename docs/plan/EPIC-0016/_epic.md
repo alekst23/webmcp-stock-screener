@@ -1,11 +1,14 @@
 # EPIC-0016: AWS Re-platform
 
+**Status**: 10/13 tickets Done and merged to `main` (2026-09-02). The three
+remaining tickets are production operations rather than code: T-0016-8's
+Terraform apply, T-0016-10's cutover, and the user-gated T-0016-11
+(decommission Render). No further implementation work is outstanding.
 **Depends on**: EPIC-0013 (market data storage) — its vectorized panel I/O,
 partitioned Parquet, and `measure_universe_scale.py` are the code this epic
-deploys and the harness T-0016-9 measures with. Unmerged on
-`epic/EPIC-0013-market-data-storage`; `main`'s `backend/infra/panel_io.py`
-still round-trips every row through `PriceBar`, and `measure_universe_scale.py`
-does not exist there at all.
+deploys and the harness T-0016-9 measures with. **Satisfied**: EPIC-0013 is
+merged to `main`, so `backend/infra/panel_io.py` no longer round-trips every
+row through `PriceBar` and the measurement harness is present.
 **Blocks**: T-0001-9 AC1 (real backfill) and AC5 (live spot-check);
 EPIC-0013's T-0013-6, which needs a deployed instance to measure on
 **Issue**: #16

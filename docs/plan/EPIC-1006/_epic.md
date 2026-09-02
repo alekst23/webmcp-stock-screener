@@ -1,5 +1,10 @@
 # EPIC-1006: Workspace, Revisions & the Common Tool Contract
 
+**Status**: Done and merged to `main` (PR #19, 2026-09-02). All 8 core tickets
+landed; a 5-agent epic review found and fixed 3 critical bugs before merge.
+Follow-ups T-1006-9/10/11 remain Open. The contract modules at
+`src/lib/workbench/domain/` are the authoritative common contract for every
+epic in the program.
 **Depends on**: —
 **Blocks**: EPIC-1007 … EPIC-1014 (every epic in the new tool-surface program)
 **Issue**: —

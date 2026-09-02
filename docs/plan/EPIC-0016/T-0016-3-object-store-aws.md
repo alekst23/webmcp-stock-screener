@@ -1,7 +1,7 @@
 # T-0016-3: Provider-neutral object store on the AWS credential chain
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done -- object store resolves on the AWS credential chain; landed and merged to the epic branch, and to `main` 2026-09-02
 **Depends on**: —
 **Blocks**: T-0016-6, T-0016-7, T-0016-8
 **Issue**: #16

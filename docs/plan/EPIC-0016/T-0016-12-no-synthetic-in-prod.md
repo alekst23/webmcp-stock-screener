@@ -1,7 +1,7 @@
 # T-0016-12: No synthetic data in production
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done -- `REQUIRE_REAL_PANEL` guard plus the `render.yaml` drift fix; merged to `main` 2026-09-02
 **Depends on**: T-0016-3
 **Blocks**: —
 **Issue**: #16

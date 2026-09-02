@@ -1,7 +1,7 @@
 # T-0016-2: Health endpoint independent of the spike stack
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done -- landed and merged to the epic branch, and to `main` 2026-09-02
 **Depends on**: —
 **Blocks**: T-0016-6
 **Issue**: #16

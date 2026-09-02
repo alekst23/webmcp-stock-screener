@@ -1,6 +1,6 @@
 # EPIC-1008: Discovery & Catalog
 
-**Status**: Done (7/8 tickets; T-1008-8 is a non-blocking follow-up filed at epic review)
+**Status**: Done and merged to `main` (PR #18, 2026-09-02). 7/8 tickets; T-1008-8 is a non-blocking follow-up filed at epic review. Its contract modules landed at `src/lib/surface/`; note `src/lib/surface/provenance.ts` forks EPIC-1006's provenance contract and is pending reconciliation
 **Depends on**: —
 **Blocks**: EPIC-1009 (filter tree validates against the catalog registry),
 EPIC-1011 (chart studies resolve through the catalog registry)

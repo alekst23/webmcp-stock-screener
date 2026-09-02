@@ -1,7 +1,7 @@
 # T-0016-5: Runtime secrets in AWS, out of the gitignored `.env`
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done -- EODHD key stored in SSM Parameter Store as a SecureString with least-privilege app-role read; merged to `main` 2026-09-02
 **Depends on**: T-0016-4
 **Blocks**: T-0016-8
 **Issue**: #16

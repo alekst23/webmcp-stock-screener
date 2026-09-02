@@ -1,7 +1,7 @@
 # T-0016-4: Terraform foundation — network, bucket, registry, IAM
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done -- 17 resources applied live against the real account with a clean second plan; merged to `main` 2026-09-02
 **Depends on**: —
 **Blocks**: T-0016-5, T-0016-6, T-0016-7
 **Issue**: #16

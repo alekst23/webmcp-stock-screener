@@ -1,7 +1,7 @@
 # T-0016-8: Nightly delta as a scheduled AWS job
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Implemented, not yet applied -- `terraform/modules/nightly_job/` (EventBridge Scheduler -> ECS Fargate) is written and merged to `main`, but has never been applied to the live account, so no acceptance criterion is verified. AC9 (exactly one scheduled writer across Render and AWS) is coupled to T-0016-10's cutover
 **Depends on**: T-0016-1, T-0016-3, T-0016-5, T-0016-7
 **Blocks**: T-0016-10
 **Issue**: #16
