@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1012 (Similarity Search)
 **Design**: docs/design/similarity-search/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1012-4, T-1012-5, T-1012-7
 **Blocks**: —
 
@@ -88,3 +88,77 @@ of compared, explained matches without leaving the session.
 - `refine_similarity_search` (EPIC-1014).
 - Reference and fundamental market-data sourcing (separate workstream,
   consumed through EPIC-1008's ports).
+
+## Solution Approach
+
+**Finding: the new surface is staged, not live, program-wide.**
+`chart/tools/registerChartTools.ts` (`CHART_TOOLS_ENABLED = false`) and
+`workbench/tools/registerWorkbenchTools.ts` (`WORKBENCH_TOOLS_ENABLED =
+false`) are both no-ops until flipped, and neither is called from
+`src/routes/workbench/+page.svelte` (which registers only the 14
+flag-free panel-container tools). Even EPIC-1011's chart tools, already
+merged, are not live in the running app. This is a deliberate,
+program-wide staging decision predating this epic. AC1/AC2 ("registered
+on the new tool surface", "an end-to-end run succeeds through tool calls
+only") are satisfied the same way every sibling composition root
+satisfies them: a flagged-off `registerSimilarityTools.ts`
+(`SIMILARITY_TOOLS_ENABLED = false`), proven end to end by a **test-level**
+integration (`tools/similarityIntegration.test.ts`) that drives the three
+real tool builders against a stubbed backend -- not by editing
+`+page.svelte` or flipping any other epic's flag, both out of scope here.
+
+**Finding: the panel-kind-registry conflict (consolidated).**
+T-1012-4, T-1012-6, and T-1012-7 each independently hit and flagged the
+same gap: `defaultPanelKinds.ts` (EPIC-1007) unconditionally registers a
+_placeholder_ `similar_opportunities` kind into the live app's one
+`PanelRegistry`, and `PanelRegistry.register()` throws
+`PanelKindConflictError` on a duplicate with no unregister/replace path.
+This ticket's own composition root (`createDefaultSimilarityDeps`) and its
+integration test both build a **fresh** registry carrying only the real
+`similarOpportunitiesPanelKindDefinition`, never combined with
+`registerDefaultPanelKinds()` in the same instance -- consistent with
+every prior ticket, and not fixed here per this ticket's own Technical
+Considerations ("record the mismatch... rather than forking a local
+copy"). **Consolidated recommendation for EPIC-1007 (or whoever performs
+the whole-program staged-rollout flip):** `registerDefaultPanelKinds`
+needs a skip-if-already-registered mode, or `PanelRegistry` needs a
+`replace()`/`unregister()` method, before any epic's real panel kind can
+coexist with the placeholder set in one live registry. Until then, the
+five kinds still without a real owner (`filter_builder`, `study_library`,
+`results_table`, `watchlist`, `alerts`, `symbol_details`) plus `chart`
+and `similar_opportunities` cannot all be registered together in the
+live app's actual runtime registry.
+
+**Files:**
+
+- `tools/registerSimilarityTools.ts` — the composition root: flag,
+  `createDefaultSimilarityDeps()`, `registerSimilarityTools(deps?)`,
+  mirroring `registerChartTools.ts`'s shape. Combines
+  `FindSimilarSetupsDeps` (`PanelUseCaseDeps & { api }`),
+  `ExplainSimilarityDeps` (`{ api }`), and `PanelUseCaseDeps` for
+  `compare_setups` from one shared `SimilarityToolsDeps` object, since all
+  three share the same panel-registry/workspace/api instances in a real
+  session.
+- `tools/similarityIntegration.test.ts` — the end-to-end proof (AC2-AC7),
+  in `webmcp/integration.test.ts`'s style: a stubbed `fetch` implementing
+  T-1012-3's three real routes (verified against `httpSimilarityApi.ts`'s
+  actual wire shapes, not assumed), driving the three real tools in
+  sequence against one shared workspace. A non-uniform weight set
+  (price_shape 0.7, volume 0.3) is used throughout so AC4's score-identity
+  check cannot pass by coincidence on a uniform fixture, per this ticket's
+  own Technical Considerations.
+
+**AC4 interpretation.** "The score a candidate is ranked by in the panel"
+is read as the score carried by the `SimilarityRun` the panel's
+`config.runId` points to (there is no Svelte render harness in this
+project — see T-1012-6's Solution Approach — so no test here renders a
+DOM). The integration test asserts the candidate score returned by
+`find_similar_setups`, reconciled by `explain_similarity`, and the score
+recorded on the created panel's bound run are the same number, sourced
+from one stubbed backend response, never re-derived.
+
+**AC8/AC9 verification.** No T-1012-1..7 file is modified by this ticket
+except where noted below. Full `npm test` and `npm run typecheck` run
+after this ticket's changes; `cd backend && uv run pytest` run once to
+confirm the (untouched) backend suite is unaffected; `npm run build` run
+once to confirm the app still builds.

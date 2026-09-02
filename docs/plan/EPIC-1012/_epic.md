@@ -9,8 +9,8 @@ chart setup), EPIC-1007 (panel container & panel-kind registry)
 
 The new WebMCP surface lets a researcher capture a chart setup they like
 — a symbol, a historical window, its studies, and its normalization
-settings. This epic answers the obvious next question: *where else has
-this happened?* It delivers the Similarity area of
+settings. This epic answers the obvious next question: _where else has
+this happened?_ It delivers the Similarity area of
 `docs/reference/tool-spec.md` — `find_similar_setups` to search other
 symbols and other historical windows for setups resembling a captured
 one, `explain_similarity` to break any match down into feature-by-feature
@@ -41,16 +41,16 @@ score.
 
 ## Ticket Summary
 
-| # | Ticket | Title | Depends On | Status |
-|---|--------|-------|------------|--------|
-| 1 | T-1012-1 | Similarity feature and scoring contract | — | Open |
-| 2 | T-1012-2 | Similarity search engine over the price panel | T-1012-1 | Open |
-| 3 | T-1012-3 | Similarity search and explanation API | T-1012-2 | Open |
-| 4 | T-1012-4 | `find_similar_setups` tool | T-1012-3 | Open |
-| 5 | T-1012-5 | `explain_similarity` tool | T-1012-3 | Open |
-| 6 | T-1012-6 | `similar_opportunities` panel kind | T-1012-1 | Open |
-| 7 | T-1012-7 | `compare_setups` tool and comparison views | T-1012-6 | Open |
-| 8 | T-1012-8 | Similarity surface wiring and provenance integration | T-1012-4, T-1012-5, T-1012-7 | Open |
+| #   | Ticket   | Title                                                | Depends On                   | Status |
+| --- | -------- | ---------------------------------------------------- | ---------------------------- | ------ |
+| 1   | T-1012-1 | Similarity feature and scoring contract              | —                            | Done   |
+| 2   | T-1012-2 | Similarity search engine over the price panel        | T-1012-1                     | Done   |
+| 3   | T-1012-3 | Similarity search and explanation API                | T-1012-2                     | Done   |
+| 4   | T-1012-4 | `find_similar_setups` tool                           | T-1012-3                     | Done   |
+| 5   | T-1012-5 | `explain_similarity` tool                            | T-1012-3                     | Done   |
+| 6   | T-1012-6 | `similar_opportunities` panel kind                   | T-1012-1                     | Done   |
+| 7   | T-1012-7 | `compare_setups` tool and comparison views           | T-1012-6                     | Done   |
+| 8   | T-1012-8 | Similarity surface wiring and provenance integration | T-1012-4, T-1012-5, T-1012-7 | Done   |
 
 ## Dependency Graph
 
@@ -132,23 +132,23 @@ assumption the tickets are written against; revisit if the program
 decides otherwise.
 
 1. **Search scope shape.** The spec says "symbols or historical windows"
-   without saying whether that is one tool or two modes. *Assumption*: one
+   without saying whether that is one tool or two modes. _Assumption_: one
    tool with an explicit scope discriminator (cross-symbol, historical
    windows of the same symbol, or both), so the caller states intent
    rather than the system guessing.
 2. **Candidate universe bounds.** The spec does not state a default
-   universe or result cap. *Assumption*: when the workspace has a screener
+   universe or result cap. _Assumption_: when the workspace has a screener
    bound, its universe scopes the search; otherwise a bounded default
    universe applies. Results are capped and paged from the pinned run.
-3. **Default feature weights.** Not specified. *Assumption*: equal weight
+3. **Default feature weights.** Not specified. _Assumption_: equal weight
    across the six named families, always echoed in the response so the
    default is visible rather than hidden.
-4. **Similarity metric.** Not specified. *Assumption*: each family yields a
+4. **Similarity metric.** Not specified. _Assumption_: each family yields a
    normalized per-family similarity, and the overall score is their
    weighted combination — chosen specifically so contributions reconcile
    to the total and AC3 is checkable.
 5. **Where `compare_setups` renders.** The spec does not say whether it
-   creates a panel or reconfigures one. *Assumption*: it targets an
+   creates a panel or reconfigures one. _Assumption_: it targets an
    explicit panel ID, defaulting to the `similar_opportunities` panel bound
    to the search run.
 
