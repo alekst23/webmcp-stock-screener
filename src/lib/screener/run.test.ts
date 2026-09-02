@@ -4,10 +4,12 @@ import {
 	makeProvenance,
 	type MarketDataProvenance
 } from '../workbench/domain/provenance';
+import { emptyFilterTree } from './definition';
 import {
 	makeScreenerRun,
 	toWireScreenerMatch,
 	toWireScreenerRun,
+	type RejectedCandidate,
 	type ScreenerMatch,
 	type ScreenerRun,
 	type ScreenerRunOutcome,
@@ -39,7 +41,17 @@ function match(instrumentId: string, rank: number): ScreenerMatch {
 	};
 }
 
-function validRunInput(matches: ScreenerMatch[]): ScreenerRun {
+function rejectedCandidate(instrumentId: string): RejectedCandidate {
+	return {
+		instrumentId,
+		nodeEvaluations: { filter_2: { nodeId: 'filter_2', passed: false, value: 40, unit: 'usd' } }
+	};
+}
+
+function validRunInput(
+	matches: ScreenerMatch[],
+	rejectedEvaluations: Record<string, RejectedCandidate> = {}
+): ScreenerRun {
 	return {
 		runId: 'run_1',
 		screenerId: 'screener_1',
@@ -54,6 +66,9 @@ function validRunInput(matches: ScreenerMatch[]): ScreenerRun {
 		warnings: [],
 		provenance: provenance(),
 		matches,
+		rejectedEvaluations,
+		filterTree: emptyFilterTree('filter_root'),
+		rankingSpec: null,
 		createdAt: '2026-09-02T14:30:05.000Z'
 	};
 }
@@ -136,6 +151,27 @@ describe('makeScreenerRun', () => {
 			'a null provenance must be rejected, not treated as an optional field'
 		).toThrow(/provenance/);
 	});
+
+	it('test_makeScreenerRun_accepts_rejectedEvaluations_disjoint_from_matches', () => {
+		const input = validRunInput([match('inst:XNAS:AAPL', 1)], {
+			'inst:XNAS:MSFT': rejectedCandidate('inst:XNAS:MSFT')
+		});
+		const run = makeScreenerRun(input);
+		expect(
+			run.rejectedEvaluations['inst:XNAS:MSFT'],
+			'a rejected candidate disjoint from matches must be preserved'
+		).toBeDefined();
+	});
+
+	it('test_makeScreenerRun_throws_when_an_instrument_is_in_both_matches_and_rejectedEvaluations', () => {
+		const input = validRunInput([match('inst:XNAS:AAPL', 1)], {
+			'inst:XNAS:AAPL': rejectedCandidate('inst:XNAS:AAPL')
+		});
+		expect(
+			() => makeScreenerRun(input),
+			'an instrument cannot be both a match and a rejected evaluation'
+		).toThrow(/cannot appear in both matches and rejectedEvaluations/);
+	});
 });
 
 describe('toWireScreenerRun / toWireScreenerMatch', () => {
@@ -169,6 +205,38 @@ describe('toWireScreenerRun / toWireScreenerMatch', () => {
 			'node_evaluations must be keyed by node_id with node_id preserved inside'
 		).toBe('filter_2');
 		expect(evaluation?.passed, 'the node evaluation pass/fail must survive').toBe(true);
+	});
+
+	it('test_toWireScreenerMatch_emits_dataUnavailable_as_data_unavailable_when_true', () => {
+		const wire = toWireScreenerMatch({
+			...match('inst:XNAS:AAPL', 1),
+			nodeEvaluations: {
+				filter_2: { nodeId: 'filter_2', passed: false, value: null, dataUnavailable: true }
+			}
+		});
+		const nodeEvaluations = wire.node_evaluations as Record<string, Record<string, unknown>>;
+		expect(
+			nodeEvaluations.filter_2?.data_unavailable,
+			'a dataUnavailable evaluation must serialize as data_unavailable: true'
+		).toBe(true);
+	});
+
+	it('test_toWireScreenerRun_emits_rejected_evaluations_keyed_by_instrument_id', () => {
+		const run = makeScreenerRun(
+			validRunInput([match('inst:XNAS:AAPL', 1)], {
+				'inst:XNAS:MSFT': rejectedCandidate('inst:XNAS:MSFT')
+			})
+		);
+		const wire = toWireScreenerRun(run);
+		const rejected = wire.rejected_evaluations as Record<string, Record<string, unknown>>;
+		expect(
+			rejected['inst:XNAS:MSFT'],
+			'rejected_evaluations must be keyed by instrument id'
+		).toBeDefined();
+		expect(
+			rejected['inst:XNAS:MSFT']?.instrument_id,
+			'a rejected candidate must carry its own instrument_id'
+		).toBe('inst:XNAS:MSFT');
 	});
 
 	it('test_toWireScreenerRun_matches_array_is_ordered_by_rank', () => {

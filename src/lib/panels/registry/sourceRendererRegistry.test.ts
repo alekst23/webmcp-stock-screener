@@ -128,6 +128,79 @@ describe('registerSourceType / registerRendererType: conflicts', () => {
 	});
 });
 
+// Three sibling epics (results, chart, similarity) each register a real
+// renderer/source type into the same registry a default-seeding call also
+// touches, with no rule about which of the two runs first at any given
+// composition root -- so "the real one wins" must hold regardless of call
+// order (mirrored for the panel-kind registry in panelKindRegistry.test.ts).
+describe('registerSourceType / registerRendererType: placeholder/real precedence is order-independent', () => {
+	it('lets a real renderer registration overwrite a placeholder registered before it', () => {
+		const registry = createSourceRendererRegistry();
+		registry.registerRendererType(makeMinimalRenderer('table', ['watchlist']), {
+			placeholder: true
+		});
+
+		expect(
+			() => registry.registerRendererType(makeMinimalRenderer('table', ['screener_results'])),
+			'a real registration must overwrite an existing placeholder, not conflict with it'
+		).not.toThrow();
+
+		expect(
+			registry.getRendererType('table')?.acceptedSourceTypes,
+			'expected the real definition to be stored'
+		).toEqual(['screener_results']);
+	});
+
+	it('skips a later placeholder renderer registration once a real one is already present', () => {
+		const registry = createSourceRendererRegistry();
+		registry.registerRendererType(makeMinimalRenderer('table', ['screener_results']));
+
+		expect(
+			() =>
+				registry.registerRendererType(makeMinimalRenderer('table', ['watchlist']), {
+					placeholder: true
+				}),
+			'a placeholder registration must never conflict with an existing real one'
+		).not.toThrow();
+
+		expect(
+			registry.getRendererType('table')?.acceptedSourceTypes,
+			'the real definition must survive a later placeholder registration attempt'
+		).toEqual(['screener_results']);
+	});
+
+	it('still rejects two real renderer registrations, regardless of an intervening placeholder', () => {
+		const registry = createSourceRendererRegistry();
+		registry.registerRendererType(makeMinimalRenderer('table', []), { placeholder: true });
+		registry.registerRendererType(makeMinimalRenderer('table', ['screener_results']));
+
+		expect(
+			() => registry.registerRendererType(makeMinimalRenderer('table', ['watchlist'])),
+			'a second real registration is a genuine duplicate and must still conflict'
+		).toThrow(RendererTypeConflictError);
+	});
+
+	it('lets a real source registration overwrite a placeholder registered before it', () => {
+		const registry = createSourceRendererRegistry();
+		registry.registerSourceType(makeMinimalSource('screener_results', true), {
+			placeholder: true
+		});
+
+		expect(
+			() => registry.registerSourceType(makeMinimalSource('screener_results', false)),
+			'a real registration must overwrite an existing placeholder, not conflict with it'
+		).not.toThrow();
+
+		expect(
+			registry.getSourceType('screener_results')?.isCompatible({
+				panelKind: 'results_table',
+				renderer: null
+			}),
+			'expected the real definition to be stored'
+		).toBe(false);
+	});
+});
+
 describe('requireSourceType / requireRendererType: unknown name lookup', () => {
 	it('requireSourceType throws UnknownSourceTypeError listing every registered source type', () => {
 		const registry = createSourceRendererRegistry();

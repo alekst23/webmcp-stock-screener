@@ -158,4 +158,69 @@ describe('registerDefaultPanelKinds', () => {
 			).toBe(true);
 		}
 	});
+
+	// T-1010-7: a sibling epic's real definition, registered into the same
+	// registry first, is what makes "each owning epic replaces its kind's
+	// definition by re-registering it, no edit to this file required" (this
+	// file's own header comment) actually true, rather than a promise the
+	// unconditional `register` call would immediately break with a
+	// PanelKindConflictError.
+	it('skips a kind that was already registered, rather than throwing a conflict', () => {
+		const registry = createPanelRegistry();
+		registry.register({
+			kind: 'results_table',
+			defaultTitle: 'Real Results',
+			defaultSize: { colSpan: 1, rowSpan: 1 },
+			minSize: { colSpan: 1, rowSpan: 1 },
+			defaultConfig: () => ({}),
+			validateConfig: () => ({ ok: true, value: {} }),
+			configSchema: { type: 'object', properties: {} },
+			linkChannels: [],
+			bindingTypes: [],
+			defaultRenderer: null,
+			component: async () => () => null
+		});
+
+		expect(() => registerDefaultPanelKinds(registry)).not.toThrow();
+
+		expect(
+			registry.require('results_table').defaultTitle,
+			'the already-registered real definition must survive, not be overwritten by the placeholder'
+		).toBe('Real Results');
+		// Every other placeholder kind still registers normally.
+		expect(registry.names().sort()).toEqual([...EXPECTED_KINDS].sort());
+	});
+
+	// The reverse call order from the test above: a composition root is free
+	// to seed the defaults before a sibling epic's real registration runs
+	// (there is no rule requiring "real first"), so the real kind must still
+	// end up as the one that resolves, not permanently stuck with the
+	// placeholder this function itself just added.
+	it("lets a sibling epic's real registration overwrite a placeholder registered before it", () => {
+		const registry = createPanelRegistry();
+		registerDefaultPanelKinds(registry);
+		expect(
+			registry.require('results_table').defaultTitle,
+			'sanity check: the placeholder should be in place before the real registration'
+		).toBe('Results');
+
+		registry.register({
+			kind: 'results_table',
+			defaultTitle: 'Real Results',
+			defaultSize: { colSpan: 1, rowSpan: 1 },
+			minSize: { colSpan: 1, rowSpan: 1 },
+			defaultConfig: () => ({}),
+			validateConfig: () => ({ ok: true, value: {} }),
+			configSchema: { type: 'object', properties: {} },
+			linkChannels: [],
+			bindingTypes: [],
+			defaultRenderer: null,
+			component: async () => () => null
+		});
+
+		expect(
+			registry.require('results_table').defaultTitle,
+			'the real definition must win even though the placeholder was registered first'
+		).toBe('Real Results');
+	});
 });

@@ -20,13 +20,25 @@ export interface ConfigurePanelViewRequest {
 	config?: Record<string, unknown>;
 }
 
+interface ResolvedConfig {
+	config: Record<string, unknown>;
+	// The recognized-fields base the candidate was merged onto, i.e. what the
+	// active renderer's own contract already recognized of the panel's prior
+	// config -- passed to describeConfigChange as `previous` (AC2).
+	previous: Record<string, unknown>;
+	// Non-blocking issues the renderer's validator surfaced alongside an
+	// otherwise-accepted config (AC4), e.g. a sort key that isn't a visible
+	// column. Empty when the renderer's validator didn't report any.
+	warnings: string[];
+}
+
 function resolveConfig(
 	deps: PanelUseCaseDeps,
 	panel: { renderer: string | null; config: Record<string, unknown>; title: string },
 	requested: Record<string, unknown> | undefined
-): Record<string, unknown> {
+): ResolvedConfig {
 	if (requested === undefined) {
-		return panel.config;
+		return { config: panel.config, previous: panel.config, warnings: [] };
 	}
 	if (panel.renderer === null) {
 		throw new PanelOperationError(
@@ -46,15 +58,43 @@ function resolveConfig(
 			}
 		);
 	}
-	return validation.value;
+	return {
+		config: validation.value,
+		previous: base,
+		warnings: (validation.warnings ?? []).map((w) => w.reason)
+	};
 }
 
-function describeChanges(request: ConfigurePanelViewRequest): string[] {
+// AC2: a renderer that contributes describeConfigChange gets a plain-language
+// diff instead of the generic fallback every renderer had before this hook
+// existed.
+function describeConfigDiff(
+	deps: PanelUseCaseDeps,
+	renderer: string | null,
+	previous: Record<string, unknown>,
+	next: Record<string, unknown>
+): string {
+	const rendererType =
+		renderer !== null ? deps.sourceRenderer.getRendererType(renderer) : undefined;
+	if (rendererType?.describeConfigChange) {
+		return rendererType.describeConfigChange({ previous, next });
+	}
+	return 'view configuration updated';
+}
+
+function describeChanges(
+	deps: PanelUseCaseDeps,
+	panel: { renderer: string | null },
+	request: ConfigurePanelViewRequest,
+	resolved: ResolvedConfig
+): string[] {
 	const parts: string[] = [];
 	if (request.title !== undefined) parts.push(`retitled to "${request.title}"`);
 	if (request.hidden !== undefined) parts.push(request.hidden ? 'hidden' : 'shown');
 	if (request.collapsed !== undefined) parts.push(request.collapsed ? 'collapsed' : 'expanded');
-	if (request.config !== undefined) parts.push('view configuration updated');
+	if (request.config !== undefined) {
+		parts.push(describeConfigDiff(deps, panel.renderer, resolved.previous, resolved.config));
+	}
 	return parts;
 }
 
@@ -69,22 +109,23 @@ export function configurePanelView(
 		request,
 		(_doc, state) => {
 			const panel = findPanel(state, request.panelId);
-			const config = resolveConfig(deps, panel, request.config);
+			const resolved = resolveConfig(deps, panel, request.config);
 
 			const updated = {
 				...panel,
 				title: request.title ?? panel.title,
 				hidden: request.hidden ?? panel.hidden,
 				collapsed: request.collapsed ?? panel.collapsed,
-				config
+				config: resolved.config
 			};
-			const changes = describeChanges(request);
+			const changes = describeChanges(deps, panel, request, resolved);
 			const summary = changes.length > 0 ? changes.join(', ') : 'no changes requested';
 
 			return {
 				nextState: { ...state, panels: state.panels.map((p) => (p.id === panel.id ? updated : p)) },
 				affectedIds: [panel.id],
-				diffSummary: `Panel "${panel.title}": ${summary}.`
+				diffSummary: `Panel "${panel.title}": ${summary}.`,
+				warnings: resolved.warnings.length > 0 ? resolved.warnings : undefined
 			};
 		}
 	);

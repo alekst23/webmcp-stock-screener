@@ -194,6 +194,65 @@ describe('createScreenerEngine execute end-to-end', () => {
 		).toBe(true);
 	});
 
+	it('test_execute_nonReturnedUniverseInstruments_areCapturedInRejectedEvaluations', async () => {
+		const engine = makeEngine();
+		const outcome = await engine.execute({
+			definition: buildDefinition(descendingCloseRanking),
+			runId: 'run_rejected'
+		});
+		if (outcome.status !== 'complete') throw new Error('Expected a complete run');
+		// Universe I1..I6; I1,I3,I6 pass the filter tree (matchedCount 3), the
+		// ranking limit of 2 returns only I1,I6 -- so I2,I4,I5 (never passed)
+		// and I3 (passed but truncated by the ranking limit) must all be
+		// explainable via rejectedEvaluations (T-1010-5's engine.ts extension).
+		expect(
+			Object.keys(outcome.rejectedEvaluations).sort(),
+			'Expected every non-returned universe instrument in rejectedEvaluations'
+		).toEqual(['I2', 'I3', 'I4', 'I5']);
+		expect(
+			outcome.rejectedEvaluations.I4?.nodeEvaluations.filter_l1?.passed,
+			'A genuinely-failed instrument must carry its real per-node verdicts (I4 close 40 <= 50)'
+		).toBe(false);
+		expect(
+			outcome.rejectedEvaluations.I4?.rankingValues,
+			'A genuinely-failed instrument was never ranked, so it has no rankingValues'
+		).toBeUndefined();
+		expect(
+			outcome.rejectedEvaluations.I3?.rankingValues,
+			'A matched-but-truncated instrument must carry its rankingValues for peer normalization'
+		).toEqual({ 'field.price.close': 60 });
+	});
+
+	it('test_execute_unavailableField_marksTheLeafEvaluationDataUnavailable', async () => {
+		const engine = makeEngine();
+		const outcome = await engine.execute({
+			definition: buildDefinition(null),
+			runId: 'run_unavail'
+		});
+		if (outcome.status !== 'complete') throw new Error('Expected a complete run');
+		// I5's close price is null (fixture), so filter_l1 (close > 50) must be
+		// reported indeterminate, not a plain fail, for explain_result's AC6.
+		const i5 = outcome.rejectedEvaluations.I5;
+		expect(i5, 'I5 must be present among the rejected/unreturned instruments').toBeDefined();
+		expect(
+			i5?.nodeEvaluations.filter_l1?.dataUnavailable,
+			'filter_l1 must be marked dataUnavailable for I5, distinct from a genuine fail'
+		).toBe(true);
+	});
+
+	it('test_execute_pinsTheFilterTreeAndRankingSpecOntoTheRun', async () => {
+		const engine = makeEngine();
+		const definition = buildDefinition(descendingCloseRanking);
+		const outcome = await engine.execute({ definition, runId: 'run_pin' });
+		if (outcome.status !== 'complete') throw new Error('Expected a complete run');
+		expect(outcome.filterTree, 'The run must pin the exact filter tree it evaluated').toEqual(
+			definition.filterTree
+		);
+		expect(outcome.rankingSpec, 'The run must pin the exact ranking spec it evaluated').toEqual(
+			descendingCloseRanking
+		);
+	});
+
 	it('test_execute_fieldUnavailableForOneInstrument_producesWarningNamingTheNode', async () => {
 		const engine = makeEngine();
 		const outcome = await engine.execute({ definition: buildDefinition(null), runId: 'run_3' });

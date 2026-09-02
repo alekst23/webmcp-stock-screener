@@ -10,6 +10,7 @@
 import type { ResourceId } from '../workbench/domain/ids';
 import { toWireProvenance, type MarketDataProvenance } from '../workbench/domain/provenance';
 import type { Revision } from '../workbench/domain/workspace';
+import type { FilterNode, RankingSpec } from './definition';
 import type { ValidationProblem } from './validation';
 
 // The record EPIC-1010's `explain_result` reads so explaining a match is a
@@ -26,6 +27,37 @@ export interface FilterNodeEvaluation {
 	value: number | string | boolean | null;
 	unit?: string;
 	detail?: string;
+	// True when at least one field/series/pattern/study this leaf condition
+	// reads was unavailable for this instrument -- distinct from a genuine,
+	// available fail that also has no scalar `value` to report (e.g. "pattern
+	// not detected"). Optional (defaults to "not unavailable" when absent,
+	// matching `unit`/`detail`'s convention) so a hand-built record that
+	// predates this field still type-checks. Never set true on a group node
+	// (engine/tree.ts's walk() only computes this per leaf); explain_result
+	// (EPIC-1010) is what turns this into a genuine indeterminate outcome
+	// instead of collapsing it into a fail.
+	dataUnavailable?: boolean;
+}
+
+// One universe instrument the run evaluated but did not return among
+// `ScreenerMatch[]` -- either it failed the filter tree outright, or it
+// passed but was truncated by the ranking limit before being returned.
+// Both cases need `nodeEvaluations` to be explainable (EPIC-1010's
+// `explain_result`, AC4: a rejected candidate's failing conditions must be
+// identifiable from the pinned run, never by re-evaluating live data).
+export interface RejectedCandidate {
+	instrumentId: string;
+	nodeEvaluations: Record<ResourceId, FilterNodeEvaluation>;
+	// Present only when this instrument passed the filter tree and entered
+	// ranking (i.e. it was truncated by the result limit, not by the filter
+	// tree) -- absent for a genuinely-failed instrument, which was never
+	// ranked. `engine/ranking.ts` normalizes every ranking field against the
+	// *whole* matched set, not just the returned slice, so a returned
+	// instrument's own ranking explanation cannot be honestly recomputed
+	// without this: `ScreenerMatch.rankingValues` alone only covers the
+	// returned top-N, which can be a strict subset of what was actually
+	// normalized against.
+	rankingValues?: Record<string, number | null>;
 }
 
 // A non-blocking finding surfaced alongside a completed run rather than a
@@ -91,6 +123,27 @@ export interface ScreenerRun {
 	// EPIC-1010 pages this after the fact; run.ts stores the complete list
 	// so paging never re-executes (spec.md "Retrievable without rerun").
 	matches: ScreenerMatch[];
+	// Every universe instrument the run evaluated but did not return, keyed
+	// by instrumentId -- see RejectedCandidate for why this covers both a
+	// genuine filter-tree failure and a matched-but-truncated instrument.
+	// Mutually exclusive with `matches` by construction (makeScreenerRun
+	// enforces this): explain_result (EPIC-1010) tells "evaluated but
+	// rejected" (AC4) apart from "outside the universe, never evaluated"
+	// (AC5) by checking membership in `matches` union this map versus
+	// neither.
+	rejectedEvaluations: Record<string, RejectedCandidate>;
+	// The exact filter tree and ranking configuration this run evaluated,
+	// pinned alongside the outcome data. Neither is recoverable from
+	// FilterNodeEvaluation alone (that carries a node's outcome, not its
+	// operator/threshold or its place in the AND/OR/NOT structure), and the
+	// *current* screener definition is not a safe substitute -- it can have
+	// moved past this run's pinned revision, and even a still-retained past
+	// revision lives under the workspace's own, separate revision-retention
+	// policy rather than this run's RunRetentionPolicy. A pinned run must be
+	// self-contained: explain_result (EPIC-1010) reads these directly off
+	// this object, never through a second store.
+	filterTree: FilterNode;
+	rankingSpec: RankingSpec | null;
 	// ISO-8601 instant the run was minted.
 	createdAt: string;
 }
@@ -168,6 +221,14 @@ export function makeScreenerRun(input: ScreenerRun): ScreenerRun {
 			);
 		}
 	});
+	const matchedIds = new Set(input.matches.map((match) => match.instrumentId));
+	const overlap = Object.keys(input.rejectedEvaluations).filter((id) => matchedIds.has(id));
+	if (overlap.length > 0) {
+		throw new Error(
+			`makeScreenerRun: instrument(s) ${overlap.join(', ')} cannot appear in both matches and ` +
+				`rejectedEvaluations -- a match and a rejection are mutually exclusive.`
+		);
+	}
 	return { ...input, status: 'complete' };
 }
 
@@ -184,7 +245,26 @@ function toWireFilterNodeEvaluation(evaluation: FilterNodeEvaluation): Record<st
 		passed: evaluation.passed,
 		value: evaluation.value,
 		unit: evaluation.unit,
-		detail: evaluation.detail
+		detail: evaluation.detail,
+		data_unavailable: evaluation.dataUnavailable
+	});
+}
+
+function toWireNodeEvaluations(
+	nodeEvaluations: Record<string, FilterNodeEvaluation>
+): Record<string, unknown> {
+	const wire: Record<string, unknown> = {};
+	for (const [nodeId, evaluation] of Object.entries(nodeEvaluations)) {
+		wire[nodeId] = toWireFilterNodeEvaluation(evaluation);
+	}
+	return wire;
+}
+
+function toWireRejectedCandidate(candidate: RejectedCandidate): Record<string, unknown> {
+	return withoutUndefined({
+		instrument_id: candidate.instrumentId,
+		node_evaluations: toWireNodeEvaluations(candidate.nodeEvaluations),
+		ranking_values: candidate.rankingValues
 	});
 }
 
@@ -201,23 +281,28 @@ function toWireWarning(warning: ScreenerWarning): Record<string, unknown> {
 // serialize one page of matches at a time, never a whole run's match list
 // in one payload.
 export function toWireScreenerMatch(match: ScreenerMatch): Record<string, unknown> {
-	const nodeEvaluations: Record<string, unknown> = {};
-	for (const [nodeId, evaluation] of Object.entries(match.nodeEvaluations)) {
-		nodeEvaluations[nodeId] = toWireFilterNodeEvaluation(evaluation);
-	}
 	return {
 		instrument_id: match.instrumentId,
 		rank: match.rank,
 		composite_score: match.compositeScore,
 		ranking_values: match.rankingValues,
-		node_evaluations: nodeEvaluations
+		node_evaluations: toWireNodeEvaluations(match.nodeEvaluations)
 	};
 }
 
 // The single snake_case serializer for a whole run, delegating to
 // toWireProvenance so this module never re-implements provenance's wire
-// shape.
+// shape. Deliberately excludes `filterTree`/`rankingSpec`: run_screener's
+// caller already supplied that exact ScreenerDefinition as input, so
+// echoing the whole filter tree back on every run_screener response would
+// duplicate data the caller already has, for no consumer's benefit -- those
+// two fields exist on ScreenerRun purely for explain_result (EPIC-1010) to
+// read off the in-memory object.
 export function toWireScreenerRun(run: ScreenerRun): Record<string, unknown> {
+	const rejectedEvaluations: Record<string, unknown> = {};
+	for (const [instrumentId, candidate] of Object.entries(run.rejectedEvaluations)) {
+		rejectedEvaluations[instrumentId] = toWireRejectedCandidate(candidate);
+	}
 	return {
 		run_id: run.runId,
 		screener_id: run.screenerId,
@@ -232,6 +317,7 @@ export function toWireScreenerRun(run: ScreenerRun): Record<string, unknown> {
 		warnings: run.warnings.map(toWireWarning),
 		provenance: toWireProvenance(run.provenance),
 		matches: run.matches.map(toWireScreenerMatch),
+		rejected_evaluations: rejectedEvaluations,
 		created_at: run.createdAt
 	};
 }

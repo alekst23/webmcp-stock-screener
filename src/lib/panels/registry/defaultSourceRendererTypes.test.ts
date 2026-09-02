@@ -137,4 +137,85 @@ describe('registerDefaultSourceRendererTypes', () => {
 			).toBe(true);
 		}
 	});
+
+	// T-1010-7: a sibling epic's real renderer/source contract, registered
+	// first into the same registry, must not be clobbered or rejected as a
+	// duplicate -- this is what lets a composition root register the real
+	// 'table'/'screener_results' contract and then still call this function
+	// for the remaining three placeholder pairs.
+	it('skips a renderer type that was already registered, rather than throwing a conflict', () => {
+		const registry = createSourceRendererRegistry();
+		registry.registerRendererType({
+			name: 'table',
+			configSchema: { type: 'object', properties: {} },
+			validateConfig: () => ({ ok: true, value: {} }),
+			defaultConfig: () => ({}),
+			acceptedSourceTypes: ['screener_results']
+		});
+
+		expect(() => registerDefaultSourceRendererTypes(registry)).not.toThrow();
+
+		expect(
+			registry.requireRendererType('table').acceptedSourceTypes,
+			'the already-registered real renderer type must survive, not be overwritten'
+		).toEqual(['screener_results']);
+		expect(registry.rendererTypeNames().sort()).toEqual([...EXPECTED_RENDERER_TYPES].sort());
+	});
+
+	it('skips a source type that was already registered, rather than throwing a conflict', () => {
+		const registry = createSourceRendererRegistry();
+		registry.registerSourceType({
+			name: 'screener_results',
+			refSchema: { type: 'object', properties: {} },
+			validateRef: () => ({ ok: true, value: {} }),
+			isCompatible: () => true,
+			compatibilityDescription: 'real contract stand-in'
+		});
+
+		expect(() => registerDefaultSourceRendererTypes(registry)).not.toThrow();
+
+		expect(
+			registry.getSourceType('screener_results')?.compatibilityDescription,
+			'the already-registered real source type must survive, not be overwritten'
+		).toBe('real contract stand-in');
+		expect(registry.sourceTypeNames().sort()).toEqual([...EXPECTED_SOURCE_TYPES].sort());
+	});
+
+	// The reverse call order from the two tests above: a composition root is
+	// free to seed the defaults before a sibling epic's real registration
+	// runs, so the real contract must still end up as the one that resolves,
+	// not permanently stuck with the placeholder this function itself just
+	// added.
+	it("lets a sibling epic's real renderer/source registration overwrite a placeholder registered before it", () => {
+		const registry = createSourceRendererRegistry();
+		registerDefaultSourceRendererTypes(registry);
+		expect(
+			registry.requireRendererType('table').acceptedSourceTypes,
+			'sanity check: the placeholder renderer should be in place first'
+		).not.toEqual(['screener_results_real']);
+
+		registry.registerRendererType({
+			name: 'table',
+			configSchema: { type: 'object', properties: {} },
+			validateConfig: () => ({ ok: true, value: {} }),
+			defaultConfig: () => ({}),
+			acceptedSourceTypes: ['screener_results_real']
+		});
+		registry.registerSourceType({
+			name: 'screener_results',
+			refSchema: { type: 'object', properties: {} },
+			validateRef: () => ({ ok: true, value: {} }),
+			isCompatible: () => true,
+			compatibilityDescription: 'real contract stand-in'
+		});
+
+		expect(
+			registry.requireRendererType('table').acceptedSourceTypes,
+			'the real renderer definition must win even though the placeholder was registered first'
+		).toEqual(['screener_results_real']);
+		expect(
+			registry.getSourceType('screener_results')?.compatibilityDescription,
+			'the real source definition must win even though the placeholder was registered first'
+		).toBe('real contract stand-in');
+	});
 });

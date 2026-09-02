@@ -217,11 +217,19 @@ function buildRendererTypes(): RendererTypeDefinition[] {
 	];
 }
 
+// Registers every renderer/source type as a placeholder (the registry's own
+// `{ placeholder: true }` option), the same way registerDefaultPanelKinds
+// does (see its own comment for the full truth table): a sibling epic's
+// real contract ends up registered either way, whether it ran before or
+// after this function -- a placeholder never conflicts with, and steps
+// aside for, a real registration on either side of it in call order.
+// Starting from an empty registry (every call site before T-1010-7) is
+// unaffected.
 export function registerDefaultSourceRendererTypes(registry: SourceRendererRegistry): void {
 	for (const rendererType of buildRendererTypes()) {
-		registry.registerRendererType(rendererType);
+		registry.registerRendererType(rendererType, { placeholder: true });
 	}
 	for (const sourceType of buildSourceTypes(registry)) {
-		registry.registerSourceType(sourceType);
+		registry.registerSourceType(sourceType, { placeholder: true });
 	}
 }

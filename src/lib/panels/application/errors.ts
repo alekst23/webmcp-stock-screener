@@ -12,6 +12,7 @@ export type PanelOperationErrorCode =
 	| 'unknown_layout_template'
 	| 'unknown_renderer_type'
 	| 'invalid_config'
+	| 'invalid_selection'
 	| 'invalid_source'
 	| 'incompatible_renderer'
 	| 'wrong_renderer'

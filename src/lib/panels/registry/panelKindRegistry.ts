@@ -11,7 +11,15 @@ export interface ConfigError {
 	reason: string;
 }
 
-export type ConfigValidation<T> = { ok: true; value: T } | { ok: false; errors: ConfigError[] };
+// `warnings` is optional and only ever present on the `ok` arm (T-1010-6,
+// AC4): a config can be valid and still carry non-blocking issues -- e.g. a
+// results-table sort key that isn't a visible column. Adding it here (rather
+// than a results-only type) is additive and backward compatible: every
+// existing validator that returns `{ ok: true, value }` with no `warnings`
+// field is still a valid ConfigValidation<T>, so no other kind/renderer
+// changes behavior.
+export type ConfigValidation<T> =
+	{ ok: true; value: T; warnings?: ConfigError[] } | { ok: false; errors: ConfigError[] };
 
 export interface PanelKindDefinition<
 	TConfig extends Record<string, unknown> = Record<string, unknown>
@@ -61,8 +69,20 @@ export class UnknownPanelKindError extends Error {
 	}
 }
 
+export interface RegisterOptions {
+	// True for a fallback registered before any sibling epic's real
+	// definition is known to exist yet (defaultPanelKinds.ts's own call).
+	// A placeholder never conflicts with, and never overwrites, anything --
+	// it silently steps aside for a real registration on either side of it
+	// in call order (see register()'s own comment for the full truth table).
+	placeholder?: boolean;
+}
+
 export interface PanelRegistry {
-	register(definition: PanelKindDefinition<Record<string, unknown>>): void;
+	register(
+		definition: PanelKindDefinition<Record<string, unknown>>,
+		options?: RegisterOptions
+	): void;
 	get(kind: string): PanelKindDefinition | undefined;
 	require(kind: string): PanelKindDefinition;
 	has(kind: string): boolean;
@@ -75,13 +95,44 @@ export interface PanelRegistry {
 // including the module-global default below.
 export function createPanelRegistry(): PanelRegistry {
 	const kinds = new Map<string, PanelKindDefinition>();
+	// Names currently holding a placeholder registration, not a real one --
+	// tracked separately from `kinds` because "is this entry replaceable"
+	// is not recoverable from the definition value itself.
+	const placeholders = new Set<string>();
 
 	return {
-		register(definition: PanelKindDefinition<Record<string, unknown>>): void {
+		// Order-independent by construction (three sibling epics -- results,
+		// chart, similarity -- each register a real kind into the same
+		// registry a default-seeding call also touches, and call order
+		// between the two is a composition-root detail no epic should have
+		// to coordinate on). The full truth table, keyed by (what's already
+		// there, what this call is registering):
+		//   nothing yet      + real        -> inserted as real
+		//   nothing yet      + placeholder -> inserted as placeholder
+		//   placeholder here + real        -> overwritten by the real one
+		//   placeholder here + placeholder -> skipped (one placeholder already covers it)
+		//   real here        + placeholder -> skipped (a real registration always wins)
+		//   real here        + real        -> PanelKindConflictError (an actual duplicate, still a bug)
+		register(
+			definition: PanelKindDefinition<Record<string, unknown>>,
+			options?: RegisterOptions
+		): void {
+			const incomingIsPlaceholder = options?.placeholder ?? false;
+			const existingIsPlaceholder = placeholders.has(definition.kind);
 			if (kinds.has(definition.kind)) {
-				throw new PanelKindConflictError(definition.kind);
+				if (incomingIsPlaceholder) {
+					return;
+				}
+				if (!existingIsPlaceholder) {
+					throw new PanelKindConflictError(definition.kind);
+				}
 			}
 			kinds.set(definition.kind, definition);
+			if (incomingIsPlaceholder) {
+				placeholders.add(definition.kind);
+			} else {
+				placeholders.delete(definition.kind);
+			}
 		},
 		get(kind: string): PanelKindDefinition | undefined {
 			return kinds.get(kind);

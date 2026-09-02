@@ -43,14 +43,14 @@ without re-running anything or trusting a number whose origin I can't see.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1010-1 | Results table configuration domain model and validation | — | Open |
-| 2 | T-1010-2 | Bounded results page, provenance envelope, and pinned-run read contract | — | Open |
-| 3 | T-1010-3 | Filter explanation and ranking contribution domain model | — | Open |
-| 4 | T-1010-4 | Paged results projection use case (`get_screener_results`) | T-1010-1, T-1010-2 | Open |
-| 5 | T-1010-5 | Result explanation use case (`explain_result`) | T-1010-2, T-1010-3 | Open |
-| 6 | T-1010-6 | Table renderer contract (columns, sort, grouping, formatting, selection semantics) | T-1010-1, EPIC-1007's T-1007-7 (contract shape) | Open |
-| 7 | T-1010-7 | `results_table` panel kind with selection and explain view | T-1010-4, T-1010-5, T-1010-6 | Open |
-| 8 | T-1010-8 | WebMCP registration and end-to-end wiring for the four Results tools | T-1010-7 | Open |
+| 1 | T-1010-1 | Results table configuration domain model and validation | — | Done |
+| 2 | T-1010-2 | Bounded results page, provenance envelope, and pinned-run read contract | — | Done |
+| 3 | T-1010-3 | Filter explanation and ranking contribution domain model | — | Done |
+| 4 | T-1010-4 | Paged results projection use case (`get_screener_results`) | T-1010-1, T-1010-2 | Done |
+| 5 | T-1010-5 | Result explanation use case (`explain_result`) | T-1010-2, T-1010-3 | Done |
+| 6 | T-1010-6 | Table renderer contract (columns, sort, grouping, formatting, selection semantics) | T-1010-1, EPIC-1007's T-1007-7 (contract shape) | Done |
+| 7 | T-1010-7 | `results_table` panel kind with selection and explain view | T-1010-4, T-1010-5, T-1010-6 | Done |
+| 8 | T-1010-8 | WebMCP registration and end-to-end wiring for the four Results tools | T-1010-7 | Done |
 
 ## Dependency Graph
 

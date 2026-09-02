@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeProvenance, type MarketDataProvenance } from '../workbench/domain/provenance';
 import { createPinnedRunStore } from './runStore';
+import { emptyFilterTree } from './definition';
 import { makeScreenerRun, type ScreenerMatch, type ScreenerRun } from './run';
 import type { RunRetentionPolicy } from './ports';
 
@@ -41,6 +42,9 @@ function run(runId: string, matches: ScreenerMatch[] = [match('inst:XNAS:AAPL', 
 		warnings: [],
 		provenance: provenance(),
 		matches,
+		rejectedEvaluations: {},
+		filterTree: emptyFilterTree('filter_root'),
+		rankingSpec: null,
 		createdAt: '2026-09-02T14:30:05.000Z'
 	});
 }

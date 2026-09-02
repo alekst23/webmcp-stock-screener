@@ -9,6 +9,7 @@ export type ResourceKind =
 	| 'panel'
 	| 'screener'
 	| 'run'
+	| 'result'
 	| 'change'
 	| 'undo'
 	| 'link'
@@ -18,13 +19,16 @@ export type ResourceKind =
 	| 'setup'
 	| 'watchlist'
 	| 'alert'
-	| 'preview';
+	| 'preview'
+	| 'column'
+	| 'rule';
 
 const RESOURCE_KINDS: ReadonlySet<string> = new Set<ResourceKind>([
 	'workspace',
 	'panel',
 	'screener',
 	'run',
+	'result',
 	'change',
 	'undo',
 	'link',
@@ -34,7 +38,9 @@ const RESOURCE_KINDS: ReadonlySet<string> = new Set<ResourceKind>([
 	'setup',
 	'watchlist',
 	'alert',
-	'preview'
+	'preview',
+	'column',
+	'rule'
 ]);
 
 // Opaque wire type. Grammar: '<kind>_<discriminator?>_<seq>', e.g.

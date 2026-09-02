@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { RendererTypeDefinition } from '../registry/sourceRendererRegistry';
 import { PanelOperationError } from './errors';
 import { readPanelState } from './panelState';
 import { createPanelTestHarness } from './testSupport';
@@ -8,6 +9,68 @@ import { configurePanelView } from './configurePanelView';
 function ctx() {
 	return { actor: 'agent' as const };
 }
+
+// A renderer with neither hook this ticket (T-1010-6) added -- describeConfigChange
+// and validateConfig's optional `warnings` -- so a config change against it must
+// behave exactly as it did before those hooks existed.
+const PLAIN_RENDERER: RendererTypeDefinition = {
+	name: 'mock_plain_renderer',
+	configSchema: { type: 'object', properties: { value: { type: 'number' } } },
+	validateConfig: (input) => ({ ok: true, value: input as Record<string, unknown> }),
+	defaultConfig: () => ({ value: 0 }),
+	acceptedSourceTypes: []
+};
+
+// A renderer that DOES define both hooks, so configurePanelView's use of them
+// can be exercised without depending on any real epic's renderer contract.
+const RICH_RENDERER: RendererTypeDefinition = {
+	name: 'mock_rich_renderer',
+	configSchema: { type: 'object', properties: { value: { type: 'number' } } },
+	validateConfig: (input) => ({
+		ok: true,
+		value: input as Record<string, unknown>,
+		warnings: [{ field: 'value', reason: 'value is unusually large' }]
+	}),
+	defaultConfig: () => ({ value: 0 }),
+	acceptedSourceTypes: [],
+	describeConfigChange: ({ previous, next }) =>
+		`value went from ${previous.value ?? 'unset'} to ${next.value ?? 'unset'}`
+};
+
+describe('configurePanelView: T-1010-6 hooks are additive and backward compatible', () => {
+	it('a renderer with no describeConfigChange/warnings hook behaves exactly as before', () => {
+		const deps = createPanelTestHarness();
+		deps.sourceRenderer.registerRendererType(PLAIN_RENDERER);
+		createPanel(deps, { context: ctx(), kind: 'chart', renderer: 'mock_plain_renderer' });
+
+		const envelope = configurePanelView(deps, {
+			context: { actor: 'agent', expectedRevision: 1 },
+			panelId: 'panel_chart_1',
+			config: { value: 5 }
+		});
+
+		expect(envelope.diffSummary).toBe('Panel "Chart": view configuration updated.');
+		expect(envelope.warnings).toEqual([]);
+	});
+
+	it('a renderer that defines describeConfigChange and warnings has both surfaced', () => {
+		const deps = createPanelTestHarness();
+		deps.sourceRenderer.registerRendererType(RICH_RENDERER);
+		createPanel(deps, { context: ctx(), kind: 'chart', renderer: 'mock_rich_renderer' });
+
+		const envelope = configurePanelView(deps, {
+			context: { actor: 'agent', expectedRevision: 1 },
+			panelId: 'panel_chart_1',
+			config: { value: 5 }
+		});
+
+		expect(envelope.diffSummary).toBe('Panel "Chart": value went from unset to 5.');
+		expect(envelope.warnings).toEqual(['value is unusually large']);
+
+		const panel = readPanelState(deps.repository.get(deps.workspaceId)!).panels[0]!;
+		expect(panel.config, 'a warning must not block the mutation').toEqual({ value: 5 });
+	});
+});
 
 describe('configurePanelView', () => {
 	it('AC3: retitling changes only the title -- id/kind/config/source/renderer/position untouched', () => {

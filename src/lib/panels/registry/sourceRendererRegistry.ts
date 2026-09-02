@@ -5,9 +5,28 @@
 // they are looked up and revalidated on every relevant mutation rather than
 // fixed at creation time like a kind is.
 import type { ConfigError, ConfigValidation } from './panelKindRegistry';
-import type { PanelSourceRef } from '../domain/panel';
+import type { Panel, PanelSourceRef } from '../domain/panel';
 
 export type { ConfigError, ConfigValidation } from './panelKindRegistry';
+
+// T-1010-6, AC5-AC9: setPanelSelection.ts had no per-renderer validation hook
+// at all before this ticket -- it stored and propagated `selectedIds`
+// completely unchecked, which made "reject a result id that isn't part of
+// this panel's run" (AC6) impossible to implement anywhere. `deps` is typed
+// `unknown` rather than as EPIC-1007's own PanelUseCaseDeps deliberately:
+// PanelUseCaseDeps lives in application/support.ts, which already imports
+// this file's SourceRendererRegistry type, so typing it precisely here would
+// create a cycle. A renderer that needs more than `selectedIds`/`panel` (this
+// epic's table contract needs a PinnedRunStore) closes over its own
+// dependency at registration time instead, the same way chartSourceTypeDefinition
+// closes over ChartSourceDeps -- see chartRendererContract.ts.
+export interface SelectionValidationInput {
+	selectedIds: string[];
+	panel: Panel;
+	deps: unknown;
+}
+
+export type SelectionValidation = { ok: true } | { ok: false; errors: ConfigError[] };
 
 export interface SourceTypeDefinition {
 	name: string;
@@ -28,6 +47,21 @@ export interface RendererTypeDefinition<
 	validateConfig(input: unknown): ConfigValidation<TConfig>;
 	defaultConfig(): TConfig;
 	acceptedSourceTypes: string[];
+	// T-1010-6, AC2: optional plain-language description of what changed
+	// between two of this renderer's own configs, used by configurePanelView
+	// in place of its generic "view configuration updated" text. A renderer
+	// that doesn't define this keeps that generic text -- unchanged behavior.
+	describeConfigChange?(input: { previous: TConfig; next: TConfig }): string;
+	// T-1010-6, AC7: how many result ids this renderer can display at once
+	// when a selection is propagated to it over a link. Undefined/'multiple'
+	// is the original, unrestricted propagation behavior every renderer
+	// registered before this field existed already has.
+	selectionCapacity?: 'single' | 'multiple';
+	// T-1010-6, AC6: renderer-specific validation of an incoming selection
+	// (e.g. "is every id part of the run this panel is showing?"). Only
+	// invoked when the panel's active renderer defines it -- a renderer that
+	// doesn't keeps its original "accept anything" behavior.
+	validateSelection?(input: SelectionValidationInput): SelectionValidation;
 }
 
 // `name` intentionally holds the conflicting source type's name, not the
@@ -96,9 +130,16 @@ export interface RendererMigration {
 	dropped: string[];
 }
 
+// See panelKindRegistry.ts's identically-shaped RegisterOptions/register()
+// comment for the full truth table this option drives -- both registries
+// implement the same order-independent placeholder/real precedence rule.
+export interface RegisterOptions {
+	placeholder?: boolean;
+}
+
 export interface SourceRendererRegistry {
-	registerSourceType(definition: SourceTypeDefinition): void;
-	registerRendererType(definition: RendererTypeDefinition): void;
+	registerSourceType(definition: SourceTypeDefinition, options?: RegisterOptions): void;
+	registerRendererType(definition: RendererTypeDefinition, options?: RegisterOptions): void;
 	getSourceType(name: string): SourceTypeDefinition | undefined;
 	requireSourceType(name: string): SourceTypeDefinition;
 	getRendererType(name: string): RendererTypeDefinition | undefined;
@@ -145,6 +186,39 @@ function recognizedFieldNames(configSchema: object): Set<string> {
 export function createSourceRendererRegistry(): SourceRendererRegistry {
 	const sourceTypes = new Map<string, SourceTypeDefinition>();
 	const rendererTypes = new Map<string, RendererTypeDefinition>();
+	// Names currently holding a placeholder registration -- see
+	// panelKindRegistry.ts's identical convention for why this can't be
+	// recovered from the stored definition itself.
+	const placeholderSourceTypes = new Set<string>();
+	const placeholderRendererTypes = new Set<string>();
+
+	// Shared by registerSourceType/registerRendererType below -- the same
+	// order-independent precedence rule (real always wins, two reals still
+	// conflict, a placeholder never conflicts) applies identically to both
+	// maps, so the truth table logic itself is written once.
+	function upsert<T>(
+		map: Map<string, T>,
+		placeholders: Set<string>,
+		name: string,
+		definition: T,
+		incomingIsPlaceholder: boolean,
+		onConflict: () => never
+	): void {
+		if (map.has(name)) {
+			if (incomingIsPlaceholder) {
+				return;
+			}
+			if (!placeholders.has(name)) {
+				onConflict();
+			}
+		}
+		map.set(name, definition);
+		if (incomingIsPlaceholder) {
+			placeholders.add(name);
+		} else {
+			placeholders.delete(name);
+		}
+	}
 
 	function requireSourceType(name: string): SourceTypeDefinition {
 		const found = sourceTypes.get(name);
@@ -169,17 +243,29 @@ export function createSourceRendererRegistry(): SourceRendererRegistry {
 	}
 
 	return {
-		registerSourceType(definition: SourceTypeDefinition): void {
-			if (sourceTypes.has(definition.name)) {
-				throw new SourceTypeConflictError(definition.name);
-			}
-			sourceTypes.set(definition.name, definition);
+		registerSourceType(definition: SourceTypeDefinition, options?: RegisterOptions): void {
+			upsert(
+				sourceTypes,
+				placeholderSourceTypes,
+				definition.name,
+				definition,
+				options?.placeholder ?? false,
+				() => {
+					throw new SourceTypeConflictError(definition.name);
+				}
+			);
 		},
-		registerRendererType(definition: RendererTypeDefinition): void {
-			if (rendererTypes.has(definition.name)) {
-				throw new RendererTypeConflictError(definition.name);
-			}
-			rendererTypes.set(definition.name, definition);
+		registerRendererType(definition: RendererTypeDefinition, options?: RegisterOptions): void {
+			upsert(
+				rendererTypes,
+				placeholderRendererTypes,
+				definition.name,
+				definition,
+				options?.placeholder ?? false,
+				() => {
+					throw new RendererTypeConflictError(definition.name);
+				}
+			);
 		},
 		getSourceType(name: string): SourceTypeDefinition | undefined {
 			return sourceTypes.get(name);
