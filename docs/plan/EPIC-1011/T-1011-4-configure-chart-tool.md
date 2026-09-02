@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1011-1, T-1011-3
 **Blocks**: T-1011-8, T-1011-9
 
@@ -133,6 +133,13 @@ observable contract is the report: when `invalidatesChartData(changes)` is
 true the draft carries an explicit warning naming the fields that forced it,
 and `describeChartDataInvalidation(changes)` is exported so T-1011-6 and
 T-1011-9 use the same sentence.
+
+**One finding worth passing on.** `applyOperations` merges per-operation
+drafts and keeps only `diffSummary`; a draft's `warnings` do not reach the
+envelope through that path. Every notice this ticket must deliver — the
+default normalization it applied, the caches it invalidated — is therefore
+written into the diff summary as well as into `warnings`. T-1011-9 should
+either keep doing that or take it up with EPIC-1006.
 
 **Schemas (AC11).** Both `inputSchema`s and the renderer `configSchema` are
 hand-written JSON Schema objects whose descriptions state that the instrument
