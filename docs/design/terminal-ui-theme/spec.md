@@ -31,7 +31,13 @@ still legible at a glance.
 3. **Status stays distinguishable**: every state the app already
    distinguishes visually remains distinguishable on the dark ground.
 4. **A persistent shell**: the workbench is laid out in stable regions
-   rather than one centered column.
+   rather than one centered column, under the product name **MarketPane**.
+5. **Data-freshness pill**: the header always shows how old the last
+   data pull is, replacing the permanent synthetic-data warning banner
+   now that the app serves real market data by default.
+6. **Expandable header search**: the ticker/universe filter (previously
+   a fixed field in the chart toolbar) lives in a collapsed search
+   control in the header, expanding on demand.
 
 ## Behavioral Specifications
 
@@ -56,7 +62,7 @@ still legible at a glance.
 
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
-| Synthetic data | the backend is serving a synthetic (mock) price panel | the researcher looks at the panel-status line | it still does not read like real market data at a glance, and remains legible against the dark ground |
+| Synthetic data (defensive) | the backend is, exceptionally, still serving a synthetic (mock) price panel — a local/dev fallback, not the normal production state now that real data is live | the researcher looks at the data-freshness pill | the pill itself carries a visually distinct treatment naming it synthetic — the invariant that mock data must never read like real data holds, but there is no separate permanent warning banner for the now-uncommon case |
 | Degraded bridge | the WebMCP bridge is unavailable or failed to connect | the researcher looks at the header | it still does not read like a working bridge at a glance, and remains legible against the dark ground |
 | Errors | an action fails and reports an error | the researcher looks at the error text | it is visually distinct from ordinary body text and from the synthetic-data and degraded-bridge treatments |
 | Distinct from each other | the synthetic-data, degraded-bridge, and error treatments | they are compared | no two of them are rendered in the same colour, so one state can never be mistaken for another |
@@ -67,11 +73,31 @@ still legible at a glance.
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
 | Stable regions | the workbench at any amount of workspace content | the researcher looks at the page | it is laid out in stable regions — a top bar carrying identity and session status, a work area, and the activity log — rather than one centered column of stacked blocks |
+| Identity | the top bar | the researcher looks at it | it identifies the product as **MarketPane**, not the prior name, everywhere the name previously appeared (page title, header) |
+| No intro paragraph | the work area | the page renders | it opens directly on the workspace content; the explanatory intro paragraph that used to precede it is gone |
 | Log stays at the bottom | the page renders any amount of workspace content | the researcher looks for the activity log | it still appears at the bottom, below all panels and the focus chart |
 | Tool counts stay in the header | the page loads | the researcher looks at the top bar | both counts are still there: the number of tools defined and the number currently callable |
 | Agent context survives | the page loads | an agent reads the page's HTML source | the agent-facing context comment is still present and still states plainly whether the tools are callable |
 | Navigation is honest | the researcher looks at the top bar | they consider where they can go | it offers only destinations that exist; it does not present controls for capabilities the app does not have |
 | Density does not cost reachability | any interactive control in the denser layout | the researcher operates it with a pointer or keyboard | it remains large enough to hit and shows a visible focus state when focused |
+
+### Data-freshness pill
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Happy path | a loaded price panel with a known as-of time | the researcher looks at the header | a pill shows how long ago the data was last pulled (e.g. "updated 2h ago"), computed from the panel's as-of timestamp against the current time |
+| Stale data | the last pull is old enough to be notable | the researcher looks at the pill | the pill's treatment marks it as stale rather than presenting old data with the same visual weight as fresh data |
+| No panel loaded yet | the panel status has not resolved | the page renders | the pill shows a neutral "checking…"/unknown state rather than a wrong or stale-looking age |
+| Replaces the old warning | the app is serving real data | the researcher looks at the header | there is no separate permanent "synthetic data" banner — the pill is the single freshness/status indicator |
+
+### Expandable header search
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Collapsed by default | the header | the page renders | the ticker/universe search is a collapsed control, not a fixed-width field taking up permanent space |
+| Expand to search | the collapsed search control | the researcher activates it | it expands in place to accept ticker/universe input, functionally identical to the field it replaces (same parsing, same effect on the next search) |
+| Collapse after use | an expanded search control that has focus elsewhere | the researcher dismisses it (click outside, Escape) | it collapses back to its compact form without losing or discarding a value the researcher already committed |
+| Keyboard reachable | the collapsed search control | the researcher tabs to it | it can be expanded and used without a pointer |
 
 ## Non-Goals
 
@@ -84,5 +110,11 @@ still legible at a glance.
 - Responsive breakpoint behavior beyond keeping the existing layout usable
   at small widths.
 - Reordering or resizing panels (already a Non-Goal of the workbench spec).
+- Changing what the universe/ticker search does, or its parsing — only
+  where it lives in the layout. The underlying "Instance search" behavior
+  it drives is unchanged and owned by
+  [Pattern Research Workbench](../pattern-research-workbench/spec.md).
+- A general notification/toast system. The freshness pill is the one
+  status indicator this feature adds.
 
-*Implemented by:* hotfix/terminal-ui-theme
+*Implemented by:* hotfix/terminal-ui-theme, hotfix/marketpane-rebrand
