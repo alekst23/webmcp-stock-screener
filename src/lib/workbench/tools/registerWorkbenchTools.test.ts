@@ -21,6 +21,6 @@ describe('registerWorkbenchTools', () => {
 		const deps = createDefaultWorkbenchDeps();
 		expect(deps.repository.list()).toEqual([]);
 		expect(deps.registry.kinds()).toEqual([]);
-		expect(deps.provenance.current('prices').source).toBe('not_configured');
+		expect(deps.provenance.current('prices').sourceId).toBe('not_configured');
 	});
 });

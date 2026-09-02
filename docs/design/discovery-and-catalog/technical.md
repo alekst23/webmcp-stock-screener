@@ -20,7 +20,8 @@ Everything here lives in **new files**. `src/lib/webmcp/tools.ts`,
 
 | Module | Layer | Contents |
 |--------|-------|----------|
-| `src/lib/surface/provenance.ts` | domain | `DiscoveryEnvelope`, `Provenance`, engine version (T-1008-1) |
+| `src/lib/surface/provenance.ts` | domain | `DiscoveryEnvelope` plus re-exports of the common provenance contract (T-1008-1) |
+| `src/lib/workbench/domain/provenance.ts` | domain | `MarketDataProvenance`, `makeProvenance`, engine version (EPIC-1006) |
 | `src/lib/surface/ids.ts` | domain | stable-ID construction and validation (T-1008-1) |
 | `src/lib/catalog/types.ts` | domain | catalog item type model (T-1008-2) |
 | `src/lib/catalog/items.ts` | domain | seeded inventory, data only (T-1008-2) |
@@ -35,15 +36,18 @@ not for discovery: sibling epics need the same envelope.
 
 ## Contracts
 
-### `Provenance` (`src/lib/surface/provenance.ts`, T-1008-1)
+### `MarketDataProvenance` (`src/lib/workbench/domain/provenance.ts`)
+
+Owned by EPIC-1006 as the common contract and re-exported through
+`src/lib/surface/provenance.ts` for discovery callers.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `asOf` | `string` | ISO-8601 with offset; when the payload is true as of |
 | `sourceId` | `string` | stable source identifier, e.g. `src.catalog.builtin` |
 | `sourceLabel` | `string` | human-readable source name |
-| `delivery` | `'live' \| 'delayed' \| 'end_of_day' \| 'static'` | `static` for the built-in catalog |
-| `delaySeconds` | `number \| undefined` | required when `delivery` is `delayed` |
+| `liveness` | `'live' \| 'delayed' \| 'end_of_day' \| 'historical' \| 'static'` | `static` for the built-in catalog |
+| `delaySeconds` | `number \| undefined` | required when `liveness` is `delayed`, forbidden otherwise |
 | `timezone` | `string` | IANA zone the payload's dates/times are expressed in |
 | `currency` | `string \| undefined` | ISO 4217; absent when the payload has no monetary content |
 | `priceAdjustment` | `'adjusted' \| 'unadjusted' \| 'not_applicable' \| undefined` | absent when the payload has no price content |
@@ -52,9 +56,9 @@ not for discovery: sibling epics need the same envelope.
 
 `ReportingPeriod`: `{ basis: 'point_in_time' \| 'trailing_twelve_months' \|
 'fiscal_quarter' \| 'fiscal_year'; periodEnd: string; fiscalYear: number;
-fiscalQuarter?: number }`.
+fiscalQuarter?: number; restated?: boolean }`.
 
-`asOf`, `sourceId`, `sourceLabel`, `delivery`, `timezone`, and
+`asOf`, `sourceId`, `sourceLabel`, `liveness`, `timezone`, and
 `engineVersion` are required by the type — a provenance record missing any
 of them does not compile.
 
@@ -63,7 +67,7 @@ of them does not compile.
 | Field | Type | Description |
 |-------|------|-------------|
 | `data` | `T` | the typed payload |
-| `provenance` | `Provenance` | above |
+| `provenance` | `MarketDataProvenance` | above |
 | `warnings` | `string[]` | non-fatal notes, e.g. clamped limit, unconfigured source |
 
 ### Stable IDs (`src/lib/surface/ids.ts`, T-1008-1)
@@ -216,8 +220,8 @@ outcome, never a throw and never a fabricated record.
 #### Implementer's checklist (a future reference-data source)
 
 1. Implement both methods; return `DiscoveryEnvelope`, never a bare array.
-2. Populate every required `Provenance` field. For a directory sourced from
-   a static export, `delivery: 'static'` with `asOf` set to the export date
+2. Populate every required `MarketDataProvenance` field. For a directory sourced from
+   a static export, `liveness: 'static'` with `asOf` set to the export date
    is correct and honest; do not claim `live`.
 3. Set `currency` per instrument, not on the envelope — a multi-venue
    result spans currencies.
@@ -241,7 +245,7 @@ Default when nothing is configured — which is every deployment today.
 `createUnavailableInstrumentDirectory()` is a factory, not a module-level
 singleton, so composition decides which adapter is in use. Both methods
 resolve to a well-formed envelope with an empty payload (`[]` and `null`
-respectively), `sourceId: 'src.instruments.unconfigured'`, `delivery:
+respectively), `sourceId: 'src.instruments.unconfigured'`, `liveness:
 'static'`, and a warning stating that no reference-data source is
 configured. It never throws and never invents instruments. This is the
 deliberate alternative to a mock instrument dataset.
@@ -274,7 +278,7 @@ group is composed in, and `main` stays deployable.
 this epic ships the replacement surface alongside the one EPIC-1015 retires
 and must not touch it, and a two-line JSON wrapper is a cheaper duplication
 than a coupling between the two. Also here: `catalogProvenance()` (source
-`src.catalog.builtin`, `delivery: 'static'`, no currency or reporting period
+`src.catalog.builtin`, `liveness: 'static'`, no currency or reporting period
 because a catalog entry has no monetary content) and the argument readers
 each tool uses to re-check its inputs — a bridge is not obliged to enforce a
 declared `inputSchema`, so the handlers validate rather than trust it.

@@ -138,7 +138,7 @@ describe('describe_catalog_item', () => {
 		expect(provenance.sourceId, 'the source must be the built-in catalog').toBe(
 			'src.catalog.builtin'
 		);
-		expect(provenance.delivery, 'a shipped catalog is static').toBe('static');
+		expect(provenance.liveness, 'a shipped catalog is static').toBe('static');
 		expect(provenance.engineVersion, 'the engine version must be stated').toBeTruthy();
 	});
 

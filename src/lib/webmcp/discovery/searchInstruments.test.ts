@@ -152,7 +152,7 @@ describe('search_instruments', () => {
 			'asOf',
 			'sourceId',
 			'sourceLabel',
-			'delivery',
+			'liveness',
 			'timezone',
 			'engineVersion'
 		]) {
