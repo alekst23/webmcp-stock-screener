@@ -51,3 +51,9 @@ alongside the Core Product surface above and cut over at the end.
 - [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — retire the
   original 11-tool surface once the above reaches capability parity,
   keeping the WebMCP transport layer.
+
+## Presentation
+
+- [Terminal UI Theme](terminal-ui-theme/spec.md) — the single dark,
+  high-density visual treatment shared by every route: the named palette,
+  the measured contrast floor, and the shell the workbench lays out in.
