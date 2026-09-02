@@ -131,3 +131,21 @@ treats the row bound exactly like the column bound:
 No new files beyond what T-1007-2 already introduces
 (`layout.ts`, `layout.test.ts`) — this ticket does not own a separate
 module.
+
+### AC4 addendum (delivered by T-1007-6)
+
+`src/lib/panels/shell/gridStyle.ts` supplies the CSS half: the
+container's style is a literal `display:grid; grid-template-columns:
+repeat(6, 1fr); grid-template-rows: repeat(4, 1fr); width:100%;
+height:100%` (fractions, never a computed pixel table, so it holds at any
+viewport size — no new domain state beyond the existing `GRID_COLUMNS`/
+`GRID_ROWS`), and each panel frame's placement is
+`grid-column: ${rect.col + 1} / span ${rect.colSpan}; grid-row: ${rect.row
++ 1} / span ${rect.rowSpan}` (1-based CSS lines from the domain's
+zero-based rect). Every panel frame additionally gets `min-width:0;
+min-height:0; overflow:hidden` so a body's intrinsic content size can
+never force the grid track — and therefore the page — to grow past the
+viewport; a body that needs more room than its cell scrolls internally.
+Tested directly in `gridStyle.test.ts`: a rect maps to the right
+`grid-column`/`grid-row` strings, and a `colSpan`-of-6 panel's column
+span reads `1 / span 6` (full width).

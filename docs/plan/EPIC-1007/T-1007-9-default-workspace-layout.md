@@ -74,3 +74,52 @@ to build the same starting arrangement every time.
 Real panel bodies for the three seeded kinds (sibling epics), and any
 named template registration for this arrangement (spec explicitly
 excludes it from `apply_layout_template`).
+
+## Solution Approach
+
+Lands entirely inside T-1007-6's composition root and controller — no new
+files beyond what that ticket already introduces.
+
+**The gate (AC3, the subtle one)**: `panelController.initializeWorkspace`
+returns `{ workspaceId, justCreated }`, where `justCreated` is set by
+*which branch ran* — the create branch or the load branch — never by
+inspecting `state.panels.length` on the result. `registerPanelTools.ts`
+calls `seedDefaultWorkspace(panelDeps, justCreated)` with that flag
+directly. Loading an existing (possibly empty) workspace, restoring a
+revision, or duplicating one are all "load" as far as this function is
+concerned — none of them is the code path that mints a new workspace id
+via `create_workspace`'s own logic, so none of them can set
+`justCreated: true`. This is checked with a mutation-check test: flip the
+gate in the seeding call to `state.panels.length === 0` instead of the
+`justCreated` flag, confirm the "load an existing empty workspace" test
+now (wrongly) seeds, then restore the real gate.
+
+**Seeding (AC1, AC2)**: `seedDefaultWorkspace` calls the same `createPanel`
+use case three times with explicit, non-overlapping rects that partition
+the 6x4 grid into three equal full-height columns — `filter_builder` at
+`(col:0,row:0,colSpan:2,rowSpan:4)`, `results_table` at
+`(col:2,row:0,colSpan:2,rowSpan:4)`, `chart` at
+`(col:4,row:0,colSpan:2,rowSpan:4)` — each satisfying its kind's declared
+`minSize`. No `source` is passed, so each panel is created exactly as
+`create_panel` would leave an unbound panel: `source: null`, and whatever
+`renderer` its kind's `defaultRenderer` specifies (`results_table` →
+`table`, `chart` → `chart_grid`, `filter_builder` → `null`) — the same
+values a bare `create_panel({kind})` call would produce, so a seeded
+panel is byte-for-byte what `create_panel` makes (AC2). The placeholder
+body already renders "no screener run yet"-style empty state for a
+`source: null` panel (T-1007-6's `PlaceholderPanelBody.svelte`), so no
+extra empty-state code is needed here.
+
+**Not a template (AC4)**: the three rects above are inline literals in
+`panelController.ts`, never passed to `layoutTemplateRegistry.register`.
+A test asserts `registerDefaultLayoutTemplates`'s registry names
+(`three_columns`, `quad`, `chart_wall_3x3`, `focus_with_sidebar`) do not
+include anything resolving to this arrangement, and that
+`apply_layout_template` has no fifth name to request.
+
+**No EPIC-1006 change (AC5)**: workspace creation reuses
+`recordCommit`/`emptyWorkspace` exactly as `workbench/tools/index.ts`'s
+`create_workspace` does (see T-1007-6's Solution Approach) — this ticket
+adds no field, flag, or hook to that path; seeding is purely "what this
+epic's own composition root does right after, before paint," per the
+technical doc's "Default workspace layout (seeding, not a tool)" section.

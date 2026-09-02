@@ -97,3 +97,102 @@ than a description I have to take on faith.
 Real panel bodies for the eight kinds — sibling epics replace the
 placeholder registrations. Drag-to-resize and responsive breakpoint
 behavior. Retiring the existing surface (EPIC-1015).
+
+## Solution Approach
+
+New route, new files only, under `src/lib/panels/shell/` — nothing in
+`src/routes/+page.svelte`, `src/lib/webmcp/`, `src/lib/workspace/`, or any
+existing `src/lib/panels/` file is touched (AC10). A brand-new route is
+new-files-only under the project's dead-code policy, so no feature flag.
+
+**`panelController.ts`** carries every testable behavior; the `.svelte`
+files stay thin wiring, matching the codebase's existing split:
+
+- `initializeWorkspace(deps)` decides create-vs-load by asking the
+  repository for an active workspace id, *not* by inspecting panel count
+  — the gate T-1007-9 needs. Creating calls the same building blocks
+  `workbench/tools/index.ts`'s `create_workspace` tool uses
+  (`recordCommit` + `emptyWorkspace`, imported read-only from
+  `workbench/application/changeHistory` and `workbench/domain/workspace`)
+  so the resulting document is indistinguishable from one made through
+  the real tool — no change to EPIC-1006's contract, no new tool.
+  Returns `{ workspaceId, justCreated }`; `justCreated` is a property of
+  *which code path ran*, never derived from `panels.length`.
+- `seedDefaultWorkspace(panelDeps, justCreated)` — T-1007-9; see that
+  ticket's Solution Approach.
+- `readSnapshot(deps)` reads `PanelSystemState` via the existing
+  `readPanelState` export and pairs it with the current maximized id via
+  `renderedRects` (AC1, AC3, AC4) — one function, no component-side
+  derivation.
+- `resolvePanelBody(definition)` awaits `definition.component()` inside a
+  try/catch and classifies the settled value: a function, or an object
+  whose `default` is a function, is `{ kind: 'component', value }`;
+  anything else (including every EPIC-1007 placeholder, whose
+  `component()` resolves to `{ placeholderKind }`) or a thrown/rejected
+  load is `{ kind: 'placeholder' }` / `{ kind: 'error', message }`. Pure
+  and directly testable without mounting Svelte (AC2, AC9).
+- `broadcastLinkedValue(controller, channel, sourcePanelId, value)` calls
+  `propagationTargets` and updates an in-memory `linkedValues` map
+  (`panelId -> { channel, value }`), scoped to exactly the channel's
+  group — this is client-render state layered over the workspace, the
+  same shape as `maximized`, not a workspace mutation (AC6). The
+  container has no per-kind branch: every placeholder body receives
+  whatever arrived for its own id through one uniform prop and decides
+  for itself whether/how to show it (here: display it), which is what
+  "the receiving panel's kind decides" means when every shipped kind is
+  the same placeholder.
+- A small observable store (`subscribe`/`notify`) so a tool call —
+  routed through a thin wrapper this module puts around each
+  `ToolSpec.execute` — triggers `readSnapshot` again and pushes the
+  result to every subscriber; this is how AC5's "no reload" and AC8's
+  "undo re-renders" both work: every mutation, human or agent, ends at
+  the same `notify()`.
+
+**`gridStyle.ts`** — pure functions mapping a `GridRect` to CSS: the
+container's own style string (`display:grid; grid-template-columns:
+repeat(6, 1fr); grid-template-rows: repeat(4, 1fr)`) and a panel's
+`grid-column`/`grid-row` from its zero-based rect (T-1007-8 AC4). Kept
+separate from `panelController.ts` so the CSS-mapping tests stand apart
+from the workspace-logic tests.
+
+**`registerPanelTools.ts`** is the composition root: builds real infra
+(`createLocalWorkspaceRepository`, `createRevisionService`,
+`createChangeHistory`, `createIdempotencyCache`, `createIdSequencer`,
+fresh `createPanelRegistry` + `registerDefaultPanelKinds`, fresh
+`createSourceRendererRegistry` + `registerDefaultSourceRendererTypes`,
+fresh `createLayoutTemplateRegistry` + `registerDefaultLayoutTemplates`,
+`createMaximizedPanelState()`), calls `panelController.initializeWorkspace`
+and (T-1007-9) `seedDefaultWorkspace`, builds `PanelToolDeps`, and
+registers `buildPanelTools(deps)` — wrapped to call the controller's
+`notify()` after each execute — against `ensureModelContext()`. Mirrors
+`workbench/tools/registerWorkbenchTools.ts`'s `createDefault*Deps()` +
+register-function shape; no flag, since this route is the new-files path
+that shape was written for.
+
+**Svelte layer**: `PanelContainer.svelte` subscribes to the controller,
+renders `containerGridStyle()` as the outer grid, and for each rendered
+rect (from `renderedRects`, so hidden panels are already excluded and a
+maximized panel already occupies the full grid — AC3, AC4) renders a
+`PanelFrame` positioned via `gridStyle.ts`. `PanelFrame.svelte` renders
+the title bar, a collapse toggle (calling `configurePanelView` through
+the controller then `notify()`), and — unless collapsed — a body region
+wrapped in `<svelte:boundary>` (Svelte 5) so a real body that throws
+during render is caught at that one frame, not the page (AC9's render-time
+half; `resolvePanelBody`'s try/catch covers the load-time half).
+`PlaceholderPanelBody.svelte` is the fallback: shows kind, active
+renderer, and bound/unbound state, and shows anything recorded via
+`broadcastLinkedValue` for this panel.
+
+**Route**: `src/routes/workbench/+page.svelte` calls
+`registerPanelTools()` once on mount and renders `PanelContainer` once it
+resolves; `src/routes/+page.svelte` is untouched (AC10).
+
+**Undo (AC8)**: `undo_change` is an EPIC-1006 workbench tool, not one of
+the fourteen panel tools, so it is out of this ticket's registration list
+per the design doc's tool inventory — but the same repository backs both,
+so calling it through the same `notify()`-wrapped path (exposed as a
+`panelController.undo(undoToken)` helper that calls the workbench
+`undo_change` logic against the shared repository/history/clock) re-renders
+the workspace to its prior state through the same read path as any other
+mutation. Tested at the controller level: apply a change, undo it,
+confirm the snapshot matches the pre-change snapshot.
