@@ -21,7 +21,14 @@ export type ResourceKind =
 	| 'alert'
 	| 'preview'
 	| 'column'
-	| 'rule';
+	| 'rule'
+	| 'export'
+	| 'backtest'
+	// Single words (no underscore), matching this file's own grammar rule
+	// below -- 'computed_field'/'custom_study' would parse back with kind
+	// 'computed'/'custom', which is not what mintId was given.
+	| 'computedfield'
+	| 'customstudy';
 
 const RESOURCE_KINDS: ReadonlySet<string> = new Set<ResourceKind>([
 	'workspace',
@@ -40,7 +47,11 @@ const RESOURCE_KINDS: ReadonlySet<string> = new Set<ResourceKind>([
 	'alert',
 	'preview',
 	'column',
-	'rule'
+	'rule',
+	'export',
+	'backtest',
+	'computedfield',
+	'customstudy'
 ]);
 
 // Opaque wire type. Grammar: '<kind>_<discriminator?>_<seq>', e.g.

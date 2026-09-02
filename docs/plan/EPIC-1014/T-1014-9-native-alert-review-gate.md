@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1014 (High-Value Follow-Up Tools)
 **Design**: docs/design/screener-followup-tools/spec.md
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1014-8
 **Blocks**: T-1014-11
 **Issue**: —
@@ -63,6 +63,82 @@ approved.
     `enable_alert` does not create a second pending request.
 12. Undoing an activation request with the returned undo token clears the
     pending request. Undo is never a path to arming an alert.
+
+## Solution Approach
+
+**Model extension (`alerts/domain/`).** `AlertRecord` (T-1014-8) gains two
+fields: `pendingActivation: AlertActivationRequest | null` and
+`activationHistory: AlertActivationEvent[]`. A new file,
+`domain/alertActivation.ts`, defines these types plus pure helpers
+(`computeActivationExpiry`, `isActivationRequestExpired`,
+`appendActivationEvent`) and the 15-minute `PENDING_ACTIVATION_TTL_MS`
+bound (AC7). `domain/alertStateMachine.ts` gains three read-only
+predicates -- `isPendingActivation`, `isArmed`, `isDisarmed` -- alongside
+the existing `isDraft`; each takes a known state and returns a boolean,
+matching the module's existing "no transition-performing export" guarantee
+(its pinned export-surface test is extended, not relaxed). `toWireAlert`
+is fixed to report `armed: alert.state === 'armed'` (previously hard-coded
+`false`, correct only because T-1014-8 never produced anything else) and
+now serializes `pending_activation` and `activation_history`.
+
+**Tool-reachable half (`alerts/application/enableAlert.ts` +
+`disableAlert.ts`, wired via `alerts/tools/enableAlert.ts` +
+`disableAlert.ts`).** Two new `OperationDefinition`s, following T-1014-8's
+create/edit shape exactly:
+- `alerts.enable_activation`: `draft -> pending_activation` only. `apply()`
+  hard-codes the target state (never reads one from input); refuses a
+  second request while an existing one is still pending and unexpired
+  (re-requesting after expiry is allowed, recording an `'expired'` event
+  first). Its inverse restores the pre-request document -- safe, because
+  that document is never `'armed'` (AC12).
+- `alerts.disable_activation`: `armed -> disarmed`, and a true no-op when
+  already `disarmed` (AC9). **Its `MutationDraft.inverse` is unconditionally
+  `null` on every path.** This is the single most load-bearing line in the
+  ticket: the shared undo machinery (`changeHistory.ts`) lets an agent undo
+  an undo, which *redoes* the original change -- so a normal inverse here
+  would hand an agent a tool-only path back to `armed` via two
+  `undo_change` calls. `inverse: null` means there is no undo token for
+  `disable_alert` at all, closing that path structurally rather than by
+  convention. Verified by a mutation check (temporarily restoring a real
+  inverse) that fails `disableAlert.test.ts`, `disableAlert.test.ts` (tools),
+  and `alertActivationSafety.test.ts` in three places.
+
+**Edit invalidation (AC6, extends T-1014-8's `editAlertDraft.ts`).**
+`findEditableAlert`'s guard now accepts `'pending_activation'` alongside
+`'draft'` (previously only `'draft'`). When the edited alert was pending,
+`applyEditAlertDraft` clears `pendingActivation`, appends an
+`'invalidated'` activation-history event, and its `diffSummary` says so;
+the target state stays hard-coded to `'draft'` exactly as before. `'armed'`
+and `'disarmed'` remain refused.
+
+**Human-only half (`alerts/application/confirmAlertActivation.ts` +
+`declineAlertActivation.ts`).** Plain functions -- not
+`OperationDefinition`s, not registered in the shared `OperationRegistry`,
+not built into any `ToolSpec`, and never imported by anything under
+`alerts/tools/`. `confirmAlertActivation` is the only code in the program
+that writes `state: 'armed'`. Both bypass `recordCommit`/`ChangeHistory`
+entirely -- calling `RevisionService.commit` directly with `inverse: null`
+-- so a confirm or decline never creates a `ChangeHistory` entry and so
+never has a redeemable `undo_change` token. This is what makes the
+redo-based attack above impossible for confirm as well: there is no
+undo-of-undo to chain through if there was never an undo to begin with.
+Both are dependency-shape-pinned (`Object.keys(deps)` has no `history`
+field) so the absence is structural, not just a choice this call site
+happened to make. `confirmAlertActivation` also checks
+`isActivationRequestExpired` and refuses to confirm an expired request
+(AC7); the alert stays `'pending_activation'` until re-requested.
+
+**Wiring (`alerts/tools/index.ts`).** `enable_alert` and `disable_alert`
+join the three T-1014-8 tools (five total, four operation kinds). No sixth
+tool exists for confirm/decline -- that absence is itself part of the
+contract and is asserted by a dedicated test.
+
+**Testing.** Each new/changed production file has a co-located unit-test
+file plus explicit mutation checks (temporarily reverting the fix,
+confirming the test goes red, then reverting back) for every
+safety-relevant branch. `alerts/tools/alertActivationSafety.test.ts` is
+AC5's dedicated adversarial suite -- see the "How AC5 is proven" note in
+this ticket's final report for what it covers.
 
 ## Design References
 
