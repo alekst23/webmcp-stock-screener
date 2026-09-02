@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1006 (Workspace, Revisions & the Common Tool Contract)
 **Design**: docs/design/workspace-revisions/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1006-5
 **Blocks**: T-1006-8
 
@@ -64,6 +64,41 @@ so that experimenting with the agent is cheap instead of frightening.
 - `docs/plan/EPIC-1006/_epic.md` — Open Question 3 records why undo is
   restricted to the newest un-undone change.
 
+## Solution Approach
+
+`changeHistory.ts`'s `createChangeHistory()` holds an in-memory
+`Map<workspaceId, ChangeRecord[]>` (append-only, newest pushed to the
+end; `list` reverses/slices for the newest-first + `limit`/`before`
+contract) capped at 200 per workspace via oldest-first pruning that skips
+any record whose `undoState === 'available'` (AC12) — since restore/undo
+themselves append rather than mutate history, a record's snapshot is
+covered by T-1006-4's own 100-per-workspace retention, which the ticket
+notes must stay consistent with this 200-record cap (history can reference
+more revisions than snapshots retain only for records already fully
+redeemed, which need no snapshot).
+
+`undoChange(token, deps)`: `history.findByUndoToken` locates the record;
+missing → `UndoTokenError('unknown')`; `undoState !== 'available'` →
+`'already_redeemed'`; record is not `history`'s newest entry for that
+workspace → `'superseded'` (message names `restore_workspace_revision`).
+On success, `deps.revisionService.commit({ mutate: () => storedInverseDraft })`
+is called — going through T-1006-5's `commit`, not the repository directly
+— then `history.markRedeemed(token)` and `history.append(...)` record the
+reversal itself as a new `ChangeRecord` with its own undo token (the
+forward draft's inverse, i.e. undoing the undo redoes the original).
+
+`restoreRevision(workspaceId, revision, context, deps)`: loads the target
+snapshot via the repository (missing → a clear `OperationValidationError`),
+and commits a draft whose `document` is that snapshot's content with
+`revision`/`updatedAt` left for `commit` to stamp forward — never copying
+the old revision number back (AC9). The inverse draft is "restore back to
+the revision that was current before this restore," so restoring is itself
+undoable.
+
+**Contracts introduced:** `ChangeRecord`, `ChangeHistory`,
+`createChangeHistory`, `undoChange`, `restoreRevision` —
+`src/lib/workbench/application/changeHistory.ts`.
+
 ## Technical Considerations
 
 - Module: `src/lib/workbench/application/changeHistory.ts`.
@@ -87,3 +122,23 @@ so that experimenting with the agent is cheap instead of frightening.
 
 The `undo_change`, `get_change_history` and `restore_workspace_revision`
 tool wrappers themselves (T-1006-8), and any UI for browsing history.
+
+## Implementation Notes
+
+- Added `recordCommit(deps, input)` to `changeHistory.ts`, exported
+  alongside `undoChange`/`restoreRevision`. Neither `_epic.md` nor
+  `technical.md` specify who calls `ChangeHistory.append` for an
+  *ordinary* mutation, but AC1 requires every applied change to be
+  recorded regardless of origin -- `RevisionService.commit` (T-1006-5)
+  deliberately doesn't know about `ChangeHistory`. `recordCommit` wraps
+  `commit` and appends the resulting `ChangeRecord`, skipping the append
+  only when `commit` returned an idempotency replay (detected by mutate()
+  never having been invoked). T-1006-7's `applyOperations` and T-1006-8's
+  mutating tools call this instead of `revisionService.commit` directly.
+- `ChangeRecord` carries one field beyond `technical.md`'s list:
+  `inverseDraft?: MutationDraft | null`, the actual draft `undoChange`
+  applies to reverse the record -- never serialized to an agent. Its own
+  `.inverse` is set to the original forward draft, so undo and redo chain
+  indefinitely in both directions without a second stored copy.
+- Updated `docs/design/workspace-revisions/technical.md`'s T-1006-6
+  section to document `recordCommit` and the `inverseDraft` field.

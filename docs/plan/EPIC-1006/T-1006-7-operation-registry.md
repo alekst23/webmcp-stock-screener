@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1006 (Workspace, Revisions & the Common Tool Contract)
 **Design**: docs/design/workspace-revisions/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1006-5
 **Blocks**: T-1006-8
 
@@ -66,6 +66,42 @@ common contract.
 - `docs/design/workspace-revisions/technical.md` — "T-1006-7" section for
   `OperationDefinition`, `OperationRegistry`, `previewOperations`,
   `applyOperations`.
+
+## Solution Approach
+
+`createOperationRegistry()` is a `Map<kind, OperationDefinition>`;
+`register` validates `kind` matches `/^[a-z_]+\.[a-z_]+$/` (namespace
+shape, AC per Technical Considerations) and throws on both a malformed
+kind and a duplicate registration (AC3) rather than silently replacing.
+The shared `operationRegistry` instance is just
+`createOperationRegistry()` exported at module scope; tests always build
+their own via the factory (per the ticket's own warning about
+order-dependent tests).
+
+`previewOperations(ops, deps)` folds each `OperationRequest` over an
+in-memory copy of the current document **in order** — `validate` and
+`describe` for operation N see the document as operation N-1 left it
+(AC7) — accumulating `perOperation` entries, `affectedIds`, and an overall
+`valid` flag; an unregistered `kind` becomes a per-operation issue
+("unknown operation: <kind>"), not a thrown error, so the rest of the
+collection still previews. No repository write ever happens here (AC6).
+
+`applyOperations(ops, context, deps)` rejects an empty array up front
+(AC12), then does the same in-order fold to build one combined
+`MutationDraft` — `document` is the final folded state, `affectedIds` is
+the union in operation order, `diffSummary` joins each op's `describe()`,
+and `inverse` is the per-operation inverses **reversed** (last operation's
+inverse applied first) chained into one draft — and calls
+`deps.revisionService.commit({ mutate: () => combinedDraft })` exactly
+once, so `expected_revision`/idempotency and the single-envelope guarantee
+fall out of T-1006-5 for free (AC8/AC10). Any operation's `validate`
+returning issues, or its `apply` throwing, aborts before `commit` is
+called — nothing is applied (AC9).
+
+**Contracts introduced:** `OperationDefinition<T>`, `OperationRegistry`,
+`createOperationRegistry`, `operationRegistry`, `OperationRequest`,
+`PreviewResult`, `previewOperations`, `applyOperations` —
+`src/lib/workbench/application/operationRegistry.ts`.
 
 ## Technical Considerations
 

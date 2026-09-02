@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1006 (Workspace, Revisions & the Common Tool Contract)
 **Design**: docs/design/workspace-revisions/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1006-5
 
@@ -56,6 +56,29 @@ token without special-casing each tool.
   the "Casing: internal vs. wire" rule.
 - `src/lib/webmcp/tools.ts` — the existing `ok` / `fail` `ToolResult`
   helpers show the project's current error-shaping convention.
+
+## Solution Approach
+
+`mutation.ts`: `buildEnvelope` is a thin defaulting constructor (`warnings
+?? []`, `undoToken ?? null`) over the `MutationEnvelope` shape; `toWireEnvelope`
+is the one function in the epic allowed to emit snake_case keys, mapping
+`changeId → change_id`, `newRevision → new_revision`, etc. one-to-one, no
+other transformation. `MutationContext` is a plain interface — no builder
+needed since every field is either optional or trivially supplied by the
+caller.
+
+`errors.ts` defines four `Error` subclasses per `technical.md`, each with a
+`toWireError()` method returning `{ error: <kind>, message, ...fields }`
+where `<kind>` is a stable machine-readable string
+(`revision_conflict`/`idempotency_conflict`/`undo_token_error`/
+`operation_validation_error`) callers switch on. `UndoTokenError` takes a
+`reason` in its constructor rather than inferring it, so T-1006-6 states
+the reason explicitly at the call site instead of this module guessing.
+
+**Contracts introduced:** `Actor`, `MutationEnvelope`, `MutationContext`,
+`buildEnvelope`, `toWireEnvelope`, `RevisionConflictError`,
+`IdempotencyConflictError`, `UndoTokenError`, `OperationValidationError` —
+`src/lib/workbench/domain/mutation.ts` and `.../domain/errors.ts`.
 
 ## Technical Considerations
 

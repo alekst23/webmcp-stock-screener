@@ -34,14 +34,17 @@ underneath me, retry without duplicating work, and reverse a mistake.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1006-1 | Workspace document model and stable-ID scheme | — | Open |
-| 2 | T-1006-2 | Mutation envelope contract and builder | — | Open |
-| 3 | T-1006-3 | Market-data provenance contract | — | Open |
-| 4 | T-1006-4 | Workspace repository and named revision storage | T-1006-1 | Open |
-| 5 | T-1006-5 | Optimistic concurrency and idempotency replay | T-1006-1, T-1006-2, T-1006-4 | Open |
-| 6 | T-1006-6 | Change history, undo tokens and revision restore | T-1006-5 | Open |
-| 7 | T-1006-7 | Extensible operation registry with preview and apply | T-1006-5 | Open |
-| 8 | T-1006-8 | Workspace and context tool surface | T-1006-3, T-1006-6, T-1006-7 | Open |
+| 1 | T-1006-1 | Workspace document model and stable-ID scheme | — | Done |
+| 2 | T-1006-2 | Mutation envelope contract and builder | — | Done |
+| 3 | T-1006-3 | Market-data provenance contract | — | Done |
+| 4 | T-1006-4 | Workspace repository and named revision storage | T-1006-1 | Done |
+| 5 | T-1006-5 | Optimistic concurrency and idempotency replay | T-1006-1, T-1006-2, T-1006-4 | Done |
+| 6 | T-1006-6 | Change history, undo tokens and revision restore | T-1006-5 | Done |
+| 7 | T-1006-7 | Extensible operation registry with preview and apply | T-1006-5 | Done |
+| 8 | T-1006-8 | Workspace and context tool surface | T-1006-3, T-1006-6, T-1006-7 | Done |
+| 9 | T-1006-9 | Wire-case the three read-only tools | T-1006-8 | Open |
+| 10 | T-1006-10 | Type `OperationRegistry.register`'s errors | T-1006-7 | Open |
+| 11 | T-1006-11 | Boundary logging, cross-tab write race, and re-serialization cost | T-1006-4, T-1006-5 | Open |
 
 ## Dependency Graph
 

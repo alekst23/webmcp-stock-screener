@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1006 (Workspace, Revisions & the Common Tool Contract)
 **Design**: docs/design/workspace-revisions/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1006-3, T-1006-6, T-1006-7
 **Blocks**: —
 
@@ -68,6 +68,40 @@ anything on my behalf.
 - `src/lib/webmcp/status.ts` — how the app reports whether tools are
   actually callable; the new tools must be counted correctly.
 
+## Solution Approach
+
+`tools/index.ts` exports `buildWorkbenchTools(deps: WorkbenchDeps):
+ToolSpec[]`, one `ToolSpec` literal per tool from `technical.md`'s table,
+matching the existing `src/lib/webmcp/tools.ts` shape (`name`,
+`description`, `inputSchema` with snake_case properties, `available`,
+`execute`). Read tools (`get_app_context`, `get_canvas_state`,
+`get_change_history`) call straight into `deps.repository`/`deps.history`
+and return plain JSON via the existing `ToolResult` shape; mutating tools
+(`create_workspace`, `save_workspace`, `undo_change`,
+`restore_workspace_revision`) build a `MutationContext` from
+`expected_revision`/`idempotency_key`/a fixed `actor: 'agent'`, call the
+matching application-layer function (`revisionService.commit`,
+`changeHistory.undoChange`/`restoreRevision`), and return
+`toWireEnvelope(...)` on success or `{ isError: true, content: [...
+JSON.stringify(err.toWireError()) ] }` on a caught typed error from
+T-1006-2 (AC9).
+
+`get_app_context`'s `permissions` field is a static object per Open
+Question 7 (`{ trading: false, ... }`), not backed by any real permission
+check yet. Composition happens in a new small module (e.g.
+`src/lib/workbench/tools/registerWorkbenchTools.ts`) that constructs the
+real `WorkbenchDeps` (local repository, revision service, change history,
+shared operation registry, a fixed-value `ProvenanceSource`, real `Clock`)
+and calls the existing `register.ts` path — gated behind a feature flag
+(module-level constant, e.g. `WORKBENCH_TOOLS_ENABLED`) per the ticket's
+own dead-code-policy note, defaulting off so `main` stays deployable while
+this call site is wired in without yet being invoked from app startup.
+Nothing here imports `src/lib/webmcp/tools.ts` or
+`src/lib/workspace/store.ts`, and neither is modified.
+
+**Contracts introduced:** `WorkbenchDeps`, `buildWorkbenchTools` —
+`src/lib/workbench/tools/index.ts`.
+
 ## Technical Considerations
 
 - Modules under `src/lib/workbench/tools/`, with `index.ts` exporting
@@ -95,3 +129,32 @@ anything on my behalf.
 
 Any tool outside the seven named here; a UI for the new workspace; and
 removing the old surface.
+
+## Implementation Notes
+
+- Fixed a bug in T-1006-5's `RevisionService.commit`, found while wiring
+  `create_workspace`: `loadCurrent`'s fallback for a never-before-stored
+  workspace id used `normalizeWorkspace`'s default revision (1), so the
+  first commit against a brand-new id bumped it to 2 instead of landing
+  at 1 (T-1006-8 AC3). Fallback now starts at revision 0 (never a real,
+  storable revision) so the first commit lands at exactly 1. Added a
+  regression test to `revisionService.test.ts`.
+- `save_workspace` does not go through `RevisionService.commit`/
+  `recordCommit`: naming attaches to the *current* revision without
+  creating a new one (epic Open Question 5), so it directly updates the
+  existing `SavedRevision`'s `name` field via
+  `WorkspaceRepository.putRevision`, after checking `expected_revision`
+  by hand. `idempotency_key` is accepted but not separately deduped —
+  re-saving the same name to the same revision is naturally idempotent in
+  effect.
+- `get_app_context` and every other read tool re-read repository/history
+  state inside their returned `execute` closure rather than at
+  `buildWorkbenchTools` build time, so a workspace created after the tool
+  list was built is still reflected on the next call.
+- `registerWorkbenchTools.ts` mirrors `register.ts`'s underlying
+  primitive (`ensureModelContext().registerTool(...)`) rather than
+  reusing `register.ts`'s `connect()` machinery, which is tightly coupled
+  to `ResearchEngine`/the old `WorkspaceState` for its availability
+  gating — this surface's tools are always-available, so that machinery
+  doesn't apply. `WORKBENCH_TOOLS_ENABLED = false` and nothing calls
+  `registerWorkbenchTools` from app startup yet.
