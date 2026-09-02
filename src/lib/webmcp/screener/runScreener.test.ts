@@ -1,0 +1,457 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { ScreenerDefinition } from '../../screener/definition';
+import type { RunRetentionPolicy } from '../../screener/ports';
+import type { ScreenerEvaluationPort } from '../../screener/ports';
+import {
+	makeScreenerRun,
+	toWireScreenerRun,
+	type ScreenerMatch,
+	type ScreenerRun,
+	type ScreenerRunOutcome,
+	type ScreenerRunRefusal
+} from '../../screener/run';
+import { createPinnedRunStore } from '../../screener/runStore';
+import { PROBLEM_CODES } from '../../screener/validation';
+import { createChangeHistory } from '../../workbench/application/changeHistory';
+import { createIdempotencyCache } from '../../workbench/application/idempotency';
+import { createOperationRegistry } from '../../workbench/application/operationRegistry';
+import { createRevisionService } from '../../workbench/application/revisionService';
+import { createIdSequencer } from '../../workbench/domain/ids';
+import type { Clock } from '../../workbench/domain/ports';
+import { makeProvenance, type MarketDataProvenance } from '../../workbench/domain/provenance';
+import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceRepository';
+import { memoryStorage } from '../../workbench/testSupport';
+import type { WorkbenchDeps } from '../../workbench/tools/index';
+import { createCreateScreenerTool } from './createScreener';
+import { createRunScreenerTool } from './runScreener';
+import { createSetScreenerRankingTool } from './setScreenerRanking';
+import type { ToolResult } from '../types';
+
+function fixedClock(iso: string): Clock {
+	return { now: () => iso };
+}
+
+const FIXED_PROVENANCE: MarketDataProvenance = {
+	asOf: '2026-09-02T14:00:00.000Z',
+	sourceId: 'eodhd',
+	sourceLabel: 'EOD Historical Data',
+	liveness: 'delayed',
+	delaySeconds: 900,
+	timezone: 'America/New_York',
+	currency: 'USD',
+	priceAdjustment: 'adjusted',
+	engineVersion: '1.0.0'
+};
+
+function jsonOf(result: ToolResult): unknown {
+	const first = result.content[0];
+	if (!first) {
+		throw new Error('ToolResult carried no content.');
+	}
+	return JSON.parse(first.text);
+}
+
+function fixtureProvenance(): MarketDataProvenance {
+	return makeProvenance({
+		asOf: '2026-09-02T14:30:00.000Z',
+		sourceId: 'src.screener.engine.fixture',
+		sourceLabel: 'Fixture screener engine',
+		liveness: 'end_of_day',
+		timezone: 'America/New_York'
+	});
+}
+
+function testMatch(instrumentId: string, rank: number): ScreenerMatch {
+	return {
+		instrumentId,
+		rank,
+		compositeScore: null,
+		rankingValues: {},
+		nodeEvaluations: {
+			filter_1: { nodeId: 'filter_1', passed: true, value: null }
+		}
+	};
+}
+
+interface EvaluationInput {
+	definition: ScreenerDefinition;
+	runId: string;
+}
+
+interface FakePort {
+	port: ScreenerEvaluationPort;
+	callCount: () => number;
+}
+
+// A counting fake standing in for T-1009-7's real engine: this ticket's
+// job is proving run_screener orchestrates correctly (mints an id, calls
+// execute exactly when it should, stores/shapes what execute returns), not
+// re-testing the engine's own evaluation logic (engine.test.ts already
+// covers that).
+function makeFakePort(buildOutcome: (input: EvaluationInput) => ScreenerRunOutcome): FakePort {
+	let calls = 0;
+	const port: ScreenerEvaluationPort = {
+		async validate(definition) {
+			return {
+				screenerId: definition.screenerId,
+				screenerRevision: definition.revision,
+				valid: true,
+				problems: [],
+				skippedNodeIds: [],
+				costEstimate: null,
+				detectionExhaustive: false
+			};
+		},
+		async execute(input) {
+			calls += 1;
+			return buildOutcome(input);
+		}
+	};
+	return { port, callCount: () => calls };
+}
+
+function completeRunFor(
+	input: EvaluationInput,
+	opts: {
+		matches?: ScreenerMatch[];
+		universeCount?: number;
+		matchedCount?: number;
+		truncated?: boolean;
+		warnings?: ScreenerRun['warnings'];
+	} = {}
+): ScreenerRun {
+	const matches = opts.matches ?? [testMatch('inst:XNAS:AAPL', 1)];
+	const matchedCount = opts.matchedCount ?? matches.length;
+	return makeScreenerRun({
+		runId: input.runId,
+		screenerId: input.definition.screenerId,
+		screenerRevision: input.definition.revision,
+		status: 'complete',
+		universeCount: opts.universeCount ?? 100,
+		matchedCount,
+		returnedCount: matches.length,
+		truncated: opts.truncated ?? matches.length < matchedCount,
+		rankingApplied: false,
+		normalization: null,
+		warnings: opts.warnings ?? [],
+		provenance: fixtureProvenance(),
+		matches,
+		createdAt: '2026-09-02T14:30:05.000Z'
+	});
+}
+
+function refusalFor(input: EvaluationInput): ScreenerRunRefusal {
+	return {
+		status: 'refused',
+		screenerId: input.definition.screenerId,
+		screenerRevision: input.definition.revision,
+		problems: [
+			{
+				severity: 'blocking',
+				code: PROBLEM_CODES.invalidParameter,
+				nodeIds: [],
+				universeCriteria: [],
+				message: 'Fixture blocking problem.'
+			}
+		]
+	};
+}
+
+describe('run_screener', () => {
+	let deps: WorkbenchDeps;
+
+	beforeEach(() => {
+		const repository = createLocalWorkspaceRepository(memoryStorage());
+		const clock = fixedClock('2026-01-01T00:00:00.000Z');
+		const ids = createIdSequencer();
+		const idempotency = createIdempotencyCache();
+		deps = {
+			repository,
+			revisions: createRevisionService({ repository, clock, ids, idempotency }),
+			history: createChangeHistory(),
+			registry: createOperationRegistry(),
+			provenance: { current: () => FIXED_PROVENANCE },
+			clock,
+			ids,
+			idempotency
+		};
+	});
+
+	async function seedScreener(): Promise<{ workspaceId: string; screenerId: string }> {
+		const workspaceId = deps.ids.next('workspace');
+		const created = jsonOf(
+			await createCreateScreenerTool(deps).execute({
+				workspace_id: workspaceId,
+				name: 'Test Screener'
+			})
+		) as { affected_ids: string[] };
+		const screenerId = created.affected_ids[0];
+		if (!screenerId) {
+			throw new Error('create_screener did not return a screener id.');
+		}
+		deps.repository.setActiveId(workspaceId);
+		return { workspaceId, screenerId };
+	}
+
+	// A real mutation through the shipped write path -- AC2's "editing the
+	// screener afterwards" needs the screener's own revision to actually
+	// advance, not a hand-rolled document edit.
+	async function bumpScreenerRevision(workspaceId: string, screenerId: string): Promise<void> {
+		const result = jsonOf(
+			await createSetScreenerRankingTool(deps).execute({
+				workspace_id: workspaceId,
+				screener_id: screenerId,
+				fields: [{ field_id: 'field.volume' }]
+			})
+		) as { error?: string };
+		if (result.error) {
+			throw new Error(`set_screener_ranking failed: ${JSON.stringify(result)}`);
+		}
+	}
+
+	it('test_runScreener_validScreener_createsRunWithSummary', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port });
+
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const json = jsonOf(result) as Record<string, unknown>;
+
+		expect(result.isError, 'a valid run must not be a tool error').toBeFalsy();
+		expect(typeof json.run_id, 'AC1: a completed run must carry a run_ id').toBe('string');
+		expect(json.screener_id, 'AC1: the run must name the screener it executed').toBe(screenerId);
+		expect(json.screener_revision, 'a freshly created screener starts at revision 1').toBe(1);
+		expect(json.status, 'a valid run completes').toBe('complete');
+		expect(json.universe_count, 'AC1: the universe count must be reported').toBe(100);
+		expect(json.matched_count, 'AC1: the matched count must be reported').toBe(1);
+		expect(json.returned_count, 'AC1: the returned count must be reported').toBe(1);
+		expect(Array.isArray(json.warnings), 'AC1: warnings must be an array, even if empty').toBe(
+			true
+		);
+		expect(json.provenance, 'AC6: every run must carry provenance').toBeTruthy();
+	});
+
+	it('test_runScreener_screenerEditedAfterRun_runStaysPinned', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const store = createPinnedRunStore();
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, runStore: store });
+
+		const before = jsonOf(
+			await tool.execute({ workspace_id: workspaceId, screener_id: screenerId })
+		) as { run_id: string; screener_revision: number };
+		expect(before.screener_revision, 'the run pins the revision it executed').toBe(1);
+
+		await bumpScreenerRevision(workspaceId, screenerId);
+
+		const stored = store.getRun(before.run_id);
+		expect(
+			'available' in stored,
+			'AC2: the pinned run must still be retrievable after the later edit'
+		).toBe(false);
+		if (!('available' in stored)) {
+			expect(
+				toWireScreenerRun(stored),
+				'AC2: a later edit must not change anything a previously minted run reports'
+			).toEqual(before);
+		}
+	});
+
+	it('test_runScreener_explicitRetainedRevision_runsThatRevision', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		await bumpScreenerRevision(workspaceId, screenerId); // screener now at revision 2
+
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port });
+
+		const result = await tool.execute({
+			workspace_id: workspaceId,
+			screener_id: screenerId,
+			screener_revision: 1
+		});
+		const json = jsonOf(result) as { screener_revision: number };
+
+		expect(result.isError, 'AC3: a retained explicit revision must be accepted').toBeFalsy();
+		expect(json.screener_revision, 'AC3: the run must execute exactly the named revision').toBe(1);
+		expect(fake.callCount(), 'exactly one evaluation must run').toBe(1);
+	});
+
+	it('test_runScreener_explicitUnretainedRevision_isRejected', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port });
+
+		const result = await tool.execute({
+			workspace_id: workspaceId,
+			screener_id: screenerId,
+			screener_revision: 999
+		});
+		const json = jsonOf(result) as { error?: string };
+
+		expect(result.isError, 'AC3: an unretained explicit revision must be rejected').toBe(true);
+		expect(json.error, 'the failure must be reported as an operation validation error').toBe(
+			'operation_validation_error'
+		);
+		expect(fake.callCount(), 'AC3: a rejected revision must never reach the evaluation port').toBe(
+			0
+		);
+	});
+
+	it('test_runScreener_readRunAfterExecute_doesNotReexecute', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const nodeEvaluations = {
+			filter_1: { nodeId: 'filter_1', passed: true, value: 42, unit: 'usd' }
+		};
+		const fake = makeFakePort((input) =>
+			completeRunFor(input, {
+				matches: [{ ...testMatch('inst:XNAS:AAPL', 1), nodeEvaluations }]
+			})
+		);
+		const store = createPinnedRunStore();
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, runStore: store });
+
+		const { run_id: runId } = jsonOf(
+			await tool.execute({ workspace_id: workspaceId, screener_id: screenerId })
+		) as { run_id: string };
+
+		store.getRun(runId);
+		const matches = store.getMatches(runId, 0, 10);
+
+		expect(
+			fake.callCount(),
+			'AC4/AC5: reading a stored run back must never call the evaluation port again'
+		).toBe(1);
+		expect('available' in matches, 'the run must be readable by id').toBe(false);
+		if (!('available' in matches)) {
+			expect(
+				matches[0]?.nodeEvaluations,
+				'AC4: per-node evaluations must be preserved in the stored match'
+			).toEqual(nodeEvaluations);
+		}
+	});
+
+	it('test_runScreener_evictedRun_reportsRunNotAvailable', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const alwaysEvict: RunRetentionPolicy = { shouldEvict: () => true };
+		const store = createPinnedRunStore({ policy: alwaysEvict });
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, runStore: store });
+
+		const { run_id: runId } = jsonOf(
+			await tool.execute({ workspace_id: workspaceId, screener_id: screenerId })
+		) as { run_id: string };
+
+		const read = store.getRun(runId);
+		expect(
+			'available' in read,
+			'AC5/AC11: an evicted run must fail explicitly, never fall back to a fresh rerun'
+		).toBe(true);
+		if ('available' in read) {
+			expect(
+				read.reason,
+				'a run this store held and reclaimed reports "evicted", not "unknown"'
+			).toBe('evicted');
+		}
+	});
+
+	it('test_runScreener_blockingProblems_refusesAndMintsNoRun', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => refusalFor(input));
+		const store = createPinnedRunStore();
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, runStore: store });
+
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const json = jsonOf(result) as Record<string, unknown>;
+
+		expect(
+			result.isError,
+			'AC7: a refusal is a well-formed answer, not a tool failure'
+		).toBeFalsy();
+		expect(json.status, 'AC7: blocking problems must refuse the run').toBe('refused');
+		expect(json.run_id, 'AC7: a refusal must never carry a run_id').toBeUndefined();
+		expect(
+			Array.isArray(json.problems) && (json.problems as unknown[]).length > 0,
+			'AC7: the blocking problems must be returned'
+		).toBe(true);
+
+		// The id run_screener minted internally before the port refused is
+		// discarded -- assert the store never received anything under it.
+		const probe = store.getRun('run_1');
+		expect('available' in probe, 'AC7: nothing may be stored under the discarded run id').toBe(
+			true
+		);
+		if ('available' in probe) {
+			expect(probe.reason, 'the store never received this id at all').toBe('unknown');
+		}
+	});
+
+	it('test_runScreener_nothingMatches_reportsZeroMatchedWithWarning', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) =>
+			completeRunFor(input, {
+				matches: [],
+				matchedCount: 0,
+				warnings: [{ code: 'empty_result', message: 'No instrument satisfied the filter tree.' }]
+			})
+		);
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port });
+
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const json = jsonOf(result) as Record<string, unknown>;
+
+		expect(result.isError, 'AC8: zero matches is a normal result, not an error').toBeFalsy();
+		expect(json.matched_count, 'AC8: a normal run may report zero matches').toBe(0);
+		expect(
+			Array.isArray(json.warnings) && (json.warnings as unknown[]).length > 0,
+			'AC8: zero matches must carry a warning'
+		).toBe(true);
+	});
+
+	it('test_runScreener_overLimit_reportsTruncated', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const returned = [testMatch('inst:A', 1), testMatch('inst:B', 2)];
+		const fake = makeFakePort((input) =>
+			completeRunFor(input, { matches: returned, matchedCount: 10, truncated: true })
+		);
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port });
+
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const json = jsonOf(result) as Record<string, unknown>;
+
+		expect(json.matched_count, 'AC9: the total matched count must be reported').toBe(10);
+		expect(json.returned_count, 'AC9: the returned count reflects only what was stored').toBe(2);
+		expect(json.truncated, 'AC9: truncation must be explicit').toBe(true);
+	});
+
+	it('test_runScreener_replayedIdempotencyKey_returnsOriginalRunWithoutSecondExecution', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port });
+		const input = { workspace_id: workspaceId, screener_id: screenerId, idempotency_key: 'key-1' };
+
+		const first = jsonOf(await tool.execute(input)) as { run_id: string };
+		const second = jsonOf(await tool.execute(input)) as { run_id: string };
+
+		expect(fake.callCount(), 'AC10: a replayed key must not execute a second query').toBe(1);
+		expect(second.run_id, 'AC10: a replay must return the original run_id').toBe(first.run_id);
+	});
+
+	it('test_runScreener_staleExpectedRevision_isRejected', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port });
+
+		const result = await tool.execute({
+			workspace_id: workspaceId,
+			screener_id: screenerId,
+			expected_revision: 999
+		});
+		const json = jsonOf(result) as { error?: string };
+
+		expect(result.isError, 'a stale expected_revision must be rejected').toBe(true);
+		expect(json.error, 'the failure must be reported as a revision conflict').toBe(
+			'revision_conflict'
+		);
+		expect(fake.callCount(), 'a rejected call must never reach the evaluation port').toBe(0);
+	});
+});
