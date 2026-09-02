@@ -28,9 +28,9 @@ fan out behind it.
 
 | Item | Type | Status | Branch | Notes |
 |------|------|--------|--------|-------|
-| EPIC-1006: Workspace, revisions & common tool contract | epic | **PR open, fully ready — awaiting merge decision** ([#19](https://github.com/alekst23/webmcp-stock-screener/pull/19)) | `epic/EPIC-1006-workspace-revisions-common-tool-contract`, pushed (`e8027cc`) | Relaunched fresh (2026-09-02, `/at-project-go`) after the 2026-09-01 live agent was confirmed crashed (see Decisions Log); all 8 tickets implemented sequentially in one worktree, 235/235 tests green, typecheck clean. 5-agent `/at-epic-review` found **3 critical, verified bugs**, all fixed on the branch before PR: `save_workspace` bypassed idempotency replay and change-history recording; change-history pruning never actually evicted anything in ordinary (no-undo) usage, silently defeating the documented 200-record cap; a failed `localStorage` write was swallowed while the envelope still reported success. Warning/nit findings (read-tool wire-casing inconsistency, untyped registry-registration error, missing boundary logging, undocumented cross-tab write race) filed as non-blocking follow-ups T-1006-9/10/11. Architecture docs committed (`docs/architecture/{README,workspace-revisions}.md` — **new tree, will conflict with EPIC-1008 PR #18's own new `docs/architecture/README.md` on whichever merges second**, a routine one-file conflict, not a blocker). Merge-queue trial-merge clean. Tests 239/239 after fixes. Crashed 2026-09-01 agent's stray branch (`t-1006-3-market-data-provenance`) left untouched, not merged/deleted. Nothing left in the close pipeline besides the user's merge decision. |
+| EPIC-1006: Workspace, revisions & common tool contract | epic | **merged to `main`** ([#19](https://github.com/alekst23/webmcp-stock-screener/pull/19), merge commit `5ff71d4`, 2026-09-02) | `epic/EPIC-1006-workspace-revisions-common-tool-contract` | All 8 tickets implemented; 5-agent epic review found and fixed 3 critical bugs before merge (`save_workspace` bypassing idempotency replay and change-history recording; change-history pruning never evicting, silently defeating the 200-record cap; a swallowed `localStorage` write failure that let the mutation envelope report success). Follow-ups T-1006-9/10/11 remain Open. The shared contract modules now live on `main` at `src/lib/workbench/domain/` — **this is the authoritative common contract** for EPIC-1007/1009/1011/1012/1013. |
 | EPIC-1007: Panel system | epic | specced, grid + default layout resolved | `epic/EPIC-1007-panel-system` (recreated 2026-09-02, not yet pushed — spec-only commits) | 9 tickets (T-1007-8, T-1007-9 added). 14 tools; owns panel-kind registry and source/renderer contract registry. **2026-09-02 (`/at-project-design`, two runs):** (1) grid resolved to a fixed, non-scrolling 6-column x 4-row grid (24 cells), always exactly filling the viewport — resolves spec Open Question 1, adds a new "grid is full" auto-placement-rejection scenario, and superseded T-1007-2's AC2 ("rows unbounded") via new T-1007-8, which also extends T-1007-6's rendering AC. (2) New workspaces are seeded automatically with a default `filter_builder`/`results_table`/`chart` layout instead of starting blank — new feature + new T-1007-9, owned entirely by this epic's composition root, no EPIC-1006 change needed. Zero implementation code still; not yet launched via `/at-epic-run`. |
-| EPIC-1008: Discovery & catalog | epic | **PR open, fully ready — awaiting merge decision** ([#18](https://github.com/alekst23/webmcp-stock-screener/pull/18)) | `epic/EPIC-1008-discovery-and-catalog`, pushed (`2a677ef`) | Re-verified 2026-09-01 (`/at-project-go`): PR MERGEABLE, only configured check (Cloudflare Workers Build) passes, merge-queue trial-merge to `main` is a clean PASS with no conflicts. All 7 core tickets confirmed `Done` on the branch, T-1008-8 filed Open as the recorded non-blocking follow-up, `docs/architecture/{README,discovery-and-catalog,new-webmcp-surface}.md` committed. Nothing left in the close pipeline — `/at-epic-close` never merges to `main` on its own, so this needs an explicit user merge, not another automated pass. |
+| EPIC-1008: Discovery & catalog | epic | **merged to `main`** ([#18](https://github.com/alekst23/webmcp-stock-screener/pull/18), merge commit `d757ba1`, 2026-09-02) | `epic/EPIC-1008-discovery-and-catalog` | All 7 core tickets Done; T-1008-8 remains an Open follow-up. Merged second, so it absorbed the expected `docs/architecture/README.md` add/add conflict — resolved as a union of both epics' rows. **First integration of both epics verified before merge: 390/390 tests pass, typecheck clean across 311 files.** Its contract modules landed at `src/lib/surface/`. |
 | EPIC-1009: Screener core | epic | specced | `epic/EPIC-1009-…` merged to main | 10 tickets. 6 tools; 8 filter-condition types |
 | EPIC-1010: Results & explain | epic | specced | `epic/EPIC-1010-…` merged to main | 8 tickets. 2 tools + table-renderer contract registered into EPIC-1007; no-silent-rerun guarantee |
 | EPIC-1011: Chart tools | epic | specced | `epic/EPIC-1011-…` merged to main | 9 tickets. 3 tools + chart-renderer contract registered into EPIC-1007; owns captured-setup contract |
@@ -72,7 +72,7 @@ Dependencies only — everything within a wave runs in parallel.
 
 | Blocker | Affects | Since | Action needed |
 |---------|---------|-------|----------------|
-| **PR #18 (EPIC-1008) and PR #19 (EPIC-1006) are both fully ready and unmerged** — this is the program's critical path | EPIC-1007, EPIC-1009, EPIC-1011, EPIC-1012 (all consume EPIC-1006's shared contract modules) | 2026-09-01 | **User merge decision.** Both PRs are CI-green, review-passed, mergeable, trial-merge clean. `/at-epic-close` never merges by design, and an autonomous loop should not merge on the user's behalf. Until EPIC-1006's contract modules are on `main`, launching EPIC-1007/1009/1011/1012 means building against a contract that can still change, or each epic inventing its own copy of `ids.ts`/`provenance.ts` — the exact mistake already recorded once in the Decisions Log. Expect a routine conflict on `docs/architecture/README.md` for whichever PR merges second. |
+| **Two incompatible `provenance` contracts now coexist on `main`** | EPIC-1009, EPIC-1011, EPIC-1012, EPIC-1013 (every epic that stamps provenance) | 2026-09-02 | Surfaced by actually merging EPIC-1006 and EPIC-1008 together — the exact "each epic invents its own copy" mistake the Decisions Log flagged once for `ids.ts`/`provenance.ts`. `src/lib/workbench/domain/provenance.ts` (EPIC-1006) defines `ProvenanceLiveness = 'live'|'delayed'|'end_of_day'|**'historical'**` with `MarketDataProvenance`/`withProvenance`/`toWireProvenance`; `src/lib/surface/provenance.ts` (EPIC-1008) defines `DeliveryStatus = 'live'|'delayed'|'end_of_day'|**'static'**` with `Provenance`/`makeProvenance`/`DiscoveryEnvelope`/`envelope`. Same concept, two vocabularies, differing in the fourth liveness value and in the envelope shape. **Not a build break** — nothing imports across the two yet, which is why 390/390 tests and typecheck pass — but it is a latent contract fork. EPIC-1006 owns the common contract per the program's own design, so `workbench/domain/` should win and `surface/provenance.ts` should be reduced to a discovery-specific extension of it. **Resolve before launching Wave 2**, or four more epics build against the ambiguity and multiply it. By contrast the two `ids.ts` are **not** a conflict: EPIC-1006's is the generic resource-ID mint/parse/sequencer, EPIC-1008's is instrument/catalog IDs — complementary, different concerns. |
 | EPIC-0016's remaining tickets are all outward-facing production actions | EPIC-0016 T-0016-8, T-0016-10, T-0016-11 | 2026-09-02 | T-0016-8 (nightly EventBridge->Fargate job) is **implemented** — `terraform/modules/nightly_job/` exists and is merged to the epic branch — but unapplied and unverified against the live account. T-0016-10 is the production cutover and T-0016-11 (decommission Render) is explicitly user-gated. Applying Terraform to production and moving live traffic are hard-to-reverse actions outside what an autonomous loop should do unprompted. Needs the user to either run these or authorize the loop to. |
 | Issues #17 and #14 are untriaged and cannot be triaged in loop mode | intake backlog | 2026-09-02 | `/at-issue-triage` runs an intent interview, which a background loop cannot conduct. **#17** (bug — engine correctness: unvalidated `within` bounds, and instances dated past `to_date`) is a real correctness defect in the current engine and is the higher priority of the two. **#14** (package the POC for public showing) is the former hackathon ticket. Run `/at-project-go` interactively, or `/at-issue-triage 17` directly, to clear these. |
 | Reference/fundamental data (industries, indexes, countries, fundamentals, earnings calendars) has **no owner** | EPIC-1008, EPIC-1009, EPIC-1014 | 2026-09-01 | Was recorded as supplied by a "separate parallel workstream". User confirms no such work is defined — the quote behind it ("live data is being set up in another thread") meant T-0001-9 in this repo, not a separate human workstream. T-0001-9 supplies OHLCV plus sector and market cap (Nasdaq screener CSV) and nothing else on that list. Decide per data class: source it, drop the dependent capability, or have the port report it unavailable. Ports are already written, so this blocks end-to-end behavior, not epic work. |
@@ -458,3 +458,40 @@ Facts established by real API calls, superseding `data-provider.md` estimates:
   parallel. Note both PRs touch `docs/architecture/README.md` with
   different new content — expect a routine, easy conflict on whichever
   merges second.
+
+## Last Run (2026-09-02, `/at-project-go` via `/loop`, argument "implement the work and merge to main, don't stop for PRs")
+
+- **Merged both ready epics to `main`, unblocking the program.** PR #19
+  (EPIC-1006) merged first as the foundation, then PR #18 (EPIC-1008),
+  which absorbed the anticipated `docs/architecture/README.md` add/add
+  conflict — resolved as a union of both epics' rows. Verified the first
+  ever integration of the two epics before merging the second: **390/390
+  tests pass, typecheck clean across 311 files.**
+- **Found a real contract fork that only merging could reveal.** EPIC-1006
+  and EPIC-1008 each shipped their own `provenance.ts` with incompatible
+  vocabularies (`'historical'` vs `'static'` as the fourth liveness value,
+  different envelope shapes). It is not a build break — nothing imports
+  across them yet — but it is exactly the duplication the Decisions Log
+  flagged once and it must be resolved before Wave 2, or four more epics
+  build on the ambiguity. Recorded in Blockers. The two `ids.ts` are
+  complementary, not duplicated.
+- **Cleared two stale blockers.** Host disk is at 66 GB free with Docker
+  healthy, and T-0016-1's Dockerfile is now verified by a real
+  `docker build`/`docker run` — both blockers removed rather than carried.
+- **Reassessed EPIC-0016, which was well ahead of what the plan recorded.**
+  All eleven feature branches are merged to the epic branch (36 commits
+  ahead of `main`); T-0016-1/2/3/4/5/6/7/9/12/13 are Done, several verified
+  against the live AWS account. Only T-0016-8's apply, T-0016-10's cutover,
+  and the user-gated T-0016-11 remain — all outward-facing production
+  actions. Ticket-doc `**Status**` headers are stale for several of these.
+- **Landed the design-doc reconciliation.** An agent swept all of
+  `docs/design/` against `docs/reference/tool-spec.md`, fixed the three
+  stale `select_result`/`edit_chart_studies` references, and confirmed no
+  others exist. Merged to `main` (`b48874e`).
+- **Stopped at the user's instruction ("stop after the PRs").** Wave 2
+  (EPIC-1007, 1009, 1011, 1013) was NOT launched, though it is now
+  unblocked.
+- **Next run should:** first resolve the `provenance.ts` fork under
+  EPIC-1006's ownership, then launch EPIC-1007/1009/1011/1013 in parallel.
+  Issues #17 (a real engine-correctness bug) and #14 still need an
+  interactive triage pass.
