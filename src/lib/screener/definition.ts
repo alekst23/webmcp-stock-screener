@@ -64,11 +64,28 @@ export interface RankingTieBreak {
 	direction: 'asc' | 'desc';
 }
 
+// A closed union rather than a free-form string (T-1009-5, spec.md Open
+// Question 3): the set of ways differing units can be made comparable
+// before weighting is a small, fixed vocabulary that T-1009-7's evaluation
+// engine and a run's own report (run.ts's `normalization` field) must agree
+// on, not something a caller can invent per call.
+export type RankingNormalization = 'percentile_rank' | 'z_score' | 'min_max';
+
+export const RANKING_NORMALIZATIONS: readonly RankingNormalization[] = [
+	'percentile_rank',
+	'z_score',
+	'min_max'
+] as const;
+
+// percentile-rank within the matched set is the documented default
+// (spec.md Open Question 3).
+export const DEFAULT_RANKING_NORMALIZATION: RankingNormalization = 'percentile_rank';
+
 export interface RankingSpec {
 	fields: RankingField[];
 	tieBreak: RankingTieBreak | null;
 	limit: number;
-	normalization: string;
+	normalization: RankingNormalization;
 }
 
 export interface ScreenerDefinition {
@@ -269,6 +286,16 @@ function normalizeTieBreak(value: unknown): RankingTieBreak | null {
 	return { fieldId: value.fieldId, direction: value.direction === 'asc' ? 'asc' : 'desc' };
 }
 
+// Foreign or malformed values repair to the documented default rather than
+// being kept verbatim -- RankingNormalization is a closed union, not a
+// free-form string a persisted or hand-built record could smuggle anything
+// into.
+function normalizeNormalization(value: unknown): RankingNormalization {
+	return typeof value === 'string' && (RANKING_NORMALIZATIONS as readonly string[]).includes(value)
+		? (value as RankingNormalization)
+		: DEFAULT_RANKING_NORMALIZATION;
+}
+
 // A missing or foreign `ranking` normalizes to null -- the documented default
 // order -- rather than a hollow RankingSpec, matching "null means the
 // documented default order" in technical.md.
@@ -280,7 +307,7 @@ export function normalizeRanking(value: unknown): RankingSpec | null {
 		fields: normalizeRankingFieldArray(value.fields),
 		tieBreak: normalizeTieBreak(value.tieBreak),
 		limit: typeof value.limit === 'number' && value.limit > 0 ? value.limit : 100,
-		normalization: asString(value.normalization, 'percentile_rank')
+		normalization: normalizeNormalization(value.normalization)
 	};
 }
 
