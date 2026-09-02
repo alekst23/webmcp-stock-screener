@@ -65,6 +65,15 @@ class WindowRef(BaseModel):
 NormalizationMode = Literal["none", "percent_change", "indexed_100", "z_score"]
 NormalizationAnchor = Literal["window_start", "anchor_bar"]
 
+# T-1012-2's AC4: a search scope selects other instruments
+# ("cross_instrument"), other historical windows of the same instrument
+# ("same_instrument_windows"), or both -- and the run that ran under it
+# states which. Defined here (not only in
+# domain/contracts/similarity_engine.py, which imports this one) so
+# `SimilarityRun.scope` doesn't need a domain/models -> domain/contracts
+# back-reference.
+SearchScope = Literal["cross_instrument", "same_instrument_windows", "both"]
+
 
 class NormalizationRef(BaseModel):
     """Mirrors `Normalization` in
@@ -294,12 +303,13 @@ class SimilarityExplanation(BaseModel):
 
 class SimilarityRun(BaseModel):
     """A pinned, identified search result (AC8): a stable run ID, the
-    reference setup it came from, the weight set used, the normalization
-    settings applied, the market-data provenance, and its ranked
-    candidates."""
+    reference setup it came from, the search scope that was applied
+    (T-1012-2 AC4), the weight set used, the normalization settings applied,
+    the market-data provenance, and its ranked candidates."""
 
     run_id: str
     reference_setup_id: str
+    scope: SearchScope
     weights: FeatureWeightSet
     normalization: NormalizationRef
     provenance: MarketDataProvenance

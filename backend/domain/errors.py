@@ -27,3 +27,34 @@ class PanelSchemaError(DomainError):
 class PriceSourceError(DomainError):
     """Raised when the upstream market-data provider cannot be reached, or
     returns a payload that does not conform to the PriceBar contract."""
+
+
+class SimilarityReferenceUnavailableError(DomainError):
+    """Raised when a similarity search's reference instrument/window has no
+    history in the loaded panel -- there is nothing to compare candidates
+    against, which reads as "no similar setups exist" if allowed through as
+    an empty result instead (EPIC-1012 T-1012-2/T-1012-3 AC7)."""
+
+    def __init__(self, instrument_id: str, message: str) -> None:
+        super().__init__(message)
+        self.instrument_id = instrument_id
+
+
+class SimilarityRunNotFoundError(DomainError):
+    """Raised when a similarity run ID does not correspond to any pinned run
+    -- either it never existed or it was evicted (EPIC-1012 T-1012-2/
+    T-1012-3 AC5/AC8)."""
+
+    def __init__(self, run_id: str) -> None:
+        super().__init__(f"Similarity run not found: {run_id!r}")
+        self.run_id = run_id
+
+
+class SimilarityCandidateNotFoundError(DomainError):
+    """Raised when a candidate ID is not part of the named run (EPIC-1012
+    T-1012-2/T-1012-3 AC5)."""
+
+    def __init__(self, run_id: str, candidate_id: str) -> None:
+        super().__init__(f"Candidate {candidate_id!r} is not part of run {run_id!r}")
+        self.run_id = run_id
+        self.candidate_id = candidate_id
