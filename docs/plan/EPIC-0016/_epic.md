@@ -67,6 +67,7 @@ when measured peak on the deployed container approaches its ceiling.
 | 10 | T-0016-10 | Cutover — frontend origin, CORS, runbook, rollback | T-0016-6, T-0016-8, T-0016-9 | Open |
 | 11 | T-0016-11 | Decommission Render (user-gated) | T-0016-10 | Open |
 | 12 | T-0016-12 | No synthetic data in production | T-0016-3 | Open |
+| 13 | T-0016-13 | Universe enforcement -- floor the ingest/nightly pipeline and rebuild the production panel | T-0016-7, T-0016-8, T-0016-9, T-0016-12 | Open |
 
 ## Dependency Graph
 
