@@ -302,6 +302,10 @@ export interface ChangeRecord {
   affectedIds: ResourceId[];
   undoToken: ResourceId | null;
   undoState: 'available' | 'redeemed' | 'superseded' | 'none';
+  // Internal bookkeeping, never serialized to an agent: the draft
+  // undoChange applies to reverse this record. Its own `.inverse` is set
+  // to the original forward draft, so undo/redo chain indefinitely.
+  inverseDraft?: MutationDraft | null;
 }
 
 export interface ChangeHistory {
@@ -311,16 +315,30 @@ export interface ChangeHistory {
   markRedeemed(token: ResourceId): void;
 }
 
+// Commits through RevisionService and appends the resulting ChangeRecord,
+// unless commit() returned an idempotency replay (no new change happened).
+// This is the path every mutating operation in the program calls through
+// -- not just undoChange/restoreRevision -- so "every applied change is
+// recorded" (AC1) holds regardless of which sibling epic initiated it.
+export function recordCommit(deps: {...}, input: {
+  workspaceId: ResourceId;
+  context: MutationContext;
+  operationKind?: string;
+  requestInput?: unknown;
+  mutate(doc: WorkspaceDocument): MutationDraft;
+}): MutationEnvelope;
+
 export function undoChange(token: ResourceId, deps: {...}): MutationEnvelope;
 export function restoreRevision(workspaceId: ResourceId, revision: Revision, context: MutationContext, deps: {...}): MutationEnvelope;
 ```
 
-Undo applies the stored inverse draft through `RevisionService.commit`, so
-the reversal is itself a numbered, recorded, undoable change. A token is
-redeemable only while its change is the newest un-redeemed change for that
-workspace; otherwise `UndoTokenError` with `reason: 'superseded'`.
-`restoreRevision` moves forward to a new revision whose content equals the
-target revision's — it never rewrites history.
+Undo applies the stored inverse draft through `RevisionService.commit`
+(via `recordCommit`), so the reversal is itself a numbered, recorded,
+undoable change. A token is redeemable only while its change is the
+newest un-redeemed change for that workspace; otherwise `UndoTokenError`
+with `reason: 'superseded'`. `restoreRevision` moves forward to a new
+revision whose content equals the target revision's — it never rewrites
+history.
 
 History is capped at the most recent 200 records per workspace.
 
