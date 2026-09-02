@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1011-5, T-1011-6, T-1011-9
 
@@ -49,6 +49,126 @@ changed underneath a saved setup.
    accumulating across the whole series.
 9. Nothing in this ticket performs I/O or imports from an
    infrastructure, tool, or component module.
+
+## Solution Approach
+
+### Shape
+
+New domain files, pure and DOM-free:
+
+- `src/lib/workbench/chart/domain/studyEngine.ts` — the public surface:
+  `STUDY_ENGINE_VERSION`, the input/output types, the calculator lookup
+  keyed by catalog item ID, bar validation and warning derivation.
+- `studyEngine/calculators.ts` — the pure array-in/array-out kernels.
+- `studyEngine/params.ts` — catalog-driven parameter resolution.
+- `studyEngine/errors.ts` — the three typed rejections.
+- `studyEngine/testSupport.ts` — the checked-in bar fixture, following
+  the existing `testSupport.ts` convention elsewhere in `src/lib`.
+
+Split this way so no file approaches the size limit and so the
+arithmetic can be read without the catalog plumbing around it. Tests sit
+alongside as `*.test.ts`.
+
+### Entry point
+
+```ts
+computeStudy(
+  bars: readonly OhlcvBar[],
+  catalogItemId: string,
+  params?: StudyParamInput,
+  options?: { registry?: CatalogRegistry }
+): StudyComputation
+```
+
+`OhlcvBar` is a minimal structural type declared locally
+(`{ time; open; high; low; close; volume }`) rather than imported from
+T-1011-1, so this ticket has no sibling dependency; a later ticket adapts
+its `StudyInstance` bars onto it.
+
+`StudyComputation` carries `catalogItemId`, the fully resolved `params`,
+`outputs` (a record keyed by the catalog's declared output names, each an
+array of `number | null` with exactly `bars.length` entries),
+`warmupBars`, `warnings`, and `engineVersion`.
+
+Two non-throwing companions so the tool layer can validate without a
+try/catch: `validateStudyParams(catalogItemId, params)` returning issue
+strings for an `OperationDefinition.validate`, and `isStudySupported(id)`.
+
+### Parameter resolution
+
+Defaults, valid ranges, and enum members all come from
+`resolveStudy(id)` in `src/lib/catalog/registry.ts`. Nothing about a
+study's parameter metadata is duplicated here. An unknown parameter name,
+a wrong value type, a non-finite number, or a value outside the catalog's
+declared `range` raises `StudyParameterError` naming the parameter, the
+offending value and the permitted range; no clamping, no partial result.
+An unknown or non-study catalog ID raises `UnknownStudyError`.
+Malformed bars (a non-finite value in a field the selected study reads)
+raise `StudyInputError` naming the bar index and the field.
+
+### Warm-up and alignment
+
+Every output series is allocated at `bars.length` and pre-filled with
+`null`. A calculator only ever writes at indices where its definition is
+satisfied, so warm-up bars keep the explicit `null` — never a zero, a
+back-filled first value, or a shortened array. Per-study minimums:
+SMA/EMA/Bollinger `length`, ATR/RSI `length + 1` (both need a previous
+close), MACD `slow + signal - 1`, VWAP 1.
+
+Too few bars is a **warning, not an error**: the outputs come back
+all-null and `warnings` states the study, the bars required and the bars
+supplied. A partially defined multi-output study (MACD with enough bars
+for the line but not the signal) gets a warning naming the outputs that
+are entirely absent.
+
+This resolves a conflict in favour of the design docs, which are
+authoritative. AC4 lists "period longer than the series" among the
+rejections, but spec.md's "Warm-up longer than range" scenario says the
+study is added with a warning that it will plot nothing in the current
+range. A rejection would also make a study's validity depend on the
+chart's current window, so the same parameters would be accepted or
+refused depending on how far the user happened to have scrolled. AC4's
+other cases — non-positive period, non-numeric input, out-of-range
+value — are rejections as written.
+
+### Arithmetic
+
+Standard published definitions, with the choices that vary between
+implementations pinned here because the version constant covers them:
+EMA seeded with the SMA of the first `length` closes and smoothed at
+`2 / (length + 1)`; ATR and RSI use Wilder's smoothing seeded on the mean
+of the first `length` true ranges / changes; Bollinger uses the
+population standard deviation over the same window as its middle band;
+MACD's signal is an EMA over the defined portion of the MACD line; VWAP
+uses the typical price `(high + low + close) / 3` and resets on the
+anchor boundary (`session` = calendar day, `week` = ISO week, `month` =
+calendar month) rather than accumulating across the series.
+
+### Version constant
+
+The surface declares exactly one version string — `ENGINE_VERSION` in
+`src/lib/workbench/domain/provenance.ts`, which `makeProvenance()` stamps
+into `engineVersion` — so this module exports `STUDY_ENGINE_VERSION` as
+an alias of it rather than inventing a second constant that could drift
+out of step with the one a payload actually reports.
+
+Bump rule, documented at the alias: **bumping `ENGINE_VERSION` is
+required whenever study arithmetic changes** — a different seeding rule,
+a different warm-up length, a different anchor boundary, or a different
+resolution of defaults all move a number for an unchanged input, and a
+saved setup has no other way to tell that happened. Adding a study
+without touching an existing one, or changing only a message, moves no
+number and needs no bump.
+
+### Testing
+
+Reference values are computed independently from the published
+definitions — by hand for the cases that are hand-checkable (SMA,
+Bollinger's variance, VWAP resets) and via an independent throwaway
+script for the recursive ones (EMA, RSI, ATR, MACD) — then checked in as
+literals with a stated tolerance. Each calculator is also asserted for
+exact `null` warm-up placement, index alignment, and repeat-call
+determinism.
 
 ## Design References
 
