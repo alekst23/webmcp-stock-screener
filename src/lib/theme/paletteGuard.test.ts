@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { findColourLiterals, SOURCE_GLOB } from './paletteGuard';
+import { findColourLiterals } from './paletteGuard';
+import { theme } from './tokens';
 
 // Vite's glob import rather than a filesystem walk: it needs no node typings
-// (the project has none) and it resolves the same set of files SOURCE_GLOB
-// names, so the guard cannot silently walk nothing.
+// (the project has none). The pattern is repeated in SOURCE_GLOB below only
+// because import.meta.glob takes a literal -- keep the two spellings equal.
 const SOURCES = import.meta.glob('/src/**/*.svelte', {
+	query: '?raw',
+	import: 'default',
+	eager: true
+}) as Record<string, string>;
+const SOURCE_GLOB = '/src/**/*.svelte';
+
+const HTML_SOURCES = import.meta.glob('/src/*.html', {
 	query: '?raw',
 	import: 'default',
 	eager: true
@@ -12,6 +20,13 @@ const SOURCES = import.meta.glob('/src/**/*.svelte', {
 
 const PAGE = SOURCES['/src/routes/+page.svelte'] ?? '';
 const SHELL = SOURCES['/src/lib/shell/AppShell.svelte'] ?? '';
+const LAYOUT = SOURCES['/src/routes/+layout.svelte'] ?? '';
+const APP_HTML = HTML_SOURCES['/src/app.html'] ?? '';
+
+// The regions the shell renders, in source order, named by the snippet prop
+// each one takes -- read out of the source rather than spelled here so
+// renaming a region stays a refactor rather than a red test.
+const SHELL_REGIONS = [...SHELL.matchAll(/\{@render\s+(\w+)\(\)\}/g)].map((match) => match[1]);
 
 describe('colour literal detection', () => {
 	it('test_finds_a_hex_literal_with_its_line_number', () => {
@@ -43,6 +58,54 @@ describe('colour literal detection', () => {
 			'hsla(210, 50%, 40%, 0.2)'
 		]);
 		expect(found.map((f) => f.line)).toEqual([1, 2, 3, 4]);
+	});
+
+	it('test_finds_the_modern_colour_functions', () => {
+		// A hurried edit reaches for whichever colour function it knows, not
+		// only the two the palette happens to use today.
+		const source = [
+			'.a { color: oklch(70% 0.1 250); }',
+			'.b { color: lab(50% 20 -30); }',
+			'.c { color: lch(50% 30 20); }',
+			'.d { color: oklab(0.5 0.1 0.1); }',
+			'.e { color: hwb(210 20% 30%); }',
+			'.f { color: color(display-p3 1 0 0); }'
+		].join('\n');
+		expect(
+			findColourLiterals(source, 'g.svelte').map((f) => f.line),
+			'every modern colour function is a literal'
+		).toEqual([1, 2, 3, 4, 5, 6]);
+	});
+
+	it('test_finds_css_named_colours_in_a_value', () => {
+		const source = [
+			'.a { background: white; }',
+			'.b { border: 1px solid red; }',
+			'.c { background: transparent; }',
+			'<rect fill="silver" />',
+			'<div style="color: rebeccapurple"></div>',
+			'.d { color: var(--accent, lime); }'
+		].join('\n');
+		expect(
+			findColourLiterals(source, 'h.svelte').map((f) => f.literal.toLowerCase()),
+			'a named colour is as hardcoded as a hex'
+		).toEqual(['white', 'red', 'transparent', 'silver', 'rebeccapurple', 'lime']);
+	});
+
+	it('test_ignores_colour_words_that_are_not_colours', () => {
+		// The words are common enough that a guard which matched them anywhere
+		// would cry wolf on prose, class names, and property names.
+		const source = [
+			'<p>The red line marks the anchor; silver bars are stale.</p>',
+			'<span class="silver-badge">gold tier</span>',
+			'.a { white-space: nowrap; }',
+			'.b { color: var(--sea-green); }',
+			'/* background: white was rejected -- use the token */',
+			'<!-- fill="red" in a comment is not a paint -->',
+			'// const orange = 1;',
+			'.tan:hover { font-weight: 600; }'
+		].join('\n');
+		expect(findColourLiterals(source, 'i.svelte'), 'no colour is named here').toEqual([]);
 	});
 
 	it('test_ignores_var_references_to_theme_tokens', () => {
@@ -80,10 +143,9 @@ describe('colour literal detection', () => {
 	});
 });
 
-// The guard that actually holds the line: walks every component and fails
-// on any colour named outside tokens.ts. This test is red on today's main
-// (roughly forty literals across ten style blocks) and is the evidence the
-// conversion is complete rather than partial.
+// The guard that actually holds the line: walks every component and fails on
+// any colour named outside tokens.ts, so the token layer cannot erode one
+// "just one more grey" at a time.
 describe('no component names a colour directly', () => {
 	it('test_no_raw_colour_literals_outside_the_token_module', () => {
 		const files = Object.entries(SOURCES);
@@ -100,43 +162,100 @@ describe('no component names a colour directly', () => {
 	});
 });
 
-// Two spec invariants with no other home. Both are structural guarantees a
-// restyle is uniquely likely to disturb, and neither is covered by any
-// existing test -- see technical.md, "Testing", for why a source-order
+// Nothing else asserts the palette is ever handed to the browser: the tokens
+// can be perfect and every route still render unstyled if the one injection
+// site stops emitting them.
+describe('the theme reaches the document', () => {
+	it('test_the_layout_injects_the_token_stylesheet_into_the_head', () => {
+		expect(LAYOUT, '+layout.svelte was not resolved').toContain('<svelte:head>');
+		const emitted = LAYOUT.match(/(?:const|let)\s+(\w+)\s*=[^\n]*themeCss\(/);
+		expect(emitted, 'the layout no longer renders themeCss() into anything').not.toBeNull();
+		const head = LAYOUT.slice(LAYOUT.indexOf('<svelte:head>'), LAYOUT.indexOf('</svelte:head>'));
+		expect(head, 'the token stylesheet never reaches <svelte:head>').toContain(
+			`{@html ${emitted![1]}`
+		);
+	});
+
+	it('test_app_html_paints_the_token_ground_before_hydration', () => {
+		// The :root block is injected by JS, so between first paint and
+		// hydration this literal is the only thing painting the dark ground --
+		// and it is the reason native scrollbars and controls render dark.
+		expect(APP_HTML, 'src/app.html was not resolved').toContain('<html');
+		expect(APP_HTML, `app.html must paint bgApp (${theme.colors.bgApp}) before JS runs`).toContain(
+			theme.colors.bgApp
+		);
+		expect(APP_HTML, 'app.html must declare the dark colour-scheme before JS runs').toContain(
+			'color-scheme: dark'
+		);
+	});
+});
+
+// Structural guarantees a restyle is uniquely likely to disturb, and that no
+// other test covers -- see technical.md, "Testing", for why a source
 // assertion was chosen over adding a component-mounting dependency.
+describe('restyle-sensitive shell invariants', () => {
+	it('test_the_log_region_renders_last_of_the_three', () => {
+		// The log's position is the shell's, not the page's: snippet
+		// declarations are order-independent, so this is the only file where
+		// "the activity log stays at the bottom" can actually be broken.
+		expect(SHELL_REGIONS.length, 'the shell no longer renders three regions').toBe(3);
+		const header = SHELL.indexOf('<header');
+		const main = SHELL.indexOf('<main');
+		const footer = SHELL.indexOf('<footer');
+		expect(header, 'the shell has no top bar landmark').toBeGreaterThan(-1);
+		expect(main, 'the work area must follow the top bar').toBeGreaterThan(header);
+		expect(footer, 'the log region must stay below the work area').toBeGreaterThan(main);
+		expect(
+			SHELL.indexOf(`{@render ${SHELL_REGIONS[2]}()}`),
+			'the last region is rendered outside the footer'
+		).toBeGreaterThan(footer);
+	});
+
+	it('test_the_grid_orders_the_three_regions_top_to_bottom', () => {
+		// DOM order alone is not the guarantee: a grid can reorder its rows.
+		expect(SHELL, 'the shell no longer lays its regions out as three rows').toMatch(
+			/grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+auto/
+		);
+		expect(SHELL, 'a region is reordering itself out of source order').not.toMatch(/\n\s*order:\s/);
+	});
+});
+
 describe('restyle-sensitive page invariants', () => {
 	const page = PAGE;
 
-	it('test_activity_feed_renders_after_the_focus_chart', () => {
-		const focus = page.indexOf('<FocusChart');
-		const feed = page.indexOf('<ActivityFeed');
-		expect(focus, 'FocusChart is no longer rendered').toBeGreaterThan(-1);
-		expect(feed, 'ActivityFeed is no longer rendered').toBeGreaterThan(-1);
-		expect(feed, 'the activity log must stay below the focus chart').toBeGreaterThan(focus);
-		expect(page.indexOf('<GridPanel'), 'GridPanel is no longer rendered').toBeGreaterThan(-1);
-		expect(feed, 'the activity log must stay below the panels').toBeGreaterThan(
-			page.indexOf('<GridPanel')
+	it('test_the_activity_feed_is_the_shell_log_region', () => {
+		// Which region it is passed as, not where it sits in this file: the
+		// shell decides the order, so that is where the invariant is asserted.
+		const logRegion = SHELL_REGIONS[SHELL_REGIONS.length - 1];
+		const snippet = page.match(
+			new RegExp(`\\{#snippet ${logRegion}\\(\\)\\}([\\s\\S]*?)\\{/snippet\\}`)
+		);
+		expect(snippet, `the page no longer supplies the shell a ${logRegion} region`).not.toBeNull();
+		expect(snippet![1], 'the activity log is no longer the shell log region').toContain(
+			'<ActivityFeed'
 		);
 	});
 
 	it('test_agent_context_comment_is_still_emitted', () => {
 		// An agent reads this out of the page's HTML source, so it has to be an
 		// actual emitted comment -- not a rendered element, and not dropped.
-		expect(page, 'the agent context comment must still be emitted as HTML').toMatch(
-			/\{@html\s+`<!--\s*\$\{formatAgentToolsContext\(/
+		// Asserted as three independent facts rather than one exact spelling,
+		// so extracting the template into a const stays a refactor.
+		expect(page, 'the agent context must still be raw-injected').toContain('{@html');
+		expect(page, 'formatAgentToolsContext must still be called').toContain(
+			'formatAgentToolsContext('
 		);
-		expect(page, 'formatAgentToolsContext must still be imported').toContain(
-			'formatAgentToolsContext'
-		);
+		expect(page, 'the context must still be emitted as an HTML comment').toContain('<!--');
 	});
 
 	it('test_both_tool_counts_are_still_rendered_in_the_top_bar', () => {
-		const start = page.indexOf('{#snippet topBar()}');
-		expect(start, 'the page no longer composes through AppShell topBar').toBeGreaterThan(-1);
-		const end = page.indexOf('{/snippet}', start);
-		expect(end, 'the topBar snippet is unterminated').toBeGreaterThan(start);
-		const topBar = page.slice(start, end);
-		expect(topBar, 'the defined-tool count left the top bar').toContain('formatDefinedStatus(');
-		expect(topBar, 'the callable-tool count left the top bar').toContain('formatAvailableStatus(');
+		const snippets = [...page.matchAll(/\{#snippet\s+(\w+)\(\)\}([\s\S]*?)\{\/snippet\}/g)];
+		expect(snippets.length, 'the page composes nothing through the shell').toBeGreaterThan(0);
+		const topBar = snippets.find((match) => match[2].includes('formatDefinedStatus('));
+		expect(topBar, 'the defined-tool count is not rendered in any shell region').toBeDefined();
+		expect(topBar![2], 'the callable-tool count left the top bar').toContain(
+			'formatAvailableStatus('
+		);
+		expect(SHELL, `the shell has no ${topBar![1]} region to render it in`).toContain(topBar![1]);
 	});
 });

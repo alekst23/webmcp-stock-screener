@@ -31,6 +31,23 @@ describe('contrast maths', () => {
 		expect(relativeLuminance('#ffffff')).toBeCloseTo(1, 10);
 	});
 
+	it('test_relative_luminance_uses_the_wcag_channel_coefficients', () => {
+		// Every other fixture here is greyscale, where R=G=B makes any
+		// permutation -- or a flat channel average -- indistinguishable from
+		// the real coefficients. A pure primary at full intensity linearizes
+		// to 1, so its luminance IS its channel's coefficient.
+		expect(relativeLuminance('#ff0000'), 'red carries the R coefficient').toBeCloseTo(0.2126, 6);
+		expect(relativeLuminance('#00ff00'), 'green carries the G coefficient').toBeCloseTo(0.7152, 6);
+		expect(relativeLuminance('#0000ff'), 'blue carries the B coefficient').toBeCloseTo(0.0722, 6);
+		// Green is the channel the eye weights most; a wrong ordering would
+		// certify an illegible palette as compliant.
+		expect(
+			relativeLuminance('#00ff00'),
+			'green must outweigh red, and red must outweigh blue'
+		).toBeGreaterThan(relativeLuminance('#ff0000'));
+		expect(relativeLuminance('#ff0000')).toBeGreaterThan(relativeLuminance('#0000ff'));
+	});
+
 	it('test_shorthand_and_longhand_hex_agree', () => {
 		const cases: [string, string][] = [
 			['#fff', '#ffffff'],
