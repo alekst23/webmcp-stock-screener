@@ -11,7 +11,15 @@ export interface ConfigError {
 	reason: string;
 }
 
-export type ConfigValidation<T> = { ok: true; value: T } | { ok: false; errors: ConfigError[] };
+// `warnings` is optional and only ever present on the `ok` arm (T-1010-6,
+// AC4): a config can be valid and still carry non-blocking issues -- e.g. a
+// results-table sort key that isn't a visible column. Adding it here (rather
+// than a results-only type) is additive and backward compatible: every
+// existing validator that returns `{ ok: true, value }` with no `warnings`
+// field is still a valid ConfigValidation<T>, so no other kind/renderer
+// changes behavior.
+export type ConfigValidation<T> =
+	{ ok: true; value: T; warnings?: ConfigError[] } | { ok: false; errors: ConfigError[] };
 
 export interface PanelKindDefinition<
 	TConfig extends Record<string, unknown> = Record<string, unknown>
