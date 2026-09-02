@@ -59,17 +59,115 @@ export interface ThemeTokens {
 	fontFamily: Record<'ui' | 'mono', string>;
 }
 
-export const theme: ThemeTokens = null as unknown as ThemeTokens;
+export const theme: ThemeTokens = {
+	colors: {
+		// Four grounds, each a step lighter than the last, so depth reads as
+		// elevation rather than as a border count.
+		bgApp: '#080b12',
+		bgPanel: '#0e131d',
+		bgElevated: '#141b28',
+		bgHover: '#1b2433',
+
+		// `border` and `separator` only group content and are exempt from the
+		// contrast floor; `borderStrong` bounds interactive controls and so
+		// clears 3:1 on every ground.
+		border: '#202b3b',
+		borderStrong: '#8293a9',
+		separator: '#18202c',
+
+		textPrimary: '#e6edf5',
+		textSecondary: '#aebbcd',
+		textMuted: '#93a1b5',
+		// Dark rather than white: the accent is light enough that white on it
+		// falls under 3:1, so the legible pairing is the inverse one.
+		textOnAccent: '#06131f',
+
+		accent: '#4c9df5',
+		accentHover: '#7bb8ff',
+		focusRing: '#5aa9ff',
+
+		positive: '#3fd68b',
+		negative: '#ff6b6b',
+
+		warning: '#e3b341',
+		// Violet, amber and red respectively: three well-separated hues, so no
+		// two of these states can be mistaken for one another.
+		synthetic: '#c58aff',
+		syntheticBg: '#241a2e',
+		degraded: '#ffc14d',
+		degradedBg: '#2b2211',
+		error: '#ff6b6b',
+		errorBg: '#2e1519',
+
+		actorHuman: '#58a6ff',
+		actorAgent: '#3fd68b',
+
+		chartLine: '#3fd68b',
+		chartFillFrom: '#3fd68b',
+		chartFillTo: '#0e131d',
+		// Gridlines are decorative scaffolding; they sit deliberately below the
+		// contrast floor so the price line is the only thing that draws the eye.
+		chartGrid: '#1e2836',
+		chartAxis: '#93a1b5',
+		chartAnchor: '#6c7d95',
+		chartCrosshair: '#8899ad',
+		chartTooltipBg: '#080b12',
+		chartTooltipText: '#e6edf5'
+	},
+	space: {
+		xs: '0.25rem',
+		sm: '0.5rem',
+		md: '0.75rem',
+		lg: '1.25rem',
+		xl: '2rem'
+	},
+	radius: {
+		sm: '3px',
+		md: '5px',
+		lg: '8px'
+	},
+	fontSize: {
+		xs: '0.6875rem',
+		sm: '0.75rem',
+		md: '0.8125rem',
+		lg: '1rem',
+		xl: '1.25rem'
+	},
+	fontFamily: {
+		ui: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+		mono: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace'
+	}
+};
 
 // The custom-property name for a role. Shared by the emitter and any
 // consumer so the two can never disagree on a spelling.
-export function cssVarName(_role: SemanticRole): string {
-	throw new Error('not implemented');
+export function cssVarName(role: SemanticRole): string {
+	return `--${role.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
+}
+
+function declarations(t: ThemeTokens): string[] {
+	const lines: string[] = [];
+	for (const role of Object.keys(t.colors) as SemanticRole[]) {
+		lines.push(`${cssVarName(role)}: ${t.colors[role]};`);
+	}
+	for (const [key, value] of Object.entries(t.space)) {
+		lines.push(`--space-${key}: ${value};`);
+	}
+	for (const [key, value] of Object.entries(t.radius)) {
+		lines.push(`--radius-${key}: ${value};`);
+	}
+	for (const [key, value] of Object.entries(t.fontSize)) {
+		lines.push(`--font-size-${key}: ${value};`);
+	}
+	for (const [key, value] of Object.entries(t.fontFamily)) {
+		lines.push(`--font-${key}: ${value};`);
+	}
+	return lines;
 }
 
 // Renders the tokens as a `:root { ... }` block for injection into <head>.
 // Emitting from the same constants the tests measure is what keeps the
 // asserted palette and the painted palette from drifting apart.
-export function themeCss(_t?: ThemeTokens): string {
-	throw new Error('not implemented');
+export function themeCss(t: ThemeTokens = theme): string {
+	return `:root {\n\t${declarations(t).join('\n\t')}\n}`;
 }

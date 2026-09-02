@@ -16,7 +16,49 @@ export interface ColourLiteral {
 // and is never passed to findColourLiterals.
 export const SOURCE_GLOB = 'src/**/*.svelte';
 
+// A `#` run that is the right length for a colour and is not the prefix of a
+// longer identifier -- `{#each}` and `#section-1` are excluded by the length
+// and trailing-character rules rather than by a keyword list.
+const HEX = /#[0-9a-fA-F]{3,8}(?![0-9a-zA-Z_-])/g;
+const FUNCTIONAL = /\b(?:rgba?|hsla?)\([^)]*\)/gi;
+
+const HEX_LENGTHS = new Set([3, 4, 6, 8]);
+
+// An SVG `url(#gradient-id)` or an in-page `href="#anchor"` is a reference,
+// not a colour, even when the identifier happens to be spelled in hex.
+const REFERENCE_PREFIX = /(?:url\(|href\s*=\s*["'{]?|xlink:href\s*=\s*["'{]?)$/i;
+
+function lineOf(source: string, index: number): number {
+	let line = 1;
+	for (let i = 0; i < index; i += 1) {
+		if (source[i] === '\n') {
+			line += 1;
+		}
+	}
+	return line;
+}
+
+function collect(source: string, file: string, pattern: RegExp): ColourLiteral[] {
+	const found: ColourLiteral[] = [];
+	for (const match of source.matchAll(pattern)) {
+		const index = match.index ?? 0;
+		const literal = match[0];
+		if (literal.startsWith('#')) {
+			if (!HEX_LENGTHS.has(literal.length - 1)) {
+				continue;
+			}
+			if (REFERENCE_PREFIX.test(source.slice(Math.max(0, index - 16), index))) {
+				continue;
+			}
+		}
+		found.push({ file, line: lineOf(source, index), literal });
+	}
+	return found;
+}
+
 // Every hex, rgb()/rgba(), or hsl()/hsla() literal in one file's source.
-export function findColourLiterals(_source: string, _file: string): ColourLiteral[] {
-	throw new Error('not implemented');
+export function findColourLiterals(source: string, file: string): ColourLiteral[] {
+	return [...collect(source, file, HEX), ...collect(source, file, FUNCTIONAL)].sort(
+		(a, b) => a.line - b.line
+	);
 }
