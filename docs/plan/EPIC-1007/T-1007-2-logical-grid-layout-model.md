@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1007 (Panel System)
 **Design**: docs/design/panel-system/
-**Status**: In Progress
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1007-4
 
