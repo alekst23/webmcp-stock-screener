@@ -36,16 +36,18 @@ function buildDeps(): AlertToolsDeps {
 }
 
 describe('buildAlertTools', () => {
-	it('builds exactly the three tools this ticket delivers', () => {
+	it('builds exactly the five tools T-1014-8 and T-1014-9 together deliver', () => {
 		const tools = buildAlertTools(buildDeps());
 		expect(tools.map((t) => t.name).sort()).toEqual([
 			'create_alert_draft',
+			'disable_alert',
 			'edit_alert_draft',
+			'enable_alert',
 			'preview_alert'
 		]);
 	});
 
-	it('registers both operations, and registering twice against a fresh set of tools does not throw', () => {
+	it('registers all four operations; building twice against fresh tools does not throw', () => {
 		const deps = buildDeps();
 		buildAlertTools(deps);
 		expect(() => buildAlertTools(deps)).not.toThrow();
@@ -54,10 +56,18 @@ describe('buildAlertTools', () => {
 		}
 	});
 
-	it("none of the three tools' names suggest arming or confirming an alert", () => {
+	// enable_alert/disable_alert legitimately mention activation by name --
+	// that is not the property being guarded. What matters is that no tool's
+	// name suggests it can itself perform the confirm/arm step (e.g. no
+	// `arm_alert` or `confirm_activation`).
+	it('no tool name is (or suggests) arm_alert or confirm/decline_activation', () => {
 		const tools = buildAlertTools(buildDeps());
-		for (const tool of tools) {
-			expect(tool.name).not.toMatch(/arm|confirm|activat/i);
+		const names = tools.map((t) => t.name);
+		expect(names).not.toContain('arm_alert');
+		expect(names).not.toContain('confirm_activation');
+		expect(names).not.toContain('decline_activation');
+		for (const name of names) {
+			expect(name).not.toMatch(/^arm_|^confirm_|^decline_/);
 		}
 	});
 });

@@ -26,6 +26,8 @@ function draftAlert(overrides: Partial<AlertRecord> = {}): AlertRecord {
 		source: { kind: 'conditions', conditions: [VOLUME_CONDITION] },
 		previewable: true,
 		previewProblems: [],
+		pendingActivation: null,
+		activationHistory: [],
 		createdAt: NOW,
 		updatedAt: NOW,
 		...overrides

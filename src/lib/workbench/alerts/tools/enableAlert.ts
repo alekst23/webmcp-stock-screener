@@ -1,8 +1,8 @@
-// The `edit_alert_draft` tool (T-1014-8, AC9). tool-spec.md names only
-// create_alert_draft for the create half; this ships as its own small tool,
-// named after edit_filter_tree's convention, because AC9 requires editing to
-// exist and no other tool in this ticket's or T-1014-9's surface covers it.
-import type { CatalogRegistry } from '../../../catalog/registry';
+// The `enable_alert` tool (T-1014-9 AC1, AC6, AC7, AC11). Wire parsing and
+// result shaping only, wrapping the `alerts.enable_activation` operation.
+// This tool NEVER arms an alert -- see application/enableAlert.ts's header
+// comment -- and the response says so explicitly on every call (AC1),
+// whether it is the first request or a re-request after expiry.
 import { fail, ok } from '../../../webmcp/tools';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
@@ -21,32 +21,32 @@ import type { OperationRegistry } from '../../application/operationRegistry';
 import type { RevisionService } from '../../application/revisionService';
 import { readAlert, toWireAlert } from '../domain/alert';
 import {
-	ALERTS_EDIT_CONDITIONS_KIND,
-	ensureEditAlertDraftOperation,
-	prepareEditAlertDraft
-} from '../application/editAlertDraft';
+	ALERTS_ENABLE_ACTIVATION_KIND,
+	ensureEnableAlertOperation
+} from '../application/enableAlert';
 
-export const EDIT_ALERT_DRAFT_TOOL_NAME = 'edit_alert_draft';
+export const ENABLE_ALERT_TOOL_NAME = 'enable_alert';
 
-export interface EditAlertDraftDeps {
+export interface EnableAlertDeps {
 	repository: WorkspaceRepository;
 	revisions: RevisionService;
 	history: ChangeHistory;
 	registry: OperationRegistry;
 	clock: Clock;
 	ids: IdSequencer;
-	catalog?: CatalogRegistry;
 }
 
 interface WireInput {
 	workspace_id?: string;
 	alert_id?: string;
-	name?: string;
-	screener_id?: string;
-	conditions?: unknown;
 	expected_revision?: number;
 	idempotency_key?: string;
 }
+
+const NOT_ARMED_MESSAGE =
+	"Not armed. This only records a pending activation request; a human must confirm it in the " +
+	"app's alerts surface -- an explicit confirm or decline gesture the app performs, never a tool " +
+	'call -- before the alert can arm and fire.';
 
 function toErrorResult(err: unknown): ToolResult {
 	if (
@@ -70,7 +70,7 @@ function invalid(issues: string[]): ToolResult {
 	return fail(message, { error: 'invalid_request', message, issues });
 }
 
-function editAlertDraft(deps: EditAlertDraftDeps) {
+function enableAlert(deps: EnableAlertDeps) {
 	return async (rawInput: unknown): Promise<ToolResult> => {
 		const input = (rawInput ?? {}) as WireInput;
 		const workspaceId = input.workspace_id ?? deps.repository.getActiveId();
@@ -81,22 +81,12 @@ function editAlertDraft(deps: EditAlertDraftDeps) {
 		if (!doc) {
 			return notFound(`Workspace "${workspaceId}" was not found.`);
 		}
+		if (typeof input.alert_id !== 'string' || input.alert_id.length === 0) {
+			return invalid(['alert_id: expected the stable ID of an alert draft.']);
+		}
 		try {
-			const outcome = await prepareEditAlertDraft(
-				{
-					alert_id: input.alert_id,
-					...(input.name !== undefined ? { name: input.name } : {}),
-					...(input.screener_id !== undefined ? { screener_id: input.screener_id } : {}),
-					...(input.conditions !== undefined ? { conditions: input.conditions } : {})
-				},
-				doc,
-				{ ...(deps.catalog ? { registry: deps.catalog } : {}) }
-			);
-			if (!outcome.ok) {
-				return invalid(outcome.issues);
-			}
 			const envelope = applyOperations(
-				[{ kind: ALERTS_EDIT_CONDITIONS_KIND, input: outcome.prepared }],
+				[{ kind: ALERTS_ENABLE_ACTIVATION_KIND, input: { alertId: input.alert_id } }],
 				{
 					expectedRevision: input.expected_revision,
 					idempotencyKey: input.idempotency_key,
@@ -112,11 +102,13 @@ function editAlertDraft(deps: EditAlertDraftDeps) {
 				}
 			);
 			const nextDoc = deps.repository.get(workspaceId);
-			const alert = nextDoc ? readAlert(nextDoc, outcome.prepared.alertId) : null;
+			const alert = nextDoc ? readAlert(nextDoc, input.alert_id) : null;
 			return ok({
 				...toWireEnvelope(envelope),
-				alert_id: outcome.prepared.alertId,
-				alert: alert ? toWireAlert(alert) : null
+				alert_id: input.alert_id,
+				alert: alert ? toWireAlert(alert) : null,
+				armed: false,
+				message: NOT_ARMED_MESSAGE
 			});
 		} catch (err) {
 			return toErrorResult(err);
@@ -125,33 +117,31 @@ function editAlertDraft(deps: EditAlertDraftDeps) {
 }
 
 const DESCRIPTION =
-	'Edits an alert draft: rename it, or replace its conditions with a new screener_id snapshot or ' +
-	'a new set of typed conditions (give at most one of the two; omit both to only rename). A ' +
-	'draft, or an alert with a pending activation request, can be edited; editing always leaves it ' +
-	'a draft -- this tool cannot arm anything. Editing an alert with a pending activation request ' +
-	'invalidates that request: a fresh enable_alert call and a fresh confirmation are required to ' +
-	'arm it afterward. Returns the mutation envelope with the edited alert; the undo_token restores ' +
-	'the prior draft.';
+	'Requests activation for an alert draft. This does NOT arm the alert: it records a pending ' +
+	"activation request that a human must explicitly confirm or decline in the app's own alerts " +
+	'surface. No tool call, undo, or replay can arm an alert -- only that in-app confirmation can. ' +
+	'The response always states plainly that the alert is not armed. Editing the underlying draft ' +
+	'while a request is pending invalidates it, requiring a fresh enable_alert call and a fresh ' +
+	'confirmation. A pending request also expires after a bounded time and must be re-requested. ' +
+	'Returns the mutation envelope; the undo_token clears the pending request (never a path to ' +
+	'arming).';
 
-export function buildEditAlertDraftTool(deps: EditAlertDraftDeps): ToolSpec {
-	ensureEditAlertDraftOperation(deps.registry, { clock: deps.clock });
+export function buildEnableAlertTool(deps: EnableAlertDeps): ToolSpec {
+	ensureEnableAlertOperation(deps.registry, { clock: deps.clock });
 	return {
-		name: EDIT_ALERT_DRAFT_TOOL_NAME,
+		name: ENABLE_ALERT_TOOL_NAME,
 		description: DESCRIPTION,
 		inputSchema: {
 			type: 'object',
 			properties: {
 				workspace_id: { type: 'string', description: 'Defaults to the active workspace.' },
 				alert_id: { type: 'string' },
-				name: { type: 'string' },
-				screener_id: { type: 'string' },
-				conditions: { type: 'array', items: { type: 'object' } },
 				expected_revision: { type: 'number' },
 				idempotency_key: { type: 'string' }
 			},
 			required: ['alert_id']
 		},
 		available: () => true,
-		execute: editAlertDraft(deps)
+		execute: enableAlert(deps)
 	};
 }

@@ -4,7 +4,10 @@ import {
 	ALERT_STATES,
 	ALERT_STATE_TRANSITIONS,
 	INITIAL_ALERT_STATE,
-	isDraft
+	isArmed,
+	isDisarmed,
+	isDraft,
+	isPendingActivation
 } from './alertStateMachine';
 
 describe('alert state machine', () => {
@@ -23,8 +26,25 @@ describe('alert state machine', () => {
 		expect(isDraft('disarmed')).toBe(false);
 	});
 
-	// The safety property this module exists for: the module's only executable
-	// exports are INITIAL_ALERT_STATE and isDraft. There is no exported function
+	it('isPendingActivation, isArmed and isDisarmed each classify exactly their own state', () => {
+		expect(isPendingActivation('pending_activation')).toBe(true);
+		expect(isPendingActivation('draft')).toBe(false);
+		expect(isPendingActivation('armed')).toBe(false);
+		expect(isPendingActivation('disarmed')).toBe(false);
+
+		expect(isArmed('armed')).toBe(true);
+		expect(isArmed('draft')).toBe(false);
+		expect(isArmed('pending_activation')).toBe(false);
+		expect(isArmed('disarmed')).toBe(false);
+
+		expect(isDisarmed('disarmed')).toBe(true);
+		expect(isDisarmed('draft')).toBe(false);
+		expect(isDisarmed('pending_activation')).toBe(false);
+		expect(isDisarmed('armed')).toBe(false);
+	});
+
+	// The safety property this module exists for: every executable export is a
+	// predicate over an already-known state. There is no exported function
 	// that performs a transition -- in particular nothing that could be called
 	// with 'armed' as a target. This test pins the export surface so an
 	// accidental addition (e.g. a generic `transition(from, to)` a future edit
@@ -35,7 +55,10 @@ describe('alert state machine', () => {
 			'ALERT_STATES',
 			'ALERT_STATE_TRANSITIONS',
 			'INITIAL_ALERT_STATE',
-			'isDraft'
+			'isArmed',
+			'isDisarmed',
+			'isDraft',
+			'isPendingActivation'
 		]);
 	});
 
@@ -43,11 +66,16 @@ describe('alert state machine', () => {
 		const functionExports = Object.values(alertStateMachine).filter(
 			(value) => typeof value === 'function'
 		);
-		// isDraft is the one function export, and it takes a state and returns a
-		// boolean -- it cannot produce or store a state, only classify one.
-		expect(functionExports).toHaveLength(1);
-		expect(functionExports[0]).toBe(isDraft);
-		expect(typeof isDraft('armed')).toBe('boolean');
+		// Every function export takes exactly one AlertState argument and returns
+		// a boolean -- none can produce or store a state, only classify one.
+		expect(functionExports).toHaveLength(4);
+		expect(new Set(functionExports)).toEqual(
+			new Set([isDraft, isPendingActivation, isArmed, isDisarmed])
+		);
+		for (const fn of functionExports) {
+			expect(fn as (state: string) => unknown).toHaveLength(1);
+			expect(typeof (fn as (state: string) => unknown)('armed')).toBe('boolean');
+		}
 	});
 
 	it('documents the pending_activation -> armed edge as data only, for T-1014-9 to implement', () => {

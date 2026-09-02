@@ -27,6 +27,8 @@ function draftAlert(overrides: Partial<AlertRecord> = {}): AlertRecord {
 		source: { kind: 'conditions', conditions: [VOLUME_CONDITION] },
 		previewable: true,
 		previewProblems: [],
+		pendingActivation: null,
+		activationHistory: [],
 		createdAt: NOW,
 		updatedAt: NOW,
 		...overrides
@@ -166,5 +168,76 @@ describe('alerts.edit_conditions operation', () => {
 			workspaceWithDraft({ state: 'disarmed' })
 		);
 		expect(issues.length).toBeGreaterThan(0);
+	});
+
+	// AC6: a pending activation request can be edited against -- it is not
+	// refused like armed/disarmed -- and doing so invalidates the request.
+	it('accepts editing an alert with a pending activation request (AC6)', () => {
+		const operation = createEditAlertDraftOperation({ clock });
+		const issues = operation.validate(
+			{
+				alertId: 'alert_1',
+				name: 'x',
+				source: { kind: 'conditions', conditions: [VOLUME_CONDITION] },
+				previewable: true,
+				previewProblems: []
+			},
+			workspaceWithDraft({
+				state: 'pending_activation',
+				pendingActivation: { requestedAt: NOW, expiresAt: LATER }
+			})
+		);
+		expect(issues).toEqual([]);
+	});
+
+	it('editing a pending alert clears the request and records invalidation (AC6)', () => {
+		const operation = createEditAlertDraftOperation({ clock });
+		const doc = workspaceWithDraft({
+			state: 'pending_activation',
+			pendingActivation: { requestedAt: NOW, expiresAt: LATER },
+			activationHistory: [{ kind: 'requested', at: NOW, actor: 'agent' }]
+		});
+		const draft = operation.apply(
+			{
+				alertId: 'alert_1',
+				name: 'Renamed',
+				source: { kind: 'conditions', conditions: [VOLUME_CONDITION] },
+				previewable: true,
+				previewProblems: []
+			},
+			doc,
+			{ next: () => 'unused' }
+		);
+		const stored = readAlert(draft.document, 'alert_1');
+		expect(stored?.state).toBe('draft');
+		expect(stored?.pendingActivation).toBeNull();
+		expect(stored?.activationHistory).toEqual([
+			{ kind: 'requested', at: NOW, actor: 'agent' },
+			{ kind: 'invalidated', at: LATER, actor: 'agent' }
+		]);
+		expect(draft.diffSummary).toContain('invalidated');
+	});
+
+	// Mutation check: without the wasPending branch, activationHistory would
+	// stay untouched and no 'invalidated' event would be recorded -- this
+	// test fails if that branch is reverted (verified by hand: removing the
+	// `wasPending ? appendActivationEvent(...) : existing.activationHistory`
+	// conditional and always keeping `existing.activationHistory` makes this
+	// assertion fail).
+	it('editing an ordinary draft (no pending request) adds no activation history entry', () => {
+		const operation = createEditAlertDraftOperation({ clock });
+		const doc = workspaceWithDraft();
+		const draft = operation.apply(
+			{
+				alertId: 'alert_1',
+				name: 'Renamed',
+				source: { kind: 'conditions', conditions: [VOLUME_CONDITION] },
+				previewable: true,
+				previewProblems: []
+			},
+			doc,
+			{ next: () => 'unused' }
+		);
+		expect(readAlert(draft.document, 'alert_1')?.activationHistory).toEqual([]);
 	});
 });
