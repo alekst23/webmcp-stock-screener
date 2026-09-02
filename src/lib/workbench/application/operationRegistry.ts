@@ -175,6 +175,11 @@ function foldApply(
 		document: currentDoc,
 		affectedIds: [...new Set(affectedIds)],
 		diffSummary: diffParts.join(' '),
+		// Every operation's warnings are carried through to the envelope. A
+		// warning an operation raised but the caller never sees is worse than no
+		// warning at all: "this study has no plotted values in the visible range"
+		// is precisely the kind of thing the caller acts on.
+		warnings: perOpDrafts.flatMap((d) => d.warnings ?? []),
 		// The pre-collection document is provably the correct combined
 		// inverse target regardless of any single op's own inverse quality;
 		// the per-operation inverses are still chained in reverse order for

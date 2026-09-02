@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1011-4, T-1011-5, T-1011-6, T-1011-7, T-1011-8
 **Blocks**: —
 
@@ -54,6 +54,141 @@ claims in a transcript.
    setup is retrievable by its returned ID.
 10. Undoing each of the smoke run's mutations with its returned undo
     token restores the previously rendered chart.
+
+## Solution Approach
+
+### Shape
+
+Two new directories under `src/lib/workbench/chart/`, plus one composition
+root. Nothing outside `src/lib/workbench/chart/` is modified.
+
+```
+chart/components/chartScales.ts        pure geometry: price scale (linear/log),
+                                       time scale, axis ticks, candle shapes
+chart/components/chartPanelModel.ts    pure assembly: chart state + a bounded
+                                       read -> everything the panel draws
+chart/components/ChartPanel.svelte     the `chart` panel kind, runes mode
+chart/tools/index.ts                   buildChartTools + operation registration
+                                       + the composed renderer contract
+chart/tools/registerChartTools.ts      composition root, feature-flagged
+```
+
+### Rendering reads state, never guesses it
+
+`ChartPanel.svelte` takes `{ workspace, panelId, data, comparisons }` — the
+document prop is named `workspace` rather than `document` so it cannot shadow
+the global inside the component. Config, studies and annotations come from
+`readChartState(workspace, panelId)` and
+`readChartAnnotationsView(workspace, panelId)` — the latter because staleness
+is computed in exactly one place and the panel must not compute a second
+answer. Bars, studies' calculated outputs and provenance come from a
+`ChartDataResult`, which is what `get_chart_data` already returns: the panel
+and the agent therefore see the same numbers and the same provenance (AC6).
+
+`chartScales.ts` duplicates the technique of `src/lib/workspace/visualization.ts`
+rather than importing it: that module is typed against `BackendPriceBar` and
+serves the surface EPIC-1015 retires. The new module works on `OhlcvBar`,
+adds a logarithmic price scale (AC2), and derives per-bar candle geometry for
+all six candle types — `heikin_ashi` as a pure bar transform ahead of the
+same geometry, `hollow_candle` as a fill rule rather than a second shape.
+
+`chartPanelModel.ts` folds state and data into one render model: the price
+pane's marks, the price-overlay studies in list order, one sub-pane per
+sub-pane study in list order (a disabled study contributes no pane but keeps
+its place in the ordered list the model exposes, AC3), the five annotation
+kinds resolved to x/y in the price pane's space with their `stale` flag
+carried through (AC4), and comparison series normalized under each
+comparison's own mode onto the primary series' scale (AC5).
+
+### Normalization puts comparisons on a shared scale
+
+`none` draws the comparison on its own scale mapped onto the price pane;
+`percent_change` and `indexed_100` rebase both series at the anchor bar so
+one axis is meaningful for both; `z_score` standardizes each series. The
+normalized primary series is what the comparison is drawn against, so the two
+are always on the same axis rather than two invisible ones.
+
+### One construction site
+
+`buildChartTools(deps)` constructs `get_chart_data`, `add_chart_annotation`
+and `capture_chart_setup` once each and returns them. It also calls
+`registerChartOperations(deps.registry, deps)` first, so all five operation
+kinds (`chart.bind_source`, `chart.configure_view`, `chart.edit_studies`,
+`chart.add_annotation`, `chart.capture_setup`) exist before any tool factory
+runs — the tool factories' own `ensure*` calls then find them already there
+and register nothing (AC7). Registration is guarded on `registry.get(kind)`
+because the registry rejects a duplicate kind outright.
+
+`registerChartTools.ts` mirrors `registerWorkbenchTools.ts`: a
+`CHART_TOOLS_ENABLED` flag that stays `false`, a `createDefaultChartDeps()`
+that wires the local workspace repository, an in-memory series port and a
+shared `IdSequencer` seeded from **both** `chartStateIdSeed(doc)` and
+`capturedSetupIdSeed(doc)` of the active document, so a reloaded workspace
+never re-mints a live `study_N`, `annotation_N` or `setup_N`.
+
+### The renderer contract is composed, not registered twice
+
+`chartRendererTypeDefinition` (T-1011-4) is the base; `composeRendererWithStudies`
+(T-1011-5) folds the study-editing half into it. `registerChartPanelContract`
+is the single call site: it registers the chart source type and the _composed_
+renderer against a structurally-declared `PanelContractRegistry`. Nothing is
+imported from EPIC-1007.
+
+Composing the two halves as shipped surfaced a defect neither ticket could
+see alone: the view half rejects any config key it does not own, so the
+composed renderer rejected its own `defaultConfig()` over the `studies` key
+its sibling contributes. Composition is where that is knowable, so
+`buildChartRendererDefinition` shows each half only the keys it owns rather
+than teaching either half about the other.
+
+### Two seams fixed in passing
+
+Two contracts disagreed with themselves and would have failed the first real
+caller; both are fixed here rather than left for the epic to close over.
+
+- `chart.edit_studies` advertised the snake_case `EDIT_CHART_STUDIES_SCHEMA`
+  but validated camelCase only, so `panel_id` — the key its own schema
+  requires — was rejected. The operation now parses through
+  `fromWireEditChartStudiesInput`, which accepts either casing, so existing
+  camelCase callers are unaffected.
+- `timeAxisTickIndices` rounded several ticks onto the same bar whenever a
+  window held fewer bars than ticks, stacking two date labels on one bar and
+  crashing a keyed render. It now de-duplicates.
+
+### AC9/AC10 — manual browser verification is deferred
+
+A live browser smoke is not achievable in this ticket. The new surface is
+behind `CHART_TOOLS_ENABLED = false` and is deliberately not wired into any
+route: EPIC-1007 owns panel creation and layout, and its panel registry is
+not on `main`, so there is no route that can create a `chart` panel to look
+at. Flipping the flag early would put an unfinished surface into the shipping
+runtime path, which the project's dead-code policy forbids.
+
+The AC is therefore met by an automated end-to-end integration test —
+`chartSurface.smoke.test.ts` — that drives the whole epic against a real
+repository, revision service, operation registry and
+`createInMemoryChartSeries`: bind an instrument and timeframe, add a moving
+average and an RSI, read a bounded window back through `get_chart_data`, add
+a trendline and a highlighted setup window, capture the setup, retrieve it by
+its returned ID, render `ChartPanel.svelte` against that final state in jsdom
+and assert the instrument, both studies and both annotations are in the DOM,
+then undo every mutation with its own returned undo token and assert the
+prior state is restored (AC10). Manual browser verification is deferred to
+the ticket that first mounts a chart panel in a route.
+
+Undo in EPIC-1006 is one step deep by design — a token is redeemable only
+while its change is the newest, and rolling further back is what
+`restore_workspace_revision` is for. AC10's pass therefore undoes each
+mutation while it is still the newest change and re-applies it to reach the
+next, rather than unwinding six changes at the end, which the platform
+refuses with `UndoTokenError('superseded')`.
+
+Rendering a Svelte component under Vitest needed one config change:
+`vite.config.ts` now asks for the `browser` resolve condition under the test
+mode, because Vitest otherwise loads Svelte's server build, where `mount()`
+throws. Every route in this app already disables SSR, so the browser build is
+the only one that ever runs in production; `vite dev` and `vite build`
+resolve exactly as before.
 
 ## Design References
 

@@ -3,7 +3,7 @@ import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
 	plugins: [
 		sveltekit({
 			compilerOptions: {
@@ -31,5 +31,12 @@ export default defineConfig({
 		// matching what it runs on in the actual browser (see src/lib/workspace/store.ts).
 		environment: 'jsdom',
 		include: ['src/**/*.test.ts']
-	}
-});
+	},
+	// Vitest loads modules through the SSR pipeline, which resolves Svelte to its
+	// server build -- and `mount()` throws there, so a component test cannot
+	// render. Every route in this app already disables SSR, so the browser build
+	// is the only one that ever runs in production; asking for it under test
+	// makes the test environment match. Scoped to the test mode Vitest runs
+	// under, so `vite dev` and `vite build` resolve exactly as before.
+	resolve: mode === 'test' ? { conditions: ['browser'] } : undefined
+}));
