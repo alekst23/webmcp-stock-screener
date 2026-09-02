@@ -715,12 +715,19 @@ function draftFrom(
 export function createEditChartStudiesOperation(
 	options: ChartStudiesOptions = {}
 ): OperationDefinition<EditChartStudiesInput> {
+	// The operation advertises the snake_case schema above, so it has to accept
+	// what that schema describes. The parser takes either casing, which keeps
+	// every existing camelCase caller working while the wire shape the schema
+	// promises actually validates.
 	return {
 		kind: CHART_EDIT_STUDIES_KIND,
 		inputSchema: EDIT_CHART_STUDIES_SCHEMA,
-		validate: (input, doc) => validateEditChartStudies(input, doc, options),
-		describe: (input, doc) => describeEditChartStudies(input, doc, options),
-		apply: (input, doc, ids) => applyEditChartStudies(input, doc, ids, options)
+		validate: (input, doc) =>
+			validateEditChartStudies(fromWireEditChartStudiesInput(input), doc, options),
+		describe: (input, doc) =>
+			describeEditChartStudies(fromWireEditChartStudiesInput(input), doc, options),
+		apply: (input, doc, ids) =>
+			applyEditChartStudies(fromWireEditChartStudiesInput(input), doc, ids, options)
 	};
 }
 
