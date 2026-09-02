@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1007 (Panel System)
 **Design**: docs/design/panel-system/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1007-4
 
@@ -77,3 +77,73 @@ silently corrupting the arrangement.
 Rendering the grid (T-1007-6), the panel entity and kind registry
 (T-1007-1), revision/envelope handling (T-1007-4), and any responsive or
 pixel-level concern.
+
+## Solution Approach
+
+**AC2 superseded.** "Rows are unbounded" is wrong — see the Superseded
+note in `_epic.md`. T-1007-8 (owned in this same branch) corrects the row
+bound to `GRID_ROWS = 4`, exactly mirroring the column-bound check. This
+ticket's implementation is written against the corrected 6x4 grid from
+the start; there is no intermediate "unbounded rows" code path.
+
+**New files** (pure domain, no I/O, no Svelte, no registry/link-graph
+imports):
+
+- `src/lib/panels/domain/layout.ts` — geometry: `rectsOverlap`,
+  `validatePlacement`, `findFreeRect`, `applyLayout`, `splitRect`,
+  `fullGridRect`, plus the `OccupiedRect`, `PlacementViolation`,
+  `PlacementResult`, `Placement`, `LayoutResult`, `SplitResult` types.
+- `src/lib/panels/domain/layoutTemplates.ts` — a separate named-template
+  registry (`three_columns`, `quad`, `chart_wall_3x3`,
+  `focus_with_sidebar`), independent of `layout.ts`'s geometry so the
+  templates can be swapped/extended without touching placement logic.
+- `src/lib/panels/domain/layout.test.ts`, `layoutTemplates.test.ts`.
+
+**`validatePlacement`** runs four checks in this fixed order, returning
+the first that fails: (1) `invalid_size` — non-integer or `<1` spans; (2)
+`out_of_bounds` — footprint extends past column 6 or row 4 (or has a
+negative origin); (3) `below_minimum` — either span is below the kind's
+declared `minSize`; (4) `overlap` — intersects an `OccupiedRect` other
+than `ignorePanelId`, via half-open-interval `rectsOverlap`. `occupied`
+is documented as caller-pre-filtered (hidden panels already excluded) —
+this module has no concept of "hidden".
+
+**`findFreeRect`** scans row-major from `(0,0)`: outer loop over
+candidate `row` in `[0, GRID_ROWS - size.rowSpan]`, inner loop over
+`col` in `[0, GRID_COLUMNS - size.colSpan]`, returning the first
+candidate with no overlap against `occupied`. If `size` itself exceeds
+either grid dimension the loop bounds go negative and the function
+naturally returns `null` with no special-casing — the "grid is full"
+path and the "requested size too big for the grid" path are the same
+code path. Never throws.
+
+**`applyLayout`** batch algorithm: (1) split `current` into panels named
+in `placements` (moving) vs. not (unmoved, kept verbatim); (2) validate
+each placement's rect via `validatePlacement` against only the unmoved
+set (a panel moving out of its old cell must not block itself or its
+batch-mates); first individual violation short-circuits the whole call;
+(3) once every placement individually validates, pairwise-check the
+placements against each other for `batch_conflict`, naming both panel
+ids in the order encountered; (4) on success, return the full resulting
+`OccupiedRect[]` — moved panels at their new rects, unmoved panels
+unchanged.
+
+**`splitRect`** divides one rect by a line through its middle:
+`vertical` splits along a vertical line into left (`original`) / right
+(`created`) halves dividing `colSpan`; `horizontal` splits along a
+horizontal line into top (`original`) / bottom (`created`) halves
+dividing `rowSpan` — the common pane-splitting convention (the split
+line's orientation names the direction, not the resulting arrangement).
+The midpoint is `Math.ceil(span / 2)`, so `original` gets the equal or
+larger half. Both resulting rects are checked against their own
+`minSize` (`originalMinSize` / `createdMinSize`); a span that rounds to
+`0` (splitting a span of `1`) is naturally caught by the minimum check
+since every real `minSize` is `>= 1` — no separate zero-span guard
+needed. No bounds/overlap re-check is needed: both halves are subsets of
+an already-valid parent rect, so they cannot leave the grid or overlap
+each other.
+
+**`fullGridRect`** is a pure constant-shape helper
+(`{ col: 0, row: 0, colSpan: GRID_COLUMNS, rowSpan: GRID_ROWS }`) — never
+stored on a panel, computed fresh each call for `maximize_panel`'s
+render-only state.

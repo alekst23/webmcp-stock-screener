@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1007 (Panel System)
 **Design**: docs/design/panel-system/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1007-1, T-1007-2, T-1007-3
 **Blocks**: T-1007-5
 
@@ -135,3 +135,112 @@ one call.
 Tool schemas and agent-facing error shaping (T-1007-5), rendering
 (T-1007-6), and any panel-kind-specific behavior beyond calling the
 kind's own validator.
+
+## Solution Approach
+
+All new files under `src/lib/panels/application/`. Nothing in wave 1 or
+EPIC-1006 is modified.
+
+### Persistence (`panelState.ts`)
+
+`doc.extensions['panel_system']` is the source of truth for `panels`,
+`links` (a `PanelLinkGraph`) and `selections` (`panelId -> resultIds[]`).
+It has to be, not `doc.panels`: EPIC-1006's `PanelKind` union is closed to
+the same eight kinds this epic ships, and `normalizeWorkspace` silently
+drops any panel record whose kind isn't in that union — a ninth kind a
+sibling epic registers later would be destroyed on the next normalize if
+it lived in `doc.panels` directly.
+
+`readPanelState(doc)` parses `doc.extensions['panel_system']`
+defensively (same resilience contract as `normalizeWorkspace`: malformed
+or absent data yields `{ panels: [], links: emptyLinkGraph(), selections:
+{} }`, never a throw), dropping individual malformed entries rather than
+the whole state.
+
+`writePanelState(doc, state)` stores `state` verbatim under the extension
+key, then recomputes `doc.panels` / `doc.layout` / `doc.links` from
+scratch (never patched incrementally, never read back as state):
+- `doc.panels`: one `PanelRecord` per `Panel` whose `kind` is in
+  EPIC-1006's eight-kind set (reproduced as a local constant here, since
+  `workbench/domain/workspace.ts` doesn't export its internal set) —
+  `visible: !panel.hidden`. A panel outside that set is skipped, not
+  corrupted into a bogus record.
+- `doc.layout`: one `LayoutEntry` per projected panel, from `panel.rect`.
+- `doc.links`: EPIC-1006's model is pairwise
+  (`sourcePanelId`/`targetPanelId`), ours is per-channel groups. Each
+  group of N panels projects to a consecutive chain of N-1 pairwise
+  links (enough to reconstruct the group's connectivity for display,
+  without generating the full O(N^2) pairing). `result_selection` is the
+  one channel name that differs between the two systems — it maps to
+  `'selection'` here, and this is the only place that mapping happens.
+
+### Shared use-case plumbing (`support.ts`)
+
+`PanelUseCaseDeps` (workspaceId, repository, revisions, history, clock,
+ids, kinds, sourceRenderer, templates — all injected, never
+module-global) plus `commitPanelChange(deps, context, operationKind,
+requestInput, build)`, a thin wrapper around EPIC-1006's `recordCommit`
+that: loads the doc, calls `readPanelState`, hands `(doc, state)` to
+`build`, calls `writePanelState` on the result, and sets `inverse` to a
+draft whose `document` is the untouched pre-mutation `doc` — the
+"simplest correct inverse" the ticket calls for. Every use case becomes
+`build(doc, state) -> { nextState, affectedIds, diffSummary, warnings? }`
+plus validation, which is what keeps each use case under the line limit:
+all revision/idempotency/history/inverse wiring lives in one place.
+
+Validation helpers (`requirePanelKind`, `requireKnownRenderer`,
+`findPanel`, `visibleOccupied`, `throwPlacementViolation`,
+`throwLinkFailure`, grid-full) wrap wave-1's typed failures
+(`PlacementViolation`, `LinkFailure`, `UnknownPanelKindError`,
+`UnknownLayoutTemplateError`) into one consistent `PanelOperationError`
+so every panel-specific failure this epic raises has the same wire shape,
+per the ticket's `errors.ts` requirement — since T-1007-5 shapes agent
+text from the payload, not the message.
+
+### Config validation boundary (an assumption, flagged for T-1007-7)
+
+`create_panel`/`duplicate_panel` validate `config` with
+`kindDef.validateConfig` only — the design doc states a kind's
+`validateConfig` "delegates to the active renderer's own validateConfig"
+for a data-bearing kind, so calling it once is meant to cover both. The
+wave-1 placeholder kinds don't yet do that delegation (each validates
+only its own `configSchema`), and their schemas are disjoint from their
+default renderer's schema (e.g. `chart`'s `{symbol,timeframe,studies}`
+vs. `chart_grid`'s `{rows,columns,...}`) — so also calling
+`sourceRenderer.validateRendererConfig` at creation time would reject
+every kind's own default config. `configure_chart_grid` and
+`configure_panel_view` are the ones that actually validate against the
+renderer contract (AC3, AC6), which is where the ticket's renderer
+validation requirement is exercised for real.
+
+### Use cases (one file each, `build()` under 40 lines)
+
+`createPanel`, `duplicatePanel`, `removePanel`, `setPanelLayout`,
+`applyLayoutTemplate`, `splitPanel`, `bindPanelSource`,
+`setPanelRenderer`, `configureChartGrid`, `configurePanelView`,
+`linkPanels`, `unlinkPanels`, `setPanelSelection` — each
+`(deps: PanelUseCaseDeps, request) => MutationEnvelope`, request always
+carries `context: MutationContext`. `maximizePanel` is not one of these:
+it's `renderedRects(panels, maximizedPanelId)` in `maximize.ts`, a pure
+function with no deps, no commit, no revision.
+
+Notable request-shape decisions not settled by the design docs:
+- `apply_layout_template` takes an explicit `panelIds` list mapped
+  positionally to the template's slots (rather than guessing which
+  subset of the workspace's panels to use).
+- `split_panel`'s new panel copies the original's kind/source/renderer/
+  config (like `duplicate_panel`), placed in the freed half.
+- `unlink_panels` takes a `panelIds` batch (plural, matching its name)
+  and applies each removal to a local copy of the graph before writing
+  anything back, so one unknown membership fails the whole batch.
+
+### Tests
+
+`testSupport.ts` exports `createPanelTestHarness()`: in-memory
+repository (`memoryStorage()`), fixed clock, fresh `IdSequencer`, and
+freshly-seeded panel-kind / source-renderer / layout-template registries
+(via each wave-1 module's `registerDefault*` function) — never the
+module-global default registries. Every test builds its own harness.
+Colocated `*.test.ts` per use case, covering all 15 ACs; the idempotency-
+replay and undo-restores-links tests get mutation-checked per the
+ticket's requirement.
