@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1009 (Screener Core)
 **Design**: docs/design/screener-core/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1009-3, T-1009-4, T-1009-5
 
