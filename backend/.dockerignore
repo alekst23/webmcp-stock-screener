@@ -1,0 +1,33 @@
+# AC5: secrets never enter the build context. .env.example carries no real
+# values, but it is excluded too rather than carved out as a special case.
+.env
+.env.*
+
+# AC5: gitignored local data artifacts -- a developer's real backfilled
+# panel must never reach a layer. The image builds its own synthetic mock
+# panel instead (scripts/generate_mock_panel.py), inside the container.
+data/
+*.parquet
+*.feather
+
+# Not needed in the build context; keeps unrelated commits from busting
+# Docker's layer cache and keeps history out of the image entirely.
+.git/
+.gitignore
+
+# AC6: test source must never reach any layer.
+tests/
+.pytest_cache/
+.mypy_cache/
+
+# Python caches / local venvs -- rebuilt inside the image, not reused from
+# the host.
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editor / OS cruft.
+.DS_Store
+.vscode/
+.idea/

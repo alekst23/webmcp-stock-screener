@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 import main as main_module
 from application.load_panel import PANEL_KEY, load_panel
+from domain.errors import PanelStoreError
 from domain.models.panel import PanelStatus
 from domain.panel_disclosure import STALE_AFTER_SESSIONS, disclose
 from domain.trading_calendar import previous_weekday
@@ -183,6 +184,92 @@ class TestPartialCoverage:
         assert loaded is not None, "expected the panel to load"
         assert loaded.status.missing == [], f"got {loaded.status.missing}"
         assert loaded.status.row_count == len(_TICKERS) * _DAYS, f"got {loaded.status.row_count}"
+
+
+class TestUnreachableStore:
+    """T-0016-3 AC4: a configured store that cannot be reached must abort
+    startup rather than degrade to the mock panel -- the silent-mock hazard
+    a role-based AWS deploy would otherwise hit invisibly."""
+
+    def test_an_unreachable_store_raises_instead_of_falling_back_to_mock(
+        self, tmp_path: Path
+    ) -> None:
+        store = InMemoryPanelStore({PANEL_KEY: _panel_bytes()})
+
+        def _unreachable() -> None:
+            raise PanelStoreError("Object store bucket 'wrong-bucket' is not reachable")
+
+        store.ensure_reachable = _unreachable  # type: ignore[method-assign]
+        mock_path = tmp_path / "panel.parquet"
+        mock_path.write_bytes(_panel_bytes())
+
+        with pytest.raises(PanelStoreError) as caught:
+            load_panel(store, mock_path=mock_path)
+
+        assert "wrong-bucket" in str(caught.value), f"expected the bucket named, got {caught.value}"
+
+
+class TestRequireRealPanel:
+    """T-0016-12: REQUIRE_REAL_PANEL is the opt-in guard so a production
+    deploy refuses to start on the mock panel rather than serve it as though
+    it were real. Off by default -- every local checkout and the rest of
+    this suite call `load_panel` without the flag and must be unaffected."""
+
+    def test_strict_and_unconfigured_refuses_to_start_naming_the_bucket_var(
+        self, tmp_path: Path
+    ) -> None:
+        # A directory stands in for the mock path: reading it as bytes
+        # raises IsADirectoryError. If the guard did not refuse to start
+        # before ever reaching the mock fallback, this test would see that
+        # exception instead of PanelStoreError, rather than passing by luck.
+        poison_mock_path = tmp_path
+
+        with pytest.raises(PanelStoreError) as caught:
+            load_panel(None, mock_path=poison_mock_path, require_object_store=True)
+
+        assert "OBJECT_STORE_BUCKET" in str(
+            caught.value
+        ), f"expected the unset variable named, got {caught.value}"
+
+    def test_strict_and_configured_and_reachable_loads_the_real_panel(self, panel: bytes) -> None:
+        # AC4: a properly configured production deploy must start exactly as
+        # it does today -- the flag must not add friction to the happy path.
+        store = InMemoryPanelStore({PANEL_KEY: panel})
+
+        loaded = load_panel(store, mock_path=main_module.PANEL_PATH, require_object_store=True)
+
+        assert loaded is not None, "expected the real panel to load"
+        assert not loaded.status.is_synthetic, f"expected the real panel, got {loaded.status}"
+
+    def test_strict_and_unreachable_store_still_fails_through_ensure_reachable(
+        self, tmp_path: Path
+    ) -> None:
+        # AC5: the flag must not add a second, competing failure path --
+        # ensure_reachable's existing error is what must surface, unchanged.
+        store = InMemoryPanelStore({PANEL_KEY: _panel_bytes()})
+
+        def _unreachable() -> None:
+            raise PanelStoreError("Object store bucket 'wrong-bucket' is not reachable")
+
+        store.ensure_reachable = _unreachable  # type: ignore[method-assign]
+        mock_path = tmp_path / "panel.parquet"
+        mock_path.write_bytes(_panel_bytes())
+
+        with pytest.raises(PanelStoreError) as caught:
+            load_panel(store, mock_path=mock_path, require_object_store=True)
+
+        assert "wrong-bucket" in str(caught.value), f"expected the bucket named, got {caught.value}"
+
+    def test_strict_off_by_default_still_falls_back_to_mock(self, tmp_path: Path) -> None:
+        # Pins today's local-dev/test-suite path: calling load_panel exactly
+        # as every other test in this suite does must be unaffected.
+        mock_path = tmp_path / "panel.parquet"
+        mock_path.write_bytes(_panel_bytes())
+
+        loaded = load_panel(None, mock_path=mock_path)
+
+        assert loaded is not None, "expected the default (non-strict) mock fallback to still work"
+        assert loaded.status.is_synthetic, f"got {loaded.status}"
 
 
 class TestNothingLoadable:

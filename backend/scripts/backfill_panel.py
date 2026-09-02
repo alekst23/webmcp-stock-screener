@@ -111,6 +111,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--universe-key", default=UNIVERSE_KEY)
     parser.add_argument("--key", default=PANEL_KEY, help="Object key for the panel")
+    parser.add_argument(
+        "--no-enforce-floor",
+        action="store_true",
+        help=(
+            "Skip the enforced universe floor (docs/plan/EPIC-0016/"
+            "T-0016-13-universe-enforcement.md) -- for deliberate rehearsal runs "
+            "against a small --tickers-file that could never clear it. Real "
+            "production backfills should keep the floor on (the default)."
+        ),
+    )
     return parser
 
 
@@ -140,6 +150,7 @@ def main() -> None:
         to_date=to_date,
         key=args.key,
         on_progress=_progress,
+        enforce_floor=not args.no_enforce_floor,
     )
     print(
         f"Wrote {status.row_count} rows for {status.ticker_count} tickers to "

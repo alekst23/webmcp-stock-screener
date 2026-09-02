@@ -23,6 +23,7 @@ from infra.panel_frame import bars_to_panel
 from infra.panel_io import (
     PANEL_COLUMNS,
     bars_to_parquet_bytes,
+    panel_frame_to_wire_bytes,
     panel_status_from_frame,
     parquet_bytes_to_panel,
 )
@@ -106,6 +107,33 @@ class TestCompactLoad:
         assert status.first_date == date(2024, 1, 2), f"got {status.first_date}"
         assert status.ticker_count == 2, f"got {status.ticker_count}"
         assert status.row_count == 8, f"got {status.row_count}"
+
+
+class TestPanelFrameToWireBytes:
+    """T-0016-13: the inverse of parquet_bytes_to_panel, for filtering an
+    already-loaded panel in place (scripts/enforce_universe_floor.py)
+    rather than rebuilding it from PriceBar objects."""
+
+    def test_round_trip_reproduces_the_original_compact_frame(self) -> None:
+        bars = _bars()
+        original = bars_to_panel(bars)
+
+        restored = parquet_bytes_to_panel(panel_frame_to_wire_bytes(original))
+
+        pd.testing.assert_frame_equal(restored, original)
+
+    def test_a_filtered_subset_writes_back_with_only_the_kept_tickers(self) -> None:
+        # This is exactly what the enforcement rebuild does: drop rows for
+        # tickers that do not clear the floor, then write the remainder.
+        bars = _bars(tickers=("AAA", "BBB"), days=3)
+        frame = bars_to_panel(bars)
+        kept = frame[frame["ticker"] == "AAA"]
+
+        restored = parquet_bytes_to_panel(panel_frame_to_wire_bytes(kept))
+
+        tickers = set(restored["ticker"].astype(str))
+        assert tickers == {"AAA"}, f"expected only AAA to survive, got {tickers}"
+        assert len(restored) == 3, f"expected AAA's 3 rows, got {len(restored)}"
 
 
 class TestSchemaGate:

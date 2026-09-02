@@ -14,7 +14,15 @@ class PanelStore(Protocol):
     failure. A missing object is NOT an error -- `object_exists` answers that
     question, so a first-ever deploy against an empty bucket can fall back to
     the mock panel instead of crashing at startup.
+
+    `ensure_reachable` answers a different question: can the bucket itself be
+    reached at all. It is the caller's job to run it before treating a
+    configured store as usable -- a wrong bucket, a denied permission, or
+    credentials that never resolve must abort startup rather than be
+    mistaken for "not yet seeded".
     """
+
+    def ensure_reachable(self) -> None: ...
 
     def object_exists(self, key: str) -> bool: ...
 

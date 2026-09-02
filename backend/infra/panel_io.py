@@ -172,6 +172,32 @@ def parquet_bytes_to_panel(data: bytes) -> pd.DataFrame:
     )
 
 
+def panel_frame_to_wire_bytes(frame: pd.DataFrame) -> bytes:
+    """The inverse of `parquet_bytes_to_panel`: a compact panel frame back to
+    wire-format Parquet bytes, sorted by (ticker, date) as the wire format
+    expects.
+
+    For filtering an already-loaded panel in place (a universe floor applied
+    to the compact frame -- see `scripts/enforce_universe_floor.py`) rather
+    than rebuilding from `PriceBar` objects. The compact frame's `date`
+    column holds proleptic Gregorian ordinals (see `infra/panel_frame.py`);
+    the wire format wants Unix-epoch-relative `date32`, the same conversion
+    `bars_to_table` applies per-bar.
+    """
+    ordered = frame.sort_values(["ticker", "date"], kind="stable")
+    arrays = [
+        pa.array(ordered["ticker"].astype(str), type=pa.string()),
+        pa.array(
+            (ordered["date"].to_numpy().astype(np.int64) - EPOCH_ORDINAL).astype(np.int32)
+        ).cast(pa.date32()),
+    ]
+    for name in _PRICE_COLUMNS:
+        arrays.append(pa.array(ordered[name].to_numpy(dtype=np.float64), type=pa.float64()))
+    arrays.append(pa.array(ordered["volume"].to_numpy(dtype=np.int64), type=pa.int64()))
+    table = pa.Table.from_arrays(arrays, names=PANEL_COLUMNS)
+    return table_to_parquet_bytes(table)
+
+
 def parquet_bytes_to_bars(data: bytes) -> list[PriceBar]:
     """Deserialize a panel back into domain entities.
 

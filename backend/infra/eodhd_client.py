@@ -88,8 +88,13 @@ class EodhdClient:
             )
             response.raise_for_status()
             payload = response.json()
-        except (requests.RequestException, ValueError) as exc:
-            raise PriceSourceError(f"EODHD request failed for {path}") from exc
+        except (requests.RequestException, ValueError):
+            # `from None`: `api_token` travels as a query parameter, and
+            # `requests` embeds the fully resolved URL -- token included --
+            # in an HTTPError's own message. Chaining the cause would put
+            # the key in any traceback or log this exception's chain ends
+            # up in (T-0016-5 AC6).
+            raise PriceSourceError(f"EODHD request failed for {path}") from None
         if not isinstance(payload, list):
             raise PriceSourceError(f"EODHD returned a non-list payload for {path}")
         return payload
