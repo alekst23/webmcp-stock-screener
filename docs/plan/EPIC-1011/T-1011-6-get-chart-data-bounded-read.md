@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1011-1, T-1011-2, T-1011-3
 **Blocks**: T-1011-9
 
