@@ -91,17 +91,26 @@ re-registering its type, no edit to the container.
 
 ### Grid layout (`src/lib/panels/layout.ts`)
 
-Pure geometry over a fixed 12-column, unbounded-row logical grid.
+Pure geometry over a fixed 6-column by 4-row logical grid (24 cells,
+bounded in both axes — resolved 2026-09-02, see spec's "Open Questions").
+The container always renders the grid filling exactly 100% of the
+viewport's width and height, so the page never scrolls: a panel spanning
+`colSpan` columns occupies `colSpan / GRID_COLUMNS` of the width, and
+`rowSpan` rows occupies `rowSpan / GRID_ROWS` of the height. Row/column
+sizing is proportional, not fixed-pixel, so it holds at any viewport size
+without introducing scroll — consistent with the spec's existing
+pixel-layout/responsive-behavior non-goal.
 
 | Symbol | Signature | Description |
 |--------|-----------|-------------|
-| `GridPosition` | `{ col: number; row: number }` | zero-based, `col` in `[0, GRID_COLUMNS)` |
-| `GridSize` | `{ colSpan: number; rowSpan: number }` | both `>= 1` |
+| `GridPosition` | `{ col: number; row: number }` | zero-based, `col` in `[0, GRID_COLUMNS)`, `row` in `[0, GRID_ROWS)` |
+| `GridSize` | `{ colSpan: number; rowSpan: number }` | both `>= 1`; `colSpan <= GRID_COLUMNS`, `rowSpan <= GRID_ROWS` |
 | `GridRect` | `GridPosition & GridSize` | a panel's footprint |
-| `GRID_COLUMNS` | `12` | see spec Open Question 1 |
+| `GRID_COLUMNS` | `6` | |
+| `GRID_ROWS` | `4` | |
 | `rectsOverlap` | `(a: GridRect, b: GridRect) => boolean` | half-open interval intersection |
 | `validatePlacement` | `(rect, kind, occupied) => PlacementResult` | bounds, min-size, and overlap checks in one pass; error names the offending panel or bound |
-| `findFreeRect` | `(size: GridSize, occupied: OccupiedRect[]) => GridRect` | deterministic top-left-first auto-placement for `create_panel` |
+| `findFreeRect` | `(size: GridSize, occupied: OccupiedRect[]) => GridRect \| null` | deterministic top-left-first auto-placement for `create_panel`; returns `null` — not a throw — when no free rect of that size exists anywhere in the bounded grid, so the caller reports "grid is full" rather than the search overflowing past `GRID_ROWS` |
 | `applyLayout` | `(panels, placements) => LayoutResult` | all-or-nothing batch move/resize |
 
 `occupied` excludes hidden panels (spec Open Question 5).
@@ -144,6 +153,18 @@ each registering an inverse operation with EPIC-1006's undo store:
 one exception — it does not mutate the workspace or consume a revision;
 it is rendering-only client state layered over the saved layout (T-1007-4
 AC10).
+
+### Default workspace layout (seeding, not a tool)
+
+Owned entirely by this epic, no change to EPIC-1006's `create_workspace`
+required: the composition root (T-1007-6) watches for a newly created,
+still-empty workspace becoming the active one and immediately runs three
+`createPanel` calls (`filter_builder` left, `results_table` center,
+`chart` right, footprints fitting the 6x4 grid) before first paint, so the
+human never sees the blank intermediate state. Not registered as a named
+layout template — `apply_layout_template` has no entry for it, since
+re-applying it later is a distinct, explicit action (agent lays it out or
+picks an actual template), not this create-time default.
 
 ### Tool surface (`src/lib/webmcp/v2/panelTools.ts`)
 
