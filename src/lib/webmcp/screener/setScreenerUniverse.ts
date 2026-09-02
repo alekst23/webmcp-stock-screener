@@ -14,17 +14,12 @@ import {
 	type UniverseSizeResolution
 } from '../../screener/universeValidation';
 import { recordCommit } from '../../workbench/application/changeHistory';
-import {
-	IdempotencyConflictError,
-	OperationValidationError,
-	RevisionConflictError,
-	StorageWriteError,
-	UndoTokenError
-} from '../../workbench/domain/errors';
+import { OperationValidationError } from '../../workbench/domain/errors';
 import { toWireEnvelope } from '../../workbench/domain/mutation';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import type { ToolResult, ToolSpec } from '../types';
 import { fail, ok } from '../tools';
+import { resolveWorkspaceId, toErrorResult } from './support';
 
 export interface SetScreenerUniverseDeps extends WorkbenchDeps {
 	// Defaults to builtinCatalogRegistry -- overridable so tests can drive a
@@ -34,28 +29,6 @@ export interface SetScreenerUniverseDeps extends WorkbenchDeps {
 	// (src/lib/discovery/unavailableDirectory.ts), and omitting this
 	// dependency entirely is itself a valid, honest "cannot resolve" input.
 	instrumentDirectory?: InstrumentDirectory;
-}
-
-// Private copy of workbench/tools/index.ts's error-mapping helper -- see
-// createScreener.ts for why this is duplicated rather than shared.
-function toErrorResult(err: unknown): ToolResult {
-	if (
-		err instanceof RevisionConflictError ||
-		err instanceof IdempotencyConflictError ||
-		err instanceof UndoTokenError ||
-		err instanceof OperationValidationError ||
-		err instanceof StorageWriteError
-	) {
-		return fail(err.message, err.toWireError());
-	}
-	return fail(err instanceof Error ? err.message : String(err));
-}
-
-function resolveWorkspaceId(deps: WorkbenchDeps, input: { workspace_id?: unknown }): string | null {
-	if (typeof input.workspace_id === 'string') {
-		return input.workspace_id;
-	}
-	return deps.repository.getActiveId();
 }
 
 interface LiquidityWireInput {

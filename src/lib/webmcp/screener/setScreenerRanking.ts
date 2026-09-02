@@ -21,17 +21,18 @@ import {
 } from '../../screener/ranking';
 import { readScreener, writeScreener } from '../../screener/state';
 import { recordCommit } from '../../workbench/application/changeHistory';
-import {
-	OperationValidationError,
-	IdempotencyConflictError,
-	RevisionConflictError,
-	StorageWriteError,
-	UndoTokenError
-} from '../../workbench/domain/errors';
+import { OperationValidationError } from '../../workbench/domain/errors';
 import { toWireEnvelope } from '../../workbench/domain/mutation';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import { fail, ok } from '../tools';
 import type { ToolResult, ToolSpec } from '../types';
+import {
+	readOptionalNumber,
+	readOptionalString,
+	readString,
+	resolveWorkspaceId,
+	toErrorResult
+} from './support';
 
 const DESCRIPTION =
 	"Sets how a screener's matches are ordered: one field, or several weighted fields " +
@@ -248,29 +249,6 @@ function toWireRanking(ranking: RankingSpec | null): Record<string, unknown> | n
 	};
 }
 
-// Mirrors workbench/tools/index.ts's toErrorResult -- a private equivalent,
-// as instructed, rather than an import from a file this ticket must not
-// modify.
-function toErrorResult(err: unknown): ToolResult {
-	if (
-		err instanceof RevisionConflictError ||
-		err instanceof IdempotencyConflictError ||
-		err instanceof UndoTokenError ||
-		err instanceof OperationValidationError ||
-		err instanceof StorageWriteError
-	) {
-		return fail(err.message, err.toWireError());
-	}
-	return fail(err instanceof Error ? err.message : String(err));
-}
-
-function resolveWorkspaceId(deps: WorkbenchDeps, input: RawInput): string | null {
-	if (typeof input.workspace_id === 'string') {
-		return input.workspace_id;
-	}
-	return deps.repository.getActiveId();
-}
-
 function historyDeps(deps: WorkbenchDeps) {
 	return { history: deps.history, revisionService: deps.revisions, clock: deps.clock };
 }
@@ -291,7 +269,7 @@ async function execute(
 		return fail(`Workspace not found: ${workspaceId}`, { error: 'not_found' });
 	}
 
-	const screenerId = typeof input.screener_id === 'string' ? input.screener_id : '';
+	const screenerId = readString(input.screener_id);
 	if (!screenerId) {
 		return fail('set_screener_ranking requires a non-empty "screener_id".', {
 			error: 'invalid_input'
@@ -338,10 +316,8 @@ async function execute(
 		const envelope = recordCommit(historyDeps(deps), {
 			workspaceId,
 			context: {
-				expectedRevision:
-					typeof input.expected_revision === 'number' ? input.expected_revision : undefined,
-				idempotencyKey:
-					typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined,
+				expectedRevision: readOptionalNumber(input.expected_revision),
+				idempotencyKey: readOptionalString(input.idempotency_key),
 				actor: 'agent'
 			},
 			operationKind: 'screener.set_screener_ranking',

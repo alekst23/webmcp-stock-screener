@@ -231,6 +231,45 @@ describe('run_screener', () => {
 		expect(json.provenance, 'AC6: every run must carry provenance').toBeTruthy();
 	});
 
+	// AC2 (deviation note, T-1009-10): validate_screener and run_screener are
+	// browser-side tools over ScreenerEvaluationPort, not HTTP calls -- but a
+	// rejected promise from the port (an unavailable data source, a broken
+	// adapter) must still surface as a tool error an agent can act on, never
+	// an unhandled rejection escaping this async function.
+	it('test_runScreener_evaluationPortRejects_surfacesAsToolErrorNotUnhandledRejection', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const rejectingPort: ScreenerEvaluationPort = {
+			async validate(definition) {
+				return {
+					screenerId: definition.screenerId,
+					screenerRevision: definition.revision,
+					valid: true,
+					problems: [],
+					skippedNodeIds: [],
+					costEstimate: null,
+					detectionExhaustive: false
+				};
+			},
+			execute() {
+				return Promise.reject(new Error('fixture: market data source unreachable'));
+			}
+		};
+		const tool = createRunScreenerTool(deps, { evaluationPort: rejectingPort });
+
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+
+		expect(
+			result.isError,
+			'a rejected evaluation port must resolve to a tool failure, not reject the promise ' +
+				'run_screener itself returns'
+		).toBe(true);
+		const json = jsonOf(result) as Record<string, unknown>;
+		expect(
+			json.error,
+			'the rejection reason should be readable in the tool error, not swallowed'
+		).toContain('fixture: market data source unreachable');
+	});
+
 	it('test_runScreener_screenerEditedAfterRun_runStaysPinned', async () => {
 		const { workspaceId, screenerId } = await seedScreener();
 		const fake = makeFakePort((input) => completeRunFor(input));

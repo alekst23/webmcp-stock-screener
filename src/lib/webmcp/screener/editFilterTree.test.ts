@@ -128,6 +128,21 @@ describe('createEditFilterTreeTool', () => {
 		).toEqual(body.affected_ids);
 	});
 
+	// T-1009-10 AC5: every screener mutation tool must return a usable
+	// undo_token (technical.md's mutation envelope contract). This tool's
+	// mutate() previously omitted `inverse`, so undo_token was always null --
+	// fixed alongside the wiring ticket that first drove this path
+	// end to end.
+	it('test_add_returnsUndoToken_thatUndoChangeCanRedeem', async () => {
+		const result = await tool().execute({
+			screener_id: screenerId,
+			operation: 'add',
+			condition: scalarCondition('field.price.close', 10)
+		});
+		const body = payload(result) as { undo_token: string | null };
+		expect(body.undo_token, 'add_filter_tree must return a redeemable undo_token').not.toBeNull();
+	});
+
 	it('add_and_group_and_reorder_composeAcrossDeepNestingKeepingIdsStable', async () => {
 		const t = tool();
 		const first = payload(

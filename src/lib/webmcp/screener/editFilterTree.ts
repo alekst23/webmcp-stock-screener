@@ -24,18 +24,13 @@ import {
 import { readScreener, writeScreener } from '../../screener/state';
 import type { IdSequencer } from '../../workbench/domain/ids';
 import { recordCommit } from '../../workbench/application/changeHistory';
-import {
-	IdempotencyConflictError,
-	OperationValidationError,
-	RevisionConflictError,
-	StorageWriteError,
-	UndoTokenError
-} from '../../workbench/domain/errors';
+import { OperationValidationError } from '../../workbench/domain/errors';
 import { toWireEnvelope } from '../../workbench/domain/mutation';
 import type { WorkspaceDocument } from '../../workbench/domain/workspace';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import { fail, ok } from '../tools';
 import type { ToolResult, ToolSpec } from '../types';
+import { resolveWorkspaceId, toErrorResult } from './support';
 
 const OPERATIONS = ['add', 'update', 'remove', 'group', 'set_enabled', 'reorder'] as const;
 type Operation = (typeof OPERATIONS)[number];
@@ -57,27 +52,6 @@ interface EditFilterTreeInput {
 	ordered_node_ids?: string[];
 	expected_revision?: number;
 	idempotency_key?: string;
-}
-
-// Mirrors src/lib/workbench/tools/index.ts's private toErrorResult, per the
-// ticket's instruction not to modify that file.
-function toErrorResult(err: unknown): ToolResult {
-	if (
-		err instanceof RevisionConflictError ||
-		err instanceof IdempotencyConflictError ||
-		err instanceof UndoTokenError ||
-		err instanceof OperationValidationError ||
-		err instanceof StorageWriteError
-	) {
-		return fail(err.message, err.toWireError());
-	}
-	return fail(err instanceof Error ? err.message : String(err));
-}
-
-function resolveWorkspaceId(deps: WorkbenchDeps, input: EditFilterTreeInput): string | null {
-	return typeof input.workspace_id === 'string'
-		? input.workspace_id
-		: deps.repository.getActiveId();
 }
 
 // Wraps a pure filterTree.ts rejection as the program's typed validation
@@ -268,7 +242,20 @@ function mutateFilterTree(
 	return {
 		document: writeScreener(doc, nextScreener),
 		affectedIds: result.affectedIds,
-		diffSummary: result.diffSummary
+		diffSummary: result.diffSummary,
+		// `doc` is the pre-mutation document RevisionService.commit loaded --
+		// it provably still carries this screener's prior filter tree, so it
+		// is exactly the state undo must restore to (T-1009-10 AC5; matches
+		// createScreener.ts's and setScreenerUniverse.ts's own inverse). This
+		// was missing before this ticket: every other screener mutation tool
+		// sets an inverse, but this one never did, so edit_filter_tree's
+		// undo_token was always null -- a genuine bug relative to
+		// technical.md's "every mutation tool ... returns ... undo_token".
+		inverse: {
+			document: doc,
+			affectedIds: result.affectedIds,
+			diffSummary: `Reverted the ${operation} on screener ${screenerId}.`
+		}
 	};
 }
 

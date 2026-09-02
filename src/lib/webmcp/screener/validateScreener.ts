@@ -21,6 +21,7 @@ import type {
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import { fail, ok } from '../tools';
 import type { ToolResult, ToolSpec } from '../types';
+import { readString, resolveWorkspaceId, toErrorResult } from './support';
 
 const DESCRIPTION =
 	'Validates a screener without executing it: reports invalid parameters, data unavailable for ' +
@@ -83,12 +84,6 @@ function toWireValidationReport(report: ScreenerValidationReport): Record<string
 	};
 }
 
-function resolveWorkspaceId(deps: WorkbenchDeps, input: RawInput): string | null {
-	return typeof input.workspace_id === 'string'
-		? input.workspace_id
-		: deps.repository.getActiveId();
-}
-
 async function execute(
 	deps: WorkbenchDeps,
 	registry: CatalogRegistry,
@@ -107,7 +102,7 @@ async function execute(
 		return fail(`Workspace not found: ${workspaceId}`, { error: 'not_found' });
 	}
 
-	const screenerId = typeof input.screener_id === 'string' ? input.screener_id : '';
+	const screenerId = readString(input.screener_id);
 	if (!screenerId) {
 		return fail('validate_screener requires a non-empty "screener_id".', {
 			error: 'invalid_input'
@@ -120,9 +115,17 @@ async function execute(
 
 	// Reads the current document and hands the screener straight to the pure
 	// validator -- no mutate() callback, no RevisionService, no write path
-	// exists for this function to accidentally take.
-	const report = await validateScreenerDefinition(screener, { registry, marketData, costBudget });
-	return ok(toWireValidationReport(report));
+	// exists for this function to accidentally take. validateScreenerDefinition
+	// already catches a rejecting ScreenerMarketData.resolveUniverse
+	// internally (screenerValidation.ts), but this still guards against any
+	// other unexpected rejection reaching this tool's caller (AC2's "never an
+	// unhandled rejection").
+	try {
+		const report = await validateScreenerDefinition(screener, { registry, marketData, costBudget });
+		return ok(toWireValidationReport(report));
+	} catch (err) {
+		return toErrorResult(err);
+	}
 }
 
 export interface ValidateScreenerToolOptions {

@@ -6,42 +6,13 @@
 // checking, idempotency replay, or undo-token issuance.
 
 import { recordCommit } from '../../workbench/application/changeHistory';
-import {
-	IdempotencyConflictError,
-	OperationValidationError,
-	RevisionConflictError,
-	StorageWriteError,
-	UndoTokenError
-} from '../../workbench/domain/errors';
 import { toWireEnvelope } from '../../workbench/domain/mutation';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import { createScreener as mintScreener } from '../../screener/definition';
 import { writeScreener } from '../../screener/state';
 import type { ToolResult, ToolSpec } from '../types';
 import { fail, ok } from '../tools';
-
-// Private copy of workbench/tools/index.ts's error-mapping helper: the
-// ticket forbids modifying that file or exporting a shared one, and this is
-// a two-branch function, cheap enough to duplicate per tool module.
-function toErrorResult(err: unknown): ToolResult {
-	if (
-		err instanceof RevisionConflictError ||
-		err instanceof IdempotencyConflictError ||
-		err instanceof UndoTokenError ||
-		err instanceof OperationValidationError ||
-		err instanceof StorageWriteError
-	) {
-		return fail(err.message, err.toWireError());
-	}
-	return fail(err instanceof Error ? err.message : String(err));
-}
-
-function resolveWorkspaceId(deps: WorkbenchDeps, input: { workspace_id?: unknown }): string | null {
-	if (typeof input.workspace_id === 'string') {
-		return input.workspace_id;
-	}
-	return deps.repository.getActiveId();
-}
+import { resolveWorkspaceId, toErrorResult } from './support';
 
 const DESCRIPTION =
 	'Creates a screener bound to a workspace, at screener revision 1 with an empty filter ' +

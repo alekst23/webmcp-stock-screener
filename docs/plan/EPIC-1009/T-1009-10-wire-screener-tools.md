@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1009 (Screener Core)
 **Design**: docs/design/screener-core/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1009-3, T-1009-8, T-1009-9
 **Blocks**: —
 
@@ -71,3 +71,49 @@ one conversation.
 
 Any screener UI panel, retiring the old surface (EPIC-1015), and the
 results tools (EPIC-1010).
+
+## Solution Approach
+
+### Modules
+
+- `src/lib/webmcp/screener/group.ts` — `buildScreenerTools(deps: ScreenerToolDeps): ToolSpec[]`
+  composes the six tool factories T-1009-3..9 built, plus `SCREENER_TOOL_NAMES`.
+  `ScreenerToolDeps extends SetScreenerUniverseDeps` (itself `WorkbenchDeps` plus
+  `catalog` and `instrumentDirectory`) and adds the evaluation-facing options
+  `marketData`, `costBudget`, `evaluationPort`, `runStore`, `now`. One shared
+  `catalog` field rather than a second registry per tool.
+- `src/lib/webmcp/screener/registerScreenerTools.ts` — the composition root,
+  mirroring `workbench/tools/registerWorkbenchTools.ts`: `SCREENER_TOOLS_ENABLED`
+  (false), `createDefaultScreenerToolDeps()`, and `registerScreenerTools(deps)`
+  looping `mc.registerTool` over the built specs. Not called from app startup.
+- `src/lib/webmcp/screener/support.ts` — the consolidation of helpers the three
+  definition-editing tools had each copied privately: `toErrorResult`,
+  `resolveWorkspaceId`, `readString`, `readOptionalString`, `readOptionalNumber`.
+  A pure refactor; all six tools now import them.
+- `src/lib/webmcp/screener/integration.test.ts` — the end-to-end sequence.
+
+### Deviation from AC2
+
+AC2 as written assumes `validate_screener` and `run_screener` call a Python
+backend over HTTP. This epic is implemented entirely in browser-side
+TypeScript, as sibling epics EPIC-1006/1007/1008 were, so there is no HTTP hop
+to make. AC2's intent is satisfied instead: the evaluation port is injected,
+and a failure inside it surfaces as a tool error an agent can act on rather
+than an unhandled rejection. A test drives that with an evaluation port that
+rejects.
+
+### Feature flag
+
+Registering a second tool group is new behaviour in an existing runtime path
+(`document.modelContext` already carries the shipping 11-tool surface), so the
+project's dead-code policy requires a flag. `SCREENER_TOOLS_ENABLED` stays
+false until the wider program surface is ready to ship.
+
+### Test plan
+
+Group composition and unique snake_case names; no collision with the existing
+11-tool, workbench, panel or discovery surfaces; the flag gating registration;
+an evaluation-port failure returning a tool error; the full create → universe →
+conditions → group → ranking → validate → run sequence returning a pinned
+`run_id` with counts and complete provenance; the run staying byte-identical
+after a later screener edit; undo restoring prior screener state.

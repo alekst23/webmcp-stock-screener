@@ -19,7 +19,11 @@ import { createUnavailableMarketData } from '../../screener/engine/unavailableMa
 import { createPinnedRunStore } from '../../screener/runStore';
 import type { PinnedRunStore } from '../../screener/ports';
 import type { ScreenerEvaluationPort, ScreenerMarketData } from '../../screener/ports';
-import { toWireScreenerRun, type ScreenerRunRefusal } from '../../screener/run';
+import {
+	toWireScreenerRun,
+	type ScreenerRunOutcome,
+	type ScreenerRunRefusal
+} from '../../screener/run';
 import { validateScreenerDefinition } from '../../screener/screenerValidation';
 import { readScreener } from '../../screener/state';
 import type { ScreenerDefinition } from '../../screener/definition';
@@ -35,6 +39,13 @@ import type { WorkspaceRepository } from '../../workbench/domain/ports';
 import type { ValidationProblem } from '../../screener/validation';
 import { fail, ok } from '../tools';
 import type { ToolResult, ToolSpec } from '../types';
+import {
+	readOptionalNumber,
+	readOptionalString,
+	readString,
+	resolveWorkspaceId,
+	toErrorResult
+} from './support';
 
 const DESCRIPTION =
 	'Executes one specific screener revision and pins the complete, ordered result set under a ' +
@@ -72,27 +83,6 @@ interface RawInput {
 	screener_revision?: unknown;
 	expected_revision?: unknown;
 	idempotency_key?: unknown;
-}
-
-function resolveWorkspaceId(deps: WorkbenchDeps, input: RawInput): string | null {
-	if (typeof input.workspace_id === 'string') {
-		return input.workspace_id;
-	}
-	return deps.repository.getActiveId();
-}
-
-// Mirrors workbench/tools/index.ts's toErrorResult -- a private equivalent,
-// per this ticket's instructions, rather than an import from a file this
-// ticket must not modify.
-function toErrorResult(err: unknown): ToolResult {
-	if (
-		err instanceof RevisionConflictError ||
-		err instanceof IdempotencyConflictError ||
-		err instanceof OperationValidationError
-	) {
-		return fail(err.message, err.toWireError());
-	}
-	return fail(err instanceof Error ? err.message : String(err));
 }
 
 function toWireProblem(problem: ValidationProblem): Record<string, unknown> {
@@ -185,16 +175,13 @@ async function execute(
 	if (!workspaceId) {
 		return fail('No active workspace.', { error: 'not_found' });
 	}
-	const screenerId = typeof input.screener_id === 'string' ? input.screener_id : '';
+	const screenerId = readString(input.screener_id);
 	if (!screenerId) {
 		return fail('run_screener requires a non-empty "screener_id".', { error: 'invalid_input' });
 	}
-	const requestedRevision =
-		typeof input.screener_revision === 'number' ? input.screener_revision : undefined;
-	const expectedRevision =
-		typeof input.expected_revision === 'number' ? input.expected_revision : undefined;
-	const idempotencyKey =
-		typeof input.idempotency_key === 'string' ? input.idempotency_key : undefined;
+	const requestedRevision = readOptionalNumber(input.screener_revision);
+	const expectedRevision = readOptionalNumber(input.expected_revision);
+	const idempotencyKey = readOptionalString(input.idempotency_key);
 
 	const fingerprint = fingerprintRequest('screener.run_screener', {
 		workspaceId,
@@ -241,7 +228,17 @@ async function execute(
 	}
 
 	const runId = deps.ids.next('run');
-	const outcome = await evaluationPort.execute({ definition, runId });
+	// AC2 (deviation note, T-1009-10): ScreenerEvaluationPort.execute reaches
+	// through to ScreenerMarketData -- a rejected promise there (an
+	// unavailable data source, a fake engine wired to fail in a test) must
+	// surface as a tool error an agent can act on, never an unhandled
+	// rejection out of this async function.
+	let outcome: ScreenerRunOutcome;
+	try {
+		outcome = await evaluationPort.execute({ definition, runId });
+	} catch (err) {
+		return toErrorResult(err);
+	}
 
 	let result: ToolResult;
 	if (outcome.status === 'refused') {
