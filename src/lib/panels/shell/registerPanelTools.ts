@@ -7,6 +7,10 @@
 // into an existing runtime path, so the project's dead-code policy asks
 // nothing extra of it.
 import { ensureModelContext } from '../../webmcp/bridge';
+import { builtinCatalogRegistry } from '../../catalog/registry';
+import { createPinnedRunStore } from '../../screener/runStore';
+import { registerResultsTableRendererContract } from '../../results/tools/tableRendererContract';
+import { registerResultsTablePanelKind } from '../../results/registry/resultsTablePanelKind';
 import { createChangeHistory } from '../../workbench/application/changeHistory';
 import { createIdempotencyCache } from '../../workbench/application/idempotency';
 import { createRevisionService } from '../../workbench/application/revisionService';
@@ -50,13 +54,19 @@ export function createDefaultPanelShellRuntime(): PanelShellRuntime {
 	const revisions = createRevisionService({ repository, clock, ids, idempotency });
 
 	const kinds = createPanelRegistry();
-	registerDefaultPanelKinds(kinds);
-
 	const sourceRenderer = createSourceRendererRegistry();
-	registerDefaultSourceRendererTypes(sourceRenderer);
 
 	const templates = createLayoutTemplateRegistry();
 	registerDefaultLayoutTemplates(templates);
+
+	// T-1010-7: no screener-execution surface is wired into this route yet
+	// (registerScreenerTools.ts is gated behind SCREENER_TOOLS_ENABLED=false),
+	// so this store starts empty every load -- a results_table panel with no
+	// pinned run renders its own "no run" state rather than fabricating one.
+	// The same store instance is closed over by both the table renderer
+	// contract's validateSelection hook and the panel body's own reads, so
+	// they can never disagree about what's pinned.
+	const runs = createPinnedRunStore();
 
 	// T-1007-9: seeding runs synchronously, right here, before this function
 	// returns -- there is no await between initializeWorkspace deciding
@@ -75,6 +85,24 @@ export function createDefaultPanelShellRuntime(): PanelShellRuntime {
 		templates,
 		maximized: createMaximizedPanelState()
 	};
+
+	// Real results_table registration (T-1010-7), before the placeholder
+	// defaults below -- registerDefaultPanelKinds/registerDefaultSourceRendererTypes
+	// now skip any kind/renderer/source already present, so registering these
+	// first is what makes "results_table" resolve to the real kind and
+	// "table"/"screener_results" resolve to the real renderer contract
+	// everywhere downstream, including this same function's own
+	// seedDefaultWorkspace call below.
+	registerResultsTableRendererContract(sourceRenderer, { runs, catalog: builtinCatalogRegistry });
+	registerResultsTablePanelKind(kinds, {
+		useCaseDeps: deps,
+		runs,
+		catalog: builtinCatalogRegistry
+	});
+
+	registerDefaultPanelKinds(kinds);
+	registerDefaultSourceRendererTypes(sourceRenderer);
+
 	seedDefaultWorkspace(deps, init.justCreated);
 
 	return { deps, observer: createPanelWorkspaceObserver() };
