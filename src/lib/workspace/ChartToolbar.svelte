@@ -3,28 +3,27 @@
 	import type { ResearchEngine } from '../webmcp/types';
 	import { ok, fail } from '../webmcp/tools';
 	import { recordAction, type AgentActivityEvent } from './activity';
+	import { parseTickers } from './tickerSearch';
 
+	// `tickers` moved to the header's collapsed search control
+	// (hotfix/marketpane-rebrand); this toolbar now reads it as a prop
+	// instead of owning the field, so "Show monthly" still acts on whatever
+	// the researcher last committed there.
 	let {
 		engine,
 		activity,
+		tickers,
 		onclear
 	}: {
 		engine: ResearchEngine;
 		activity: Writable<AgentActivityEvent[]>;
+		tickers: string;
 		onclear?: () => void;
 	} = $props();
 
-	let tickers = $state('MOCK02, MOCK03');
 	let date = $state('2025-12-31');
 	let busy = $state(false);
 	let error = $state<string | null>(null);
-
-	function parseTickers(): string[] {
-		return tickers
-			.split(/[\s,]+/)
-			.map((ticker) => ticker.trim().toUpperCase())
-			.filter(Boolean);
-	}
 
 	async function clearPanels(): Promise<void> {
 		busy = true;
@@ -46,7 +45,7 @@
 		busy = true;
 		error = null;
 		const input = {
-			tickers: parseTickers(),
+			tickers: parseTickers(tickers),
 			date,
 			window: [-20, 0] as [number, number],
 			title: 'Monthly charts'
@@ -66,10 +65,6 @@
 
 <section class="chart-toolbar panel-card" aria-label="Chart controls">
 	<label>
-		<span>Tickers</span>
-		<input class="field" bind:value={tickers} disabled={busy} />
-	</label>
-	<label>
 		<span>End date</span>
 		<input class="field" type="date" bind:value={date} disabled={busy} />
 	</label>
@@ -87,7 +82,7 @@
 <style>
 	.chart-toolbar {
 		display: grid;
-		grid-template-columns: minmax(180px, 1fr) minmax(150px, auto) auto;
+		grid-template-columns: minmax(150px, auto) auto;
 		gap: var(--space-md);
 		align-items: end;
 		margin: 0 0 var(--space-lg);
