@@ -58,3 +58,16 @@ class SimilarityCandidateNotFoundError(DomainError):
         super().__init__(f"Candidate {candidate_id!r} is not part of run {run_id!r}")
         self.run_id = run_id
         self.candidate_id = candidate_id
+
+
+class InsufficientHistoryError(DomainError):
+    """Raised when a backtest's requested range/universe cannot support
+    its requested horizons even after the engine's own bounding/truncation
+    pass (T-1014-5 AC6) -- there is no partial history left to run
+    against, so the request is rejected rather than silently shortened to
+    nothing."""
+
+    def __init__(self, message: str, available_sessions: int, required_sessions: int) -> None:
+        super().__init__(message)
+        self.available_sessions = available_sessions
+        self.required_sessions = required_sessions
