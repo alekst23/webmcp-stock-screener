@@ -75,6 +75,7 @@ function makeRun(runId: string, candidateIds: string[]): SimilarityRun {
 	return {
 		runId,
 		referenceSetupId: 'setup_1',
+		scope: 'cross_instrument',
 		weights: makeFeatureWeightSet(),
 		normalization: { mode: 'percent_change', anchor: 'window_start' },
 		provenance: makeProvenance({

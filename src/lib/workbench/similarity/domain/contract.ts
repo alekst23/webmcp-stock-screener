@@ -11,6 +11,7 @@
 // Domain layer: pure types, pure functions, no I/O.
 import type { InstrumentRef, Normalization } from '../../chart/domain/instrument';
 import type { MarketDataProvenance } from '../../domain/provenance';
+import { toWireProvenance } from '../../domain/provenance';
 import type { WireError } from '../../domain/errors';
 import type { ResourceId } from '../../domain/ids';
 
@@ -40,6 +41,13 @@ export function isFeatureFamily(value: unknown): value is FeatureFamily {
 }
 
 const DEFAULT_WEIGHT = 1 / FEATURE_FAMILIES.length;
+
+// A search scope selects other instruments, other historical windows of the
+// same instrument, or both -- and a run states which was applied. Added here
+// as a same-epic follow-on to the Python side's own T-1012-2 addition of the
+// identical field to domain/models/similarity.py's SimilarityRun; T-1012-1's
+// original TS SimilarityRun had no field for it (epic Open Question 1).
+export type SearchScope = 'cross_instrument' | 'same_instrument_windows' | 'both';
 
 // A historical window a candidate or reference setup covers. Deliberately
 // smaller than chart/domain/capturedSetup.ts's `SetupWindow` (no session, no
@@ -275,9 +283,69 @@ export function toExplanation(candidateId: string, score: SimilarityScore): Simi
 export interface SimilarityRun {
 	runId: ResourceId;
 	referenceSetupId: ResourceId;
+	scope: SearchScope;
 	weights: FeatureWeightSet;
 	normalization: Normalization;
 	provenance: MarketDataProvenance;
 	candidates: SimilarityCandidate[];
 	warnings: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Outbound wire serialization (T-1012-4/5's tool results). One snake_case
+// serializer per entity, matching capturedSetup.ts's toWireCapturedSetup
+// precedent of a domain-owned wire serializer rather than each tool
+// hand-rolling its own.
+// ---------------------------------------------------------------------------
+
+function toWireInstrumentRef(ref: InstrumentRef): Record<string, unknown> {
+	return {
+		instrument_id: ref.instrumentId,
+		symbol: ref.symbol,
+		exchange: ref.exchange,
+		asset_type: ref.assetType
+	};
+}
+
+function toWireWindowRef(window: WindowRef): Record<string, unknown> {
+	return { start: window.start, end: window.end, timeframe: window.timeframe };
+}
+
+function toWireNormalization(normalization: Normalization): Record<string, unknown> {
+	return { mode: normalization.mode, anchor: normalization.anchor };
+}
+
+export function toWireCandidate(candidate: SimilarityCandidate): Record<string, unknown> {
+	return {
+		candidate_id: candidate.candidateId,
+		instrument: toWireInstrumentRef(candidate.instrument),
+		window: toWireWindowRef(candidate.window),
+		score: candidate.score,
+		per_family_similarity: candidate.perFamilySimilarity,
+		unavailable_families: candidate.unavailableFamilies
+	};
+}
+
+export function toWireSimilarityRun(run: SimilarityRun): Record<string, unknown> {
+	return {
+		run_id: run.runId,
+		reference_setup_id: run.referenceSetupId,
+		scope: run.scope,
+		weights: run.weights,
+		normalization: toWireNormalization(run.normalization),
+		provenance: toWireProvenance(run.provenance),
+		candidates: run.candidates.map(toWireCandidate),
+		warnings: run.warnings
+	};
+}
+
+export function toWireExplanation(explanation: SimilarityExplanation): Record<string, unknown> {
+	return {
+		candidate_id: explanation.candidateId,
+		overall_score: explanation.overallScore,
+		weight_applied: explanation.weightApplied,
+		per_family_similarity: explanation.perFamilySimilarity,
+		contributions: explanation.contributions,
+		unavailable_families: explanation.unavailableFamilies
+	};
 }

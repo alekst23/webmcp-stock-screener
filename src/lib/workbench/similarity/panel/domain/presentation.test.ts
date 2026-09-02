@@ -45,6 +45,7 @@ function run(candidates: SimilarityCandidate[], warnings: string[] = []): Simila
 	return {
 		runId: 'run_1',
 		referenceSetupId: 'setup_1',
+		scope: 'cross_instrument',
 		weights: makeFeatureWeightSet(),
 		normalization: { mode: 'percent_change', anchor: 'window_start' },
 		provenance: PROVENANCE,
