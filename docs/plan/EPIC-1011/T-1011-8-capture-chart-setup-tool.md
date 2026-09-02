@@ -56,6 +56,85 @@ without rebuilding the chart from memory.
     `docs/design/chart-tools/technical.md` as a cross-epic contract, with
     EPIC-1012 named as its consumer.
 
+## Solution Approach
+
+The record type, its constructor, its serializer, its normalizer and its
+workspace store already exist in `chart/domain/capturedSetup.ts`. This
+ticket adds only the two layers above them: an application use case and
+the tool.
+
+### Why capture needs an async prologue
+
+`buildCapturedSetup` requires a `SetupWindow` carrying a real `barCount`,
+and a `MarketDataProvenance` describing the data the capture was taken
+from. Neither is knowable from the workspace document — both come from
+the bars port, which is async. `OperationDefinition.apply` is
+synchronous. So the use case splits in two:
+
+1. **`prepareCapture` (async, application).** Resolves the chart's range
+   through `resolveChartRange` from `chartData.ts`, fetches the series
+   through `ChartSeriesPort`, and returns the resolved `SetupWindow`
+   (bar span, timeframe, session, bar count) plus the series provenance
+   and any warnings. It does **not** go through `readChartData`: that
+   read is capped at 500 bars and refuses rather than truncates, which is
+   right for a data read and wrong for a capture that only needs to count
+   bars.
+2. **`chart.capture_setup` (sync, EPIC-1006 operation).** Takes the
+   already-resolved window and provenance as operation input, calls
+   `buildCapturedSetup`, and writes through `writeCapturedSetup`.
+
+Registering the operation is what supplies `expected_revision`,
+`idempotency_key`, the envelope and the undo token — none of it is
+reimplemented here (AC9).
+
+### The window a setup covers
+
+`window.start` / `window.end` are the span of the bars actually returned,
+not the chart's resolved range. A chart configured with `max` resolves to
+a range beginning at the epoch; recording that as the setup's window
+would tell EPIC-1012 to search decades the instrument never traded.
+
+### `workspace_revision`
+
+The revision whose state was frozen, i.e. the document's revision before
+the capture commits. The capture itself lands at `revision + 1`, and the
+only difference between the two is the record's own existence.
+
+### AC4 — self-containment
+
+`buildCapturedSetup` already copies every value out of `ChartState`. The
+test that earns AC4 is behavioral, not structural: capture, snapshot the
+stored record as JSON, then reconfigure the panel's instrument, timeframe
+and studies and remove the panel's chart state entirely, and assert the
+stored record is byte-identical.
+
+### AC7 — no partial record
+
+Both rejection paths fail in `prepareCapture`, before anything is
+committed, and both raise `CaptureSetupError`, so the tool's failure
+always carries `error: capture_setup_incomplete` and the `issues` list.
+The `chart.capture_setup` operation's own `validate` repeats the same
+blockers so a caller reaching the registry directly cannot store a
+partial record either.
+
+### AC8 — round trip and retrieval
+
+The tool's success payload is built from `readCapturedSetup(doc, setupId)`
+— the record read back out of the workspace through
+`normalizeCapturedSetup` — rather than from the in-memory object it just
+wrote. The returned payload is therefore itself evidence that the record
+survives persistence, and no second retrieval path is invented.
+
+### Files
+
+- `chart/application/captureSetup.ts` — `prepareCapture`, the
+  `chart.capture_setup` `OperationDefinition`, its schema and validator.
+- `chart/tools/captureChartSetup.ts` — `buildCaptureChartSetupTool`,
+  `CAPTURE_CHART_SETUP_TOOL_NAME`, wire translation and error mapping.
+  Registers nothing on import; T-1011-9 owns the composition root.
+- `docs/design/chart-tools/technical.md` — the `CapturedChartSetup`
+  section brought field-for-field into line with the shipped type (AC10).
+
 ## Design References
 
 - `docs/design/chart-tools/spec.md` — "Capture a reference setup"
