@@ -56,9 +56,9 @@ variable "nightly_schedule_expression" {
 }
 
 variable "nightly_schedule_enabled" {
-  description = "Whether the nightly schedule actually fires (AC9). False until T-0016-10/T-0016-11's cutover retires the Render cron -- see the nightly_job module and this ticket's Solution Approach for why both must never be enabled at once."
+  description = "Whether the nightly schedule actually fires (AC9). Enabled at cutover. The Render cron it replaces targets the old R2 bucket, not this one, so the two cannot write the same panel -- but leaving both running spends the EODHD quota twice, so retire the Render cron."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "require_real_panel" {
