@@ -174,12 +174,27 @@ class PandasPatternResearchEngine:
             # row would allocate one date object per ticker-day.
             date_codes = ticker_panel["date"].to_numpy()
             local_conditions = [series.loc[positions].to_numpy() for series in conditions]
+            # Every step's resolved date, not just the anchor's, must stay
+            # inside the search range -- so the walk's usable length is
+            # wherever to_date falls in this ticker's date series, not the
+            # ticker's full row count. A step whose window runs past that
+            # point is treated exactly like one running past the panel's own
+            # trailing edge: "partial" (still in progress), never a decisive
+            # match.
+            to_date_limit = int(np.searchsorted(date_codes, to_code, side="right"))
             anchors = np.flatnonzero(local_conditions[0])
             for anchor in anchors:
                 if not (from_code <= date_codes[anchor] <= to_code):
                     continue
                 self._record_anchor(
-                    str(ticker), date_codes, local_conditions, steps, int(anchor), complete, partial
+                    str(ticker),
+                    date_codes,
+                    local_conditions,
+                    steps,
+                    int(anchor),
+                    to_date_limit,
+                    complete,
+                    partial,
                 )
         return complete, partial
 
@@ -190,10 +205,11 @@ class PandasPatternResearchEngine:
         conditions: list[np.ndarray],
         steps: list[SetupStep],
         anchor: int,
+        search_length: int,
         complete: list[Instance],
         partial: list[Instance],
     ) -> None:
-        outcome = self._walk_anchor(conditions, steps, anchor, len(date_codes))
+        outcome = self._walk_anchor(conditions, steps, anchor, search_length)
         if outcome is None:
             return
         status, position, steps_resolved = outcome
@@ -211,8 +227,9 @@ class PandasPatternResearchEngine:
         where the previous one resolved. Returns None on a decisive failure
         (this start never matches the pattern), or the furthest reached
         position with a status of "resolved" (full sequence completed) or
-        "partial" (still possible, but the panel's trailing edge doesn't
-        cover the next step's window yet)."""
+        "partial" (still possible, but `length` -- the earlier of the
+        panel's trailing edge and the search's to_date -- doesn't cover the
+        next step's window yet)."""
         position = anchor
         for step_index in range(1, len(steps)):
             outcome = self._resolve_step(
