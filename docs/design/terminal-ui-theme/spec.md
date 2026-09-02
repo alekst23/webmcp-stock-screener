@@ -48,7 +48,8 @@ still legible at a glance.
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
 | Body text | any body-level text colour paired with the background it is rendered on | the pairing is measured | its contrast ratio is at least 4.5:1 |
-| UI chrome and large text | any border, large-text, or non-text UI colour paired with its background | the pairing is measured | its contrast ratio is at least 3:1 |
+| Meaningful non-text and large text | any colour that carries meaning without text — an interactive control's boundary, a focus indicator, a state indicator — or any large-text colour, paired with its background | the pairing is measured | its contrast ratio is at least 3:1 |
+| Decorative separators are exempt | a rule or divider that only groups content, where nothing is conveyed by its presence alone | it is measured | it is held to no contrast floor; it may sit quietly below 3:1 |
 | Enforced, not asserted | a colour is introduced anywhere in the interface | the interface is checked | that colour is drawn from the named palette rather than specified ad hoc at the point of use, so the contrast floor above covers it |
 
 ### Status stays distinguishable
