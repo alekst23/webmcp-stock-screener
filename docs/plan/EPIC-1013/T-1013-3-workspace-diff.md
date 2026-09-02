@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1013 (Safety layer (preview & apply))
 **Design**: docs/design/safety-preview-apply/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1013-1
 **Blocks**: T-1013-5
 
@@ -64,3 +64,99 @@ flaky-looking failures that are actually real ambiguity.
 ## Out of Scope
 
 Computing the after-state (T-1013-2) and rendering the diff in any UI.
+
+## Implementation Plan
+
+New file `src/lib/workbench/domain/workspaceDiff.ts` (plus its test), building
+on the contracts already landed in `domain/preview.ts` (`DiffEntry`,
+`FieldChange`, `WorkspaceDiff`, `DiffChangeType`, `collectAffectedIds`). No
+existing source file changes.
+
+### Exports
+
+```ts
+export function diffWorkspaces(before: WorkspaceDocument, after: WorkspaceDocument): WorkspaceDiff;
+export function summarizeDiff(diff: WorkspaceDiff, fragments?: readonly string[]): string;
+```
+
+### Generic traversal (AC1, AC10)
+
+`diffWorkspaces` never names `panels` / `layout` / `links`. It walks the union
+of the two documents' own keys and classifies each by the *shape* of its
+value:
+
+- **Entity collection** — an array whose every element is a plain object. Each
+  element's identity is its string `id`; failing that, the value of its single
+  string-valued property whose name ends in `Id` (this is what makes `layout`,
+  keyed by `panelId`, diffable without naming it). `entityType` is the
+  property key itself.
+  - in `after` only -> `added`, `fields: []`
+  - in `before` only -> `removed`, `fields: []`
+  - in both but not deeply equal -> `updated` with only the changed fields
+    (AC2)
+  - element with no derivable identity -> compared positionally and reported
+    as a `<key>[<index>]` field change on the `workspace` entry, so it is
+    never silently dropped
+- **Everything else** (scalars, nulls, arrays of scalars, plain objects) ->
+  a field change gathered onto a single
+  `{ change: 'updated', entityType: 'workspace', id: after.id }` entry.
+- **`extensions`** — recursed with the same two rules, one level down. An
+  extension key holding an identified-object array becomes a collection with
+  `entityType: 'extensions.<key>'`; anything else becomes an
+  `extensions.<key>` field change on the workspace entry. Sibling epics'
+  entity kinds therefore appear in diffs with no edit to this file.
+- **`revision` and `updatedAt` are excluded.** The revision service stamps
+  them at commit time; they are bookkeeping, not effects of the batch, and
+  including them would make every diff report a spurious change and break the
+  preview/apply equality the honesty tests rely on.
+
+Change detection uses a small local `deepEqual` (no new dependency).
+
+### Ordering rule (AC4)
+
+Nothing depends on object-key iteration order or insertion timing:
+
+1. The `workspace` entry, if any, first.
+2. Then collections sorted by `entityType` string (extension collections sort
+   under their `extensions.` prefix, so top-level and extension collections
+   interleave by one total, stable rule).
+3. Within a collection: `added`/`updated` in `after`-array order, then
+   `removed` in `before`-array order.
+4. Within an entry: `fields` sorted by field name.
+
+`collectAffectedIds` (imported from `./preview`, not reimplemented) then
+yields the deduped first-appearance ID list for free (AC5).
+
+### Summary (AC6, AC7, AC8)
+
+`summarizeDiff` is derived from the structured diff, so it cannot describe a
+change the diff does not contain:
+
+- Empty diff -> `'No changes.'`, never an empty string (AC7).
+- Non-empty diff with `fragments` -> the fragments supply the phrasing (each
+  counting as one change); without them, clauses are derived by grouping diff
+  entries on `(change, entityType)` in first-appearance order, e.g.
+  `Added 2 panels`. Fragments are ignored for an empty diff, which is what
+  keeps the summary from outrunning the diff (AC6).
+- At most 3 clauses render; the rest degrade to `and N more changes`, where N
+  counts the diff entries the unrendered clauses stand for, so the sentence is
+  length-bounded for any batch size (AC8).
+- One short present-tense sentence matching the house example
+  `"Added RSI study and RSI 40–70 filter"`.
+
+### Purity (AC9)
+
+Both functions read their arguments and return new values: no I/O, no clock,
+no module-level state, no mutation of `before` or `after`.
+
+### Tests
+
+`workspaceDiff.test.ts` covers every AC, and specifically: identical states ->
+empty diff and a "no changes" summary; updated entity lists only changed
+fields; two structurally identical `after` documents built with different
+property-insertion and array-construction orders produce deeply equal diffs,
+and repeated calls are stable; `collectAffectedIds` over a real diff;
+a novel entity collection under `extensions` (a kind the source never names)
+appearing as added/removed/updated; `panelId`-identified layout entries;
+a 20-entity batch summarized under a stated character bound and ending in a
+remaining-count clause; frozen inputs proving non-mutation.
