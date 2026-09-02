@@ -6,7 +6,7 @@
 // duplication than a coupling between a surface being built and one being
 // retired (EPIC-1015). When the old surface goes, these become the only copy.
 
-import { makeProvenance, type Provenance } from '../../surface/provenance';
+import { makeProvenance, type MarketDataProvenance } from '../../surface/provenance';
 import type { ToolResult } from '../types';
 
 export function ok(payload: unknown): ToolResult {
@@ -22,16 +22,16 @@ export function fail(message: string, extra?: Record<string, unknown>): ToolResu
 
 export const CATALOG_SOURCE_ID = 'src.catalog.builtin';
 
-// The catalog ships with the application, so `static` is the honest delivery
-// status and there is no currency, price adjustment or reporting period to
-// state -- a catalog entry has no monetary content. `asOf` is call time
-// because the inventory is whatever this build contains.
-export function catalogProvenance(): Provenance {
+// The catalog ships with the application, so `static` is the honest liveness
+// and there is no currency, price adjustment or reporting period to state --
+// a catalog entry has no monetary content. `asOf` is call time because the
+// inventory is whatever this build contains.
+export function catalogProvenance(): MarketDataProvenance {
 	return makeProvenance({
 		asOf: new Date().toISOString(),
 		sourceId: CATALOG_SOURCE_ID,
 		sourceLabel: 'Built-in application catalog',
-		delivery: 'static',
+		liveness: 'static',
 		timezone: 'UTC'
 	});
 }

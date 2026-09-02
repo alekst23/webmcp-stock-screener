@@ -23,8 +23,8 @@ export const UNCONFIGURED_REASON =
 	'instrument-scoped work; ask the user for an explicit identifier instead.';
 
 // `static` rather than `live`: there is no feed behind this, and claiming a
-// delivery status the source cannot honour is the failure mode this whole
-// adapter exists to avoid.
+// liveness the source cannot honour is the failure mode this whole adapter
+// exists to avoid.
 function unconfiguredEnvelope<T>(data: T): DiscoveryEnvelope<T> {
 	return envelope(
 		data,
@@ -32,7 +32,7 @@ function unconfiguredEnvelope<T>(data: T): DiscoveryEnvelope<T> {
 			asOf: new Date().toISOString(),
 			sourceId: UNCONFIGURED_SOURCE_ID,
 			sourceLabel: 'No reference-data source configured',
-			delivery: 'static',
+			liveness: 'static',
 			timezone: 'UTC'
 		}),
 		[UNCONFIGURED_REASON]

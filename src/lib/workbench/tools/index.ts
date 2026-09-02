@@ -90,7 +90,9 @@ function getAppContext(deps: WorkbenchDeps) {
 			revision: doc?.revision ?? null,
 			permissions: PERMISSIONS,
 			marketDataLiveness: prices.liveness,
-			marketDataDelaySeconds: prices.delaySeconds,
+			// Explicit null rather than an omitted key: the tool's payload should
+			// say "no delay" outright, not leave the agent to infer it.
+			marketDataDelaySeconds: prices.delaySeconds ?? null,
 			presentationTimezone: prices.timezone
 		});
 	};

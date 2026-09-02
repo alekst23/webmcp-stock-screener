@@ -1,42 +1,108 @@
-// Market-data provenance contract (T-1006-3). Any market-data-bearing tool
-// result can carry a provenance record stating as-of time, source,
-// live/delayed status, timezone, currency, price-adjustment basis and
-// fundamentals reporting period -- so an agent never quotes a delayed,
-// unadjusted, foreign-currency price as though it were current. See the
-// final paragraph of docs/reference/tool-spec.md's "Common contract for
-// every tool".
+// The one market-data provenance contract for the whole WebMCP surface. Any
+// result carrying market data, reference data or fundamentals states as-of
+// time, source, liveness, timezone, currency, price-adjustment basis and
+// reporting period -- so an agent never quotes a delayed, unadjusted,
+// foreign-currency price as though it were current. See the final paragraph of
+// docs/reference/tool-spec.md's "Common contract for every tool".
+//
+// This lives in the workbench domain layer because it is the common contract
+// every sibling surface epic builds on, not one epic's private vocabulary.
+// Pure types and pure constructors, no I/O. Discovery's extension of it is
+// src/lib/surface/provenance.ts.
 
-export type ProvenanceLiveness = 'live' | 'delayed' | 'end_of_day' | 'historical';
+// One declared value so every tool in the surface reports the same version
+// rather than each hard-coding its own string.
+export const ENGINE_VERSION = '0.1.0';
+
+// `historical` and `static` are different claims and both are needed.
+// `historical` is market data about a past instant: it ticked once, and a
+// later request for a later window will return different data. `static` data
+// does not tick at all -- the built-in catalog, a dated reference-data export.
+// `end_of_day` sits between them: stale by design, but it will refresh.
+export type ProvenanceLiveness = 'live' | 'delayed' | 'end_of_day' | 'historical' | 'static';
 
 export type PriceAdjustment = 'adjusted' | 'unadjusted' | 'not_applicable';
 
-export type FiscalPeriod = 'FY' | 'Q1' | 'Q2' | 'Q3' | 'Q4';
+// A basis rather than a bare fiscal-period enum ('FY' | 'Q1'..'Q4'): a
+// trailing-twelve-month figure is neither a fiscal quarter nor a fiscal year,
+// and an enum of fiscal periods cannot say so without lying. `basis` also
+// makes `point_in_time` -- a balance-sheet snapshot -- expressible.
+export type ReportingBasis =
+	'point_in_time' | 'trailing_twelve_months' | 'fiscal_quarter' | 'fiscal_year';
 
-export interface FundamentalsPeriod {
-	fiscalYear: number;
-	fiscalPeriod: FiscalPeriod;
-	// ISO 8601 date.
+export interface ReportingPeriod {
+	basis: ReportingBasis;
+	// ISO date the reported period ends on.
 	periodEnd: string;
-	restated: boolean;
+	fiscalYear: number;
+	// Absent for annual, trailing-twelve-month and point-in-time bases.
+	fiscalQuarter?: number;
+	// Absent when the source does not say. A stated `false` is a claim that
+	// the figures are as first reported.
+	restated?: boolean;
 }
 
-export interface MarketDataProvenance {
-	// ISO 8601 instant the data describes.
+interface ProvenanceCore {
+	// ISO-8601 with offset: the instant the payload is true as of.
 	asOf: string;
-	// Provider identifier, e.g. 'eodhd'.
-	source: string;
-	liveness: ProvenanceLiveness;
-	// Set only when liveness === 'delayed'; null otherwise, never a
-	// misleading duration for live/end-of-day/historical data.
-	delaySeconds: number | null;
-	// IANA timezone name, e.g. 'America/New_York'.
+	// Stable machine identifier, e.g. 'src.catalog.builtin'.
+	sourceId: string;
+	// Human-readable name for the same source. Both are kept: an id alone
+	// cannot be shown to a user, a label alone cannot be matched on.
+	sourceLabel: string;
+	// IANA zone the payload's dates and times are expressed in.
 	timezone: string;
-	// ISO 4217 currency code, e.g. 'USD'.
-	currency: string;
-	priceAdjustment: PriceAdjustment;
-	// Explicitly absent (null) for results carrying no fundamentals.
-	fundamentalsPeriod: FundamentalsPeriod | null;
-	calcEngineVersion: string;
+	// ISO 4217. Absent -- not defaulted -- when the payload has no monetary
+	// content, because a guessed currency is worse than a stated absence.
+	currency?: string;
+	// Absent when the payload has no price content.
+	priceAdjustment?: PriceAdjustment;
+	// Absent when the payload has no fundamentals.
+	reportingPeriod?: ReportingPeriod;
+	engineVersion: string;
+}
+
+// A union rather than a nullable `delaySeconds`, so "delayed, but we won't say
+// by how much" is not expressible: the magnitude is what makes a delay
+// actionable. The same union stops a live or static record from carrying a
+// delay figure at all.
+export type MarketDataProvenance =
+	| (ProvenanceCore & { liveness: 'delayed'; delaySeconds: number })
+	| (ProvenanceCore & {
+			liveness: Exclude<ProvenanceLiveness, 'delayed'>;
+			delaySeconds?: never;
+	  });
+
+type ProvenanceInputCore = Omit<ProvenanceCore, 'engineVersion'>;
+
+export type ProvenanceInput =
+	| (ProvenanceInputCore & { liveness: 'delayed'; delaySeconds: number })
+	| (ProvenanceInputCore & {
+			liveness: Exclude<ProvenanceLiveness, 'delayed'>;
+			delaySeconds?: never;
+	  });
+
+// Keys whose value is undefined are dropped rather than written, so an omitted
+// currency stays genuinely absent from the record instead of becoming an
+// explicit `undefined` that survives into a serialized result.
+function withoutUndefined<T extends object>(value: T): T {
+	return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
+}
+
+export function makeProvenance(input: ProvenanceInput): MarketDataProvenance {
+	const core: ProvenanceCore = withoutUndefined({
+		asOf: input.asOf,
+		sourceId: input.sourceId,
+		sourceLabel: input.sourceLabel,
+		timezone: input.timezone,
+		currency: input.currency,
+		priceAdjustment: input.priceAdjustment,
+		reportingPeriod: input.reportingPeriod,
+		engineVersion: ENGINE_VERSION
+	});
+	return input.liveness === 'delayed'
+		? { ...core, liveness: 'delayed', delaySeconds: input.delaySeconds }
+		: { ...core, liveness: input.liveness };
 }
 
 export interface WithProvenance<T> {
@@ -48,23 +114,29 @@ export function withProvenance<T>(data: T, provenance: MarketDataProvenance): Wi
 	return { data, provenance };
 }
 
+function toWireReportingPeriod(period: ReportingPeriod): Record<string, unknown> {
+	return withoutUndefined({
+		basis: period.basis,
+		period_end: period.periodEnd,
+		fiscal_year: period.fiscalYear,
+		fiscal_quarter: period.fiscalQuarter,
+		restated: period.restated
+	});
+}
+
+// The single snake_case serializer for the wire. Absent optionals stay absent
+// rather than serializing as null, matching the record they came from.
 export function toWireProvenance(p: MarketDataProvenance): Record<string, unknown> {
-	return {
+	return withoutUndefined({
 		as_of: p.asOf,
-		source: p.source,
+		source_id: p.sourceId,
+		source_label: p.sourceLabel,
 		liveness: p.liveness,
 		delay_seconds: p.delaySeconds,
 		timezone: p.timezone,
 		currency: p.currency,
 		price_adjustment: p.priceAdjustment,
-		fundamentals_period: p.fundamentalsPeriod
-			? {
-					fiscal_year: p.fundamentalsPeriod.fiscalYear,
-					fiscal_period: p.fundamentalsPeriod.fiscalPeriod,
-					period_end: p.fundamentalsPeriod.periodEnd,
-					restated: p.fundamentalsPeriod.restated
-				}
-			: null,
-		calc_engine_version: p.calcEngineVersion
-	};
+		reporting_period: p.reportingPeriod ? toWireReportingPeriod(p.reportingPeriod) : undefined,
+		engine_version: p.engineVersion
+	});
 }

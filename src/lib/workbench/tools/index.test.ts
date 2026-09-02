@@ -16,14 +16,14 @@ function fixedClock(iso: string): Clock {
 
 const FIXED_PROVENANCE: MarketDataProvenance = {
 	asOf: '2026-09-02T14:00:00.000Z',
-	source: 'eodhd',
+	sourceId: 'eodhd',
+	sourceLabel: 'EOD Historical Data',
 	liveness: 'delayed',
 	delaySeconds: 900,
 	timezone: 'America/New_York',
 	currency: 'USD',
 	priceAdjustment: 'adjusted',
-	fundamentalsPeriod: null,
-	calcEngineVersion: '1.0.0'
+	engineVersion: '1.0.0'
 };
 
 function jsonOf(result: { content: { type: 'text'; text: string }[] }): unknown {

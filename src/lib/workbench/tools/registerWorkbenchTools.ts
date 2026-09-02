@@ -9,7 +9,7 @@
 // real runtime toggle) once the program's surface is complete.
 import { ensureModelContext } from '../../webmcp/bridge';
 import { createIdSequencer } from '../domain/ids';
-import type { MarketDataProvenance } from '../domain/provenance';
+import { makeProvenance, type MarketDataProvenance } from '../domain/provenance';
 import { createChangeHistory } from '../application/changeHistory';
 import { createIdempotencyCache } from '../application/idempotency';
 import { operationRegistry } from '../application/operationRegistry';
@@ -22,17 +22,16 @@ export const WORKBENCH_TOOLS_ENABLED = false;
 // A trivial fixed-value provenance source, matching T-1006-3's "no mock
 // pipeline" boundary -- the separate reference/fundamental-data workstream
 // supplies a real ProvenanceSource later.
-const FIXED_PROVENANCE: MarketDataProvenance = {
+// `static` rather than a zero-second delay: nothing ticks behind this, and a
+// delay of zero would read as "live enough", which is the claim it must not
+// make. Currency and price adjustment are omitted because it carries neither.
+const FIXED_PROVENANCE: MarketDataProvenance = makeProvenance({
 	asOf: new Date(0).toISOString(),
-	source: 'not_configured',
-	liveness: 'delayed',
-	delaySeconds: 0,
-	timezone: 'America/New_York',
-	currency: 'USD',
-	priceAdjustment: 'not_applicable',
-	fundamentalsPeriod: null,
-	calcEngineVersion: 'unset'
-};
+	sourceId: 'not_configured',
+	sourceLabel: 'No market-data source configured',
+	liveness: 'static',
+	timezone: 'America/New_York'
+});
 
 export function createDefaultWorkbenchDeps(): WorkbenchDeps {
 	const repository = createLocalWorkspaceRepository();
