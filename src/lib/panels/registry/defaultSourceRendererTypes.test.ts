@@ -137,4 +137,47 @@ describe('registerDefaultSourceRendererTypes', () => {
 			).toBe(true);
 		}
 	});
+
+	// T-1010-7: a sibling epic's real renderer/source contract, registered
+	// first into the same registry, must not be clobbered or rejected as a
+	// duplicate -- this is what lets a composition root register the real
+	// 'table'/'screener_results' contract and then still call this function
+	// for the remaining three placeholder pairs.
+	it('skips a renderer type that was already registered, rather than throwing a conflict', () => {
+		const registry = createSourceRendererRegistry();
+		registry.registerRendererType({
+			name: 'table',
+			configSchema: { type: 'object', properties: {} },
+			validateConfig: () => ({ ok: true, value: {} }),
+			defaultConfig: () => ({}),
+			acceptedSourceTypes: ['screener_results']
+		});
+
+		expect(() => registerDefaultSourceRendererTypes(registry)).not.toThrow();
+
+		expect(
+			registry.requireRendererType('table').acceptedSourceTypes,
+			'the already-registered real renderer type must survive, not be overwritten'
+		).toEqual(['screener_results']);
+		expect(registry.rendererTypeNames().sort()).toEqual([...EXPECTED_RENDERER_TYPES].sort());
+	});
+
+	it('skips a source type that was already registered, rather than throwing a conflict', () => {
+		const registry = createSourceRendererRegistry();
+		registry.registerSourceType({
+			name: 'screener_results',
+			refSchema: { type: 'object', properties: {} },
+			validateRef: () => ({ ok: true, value: {} }),
+			isCompatible: () => true,
+			compatibilityDescription: 'real contract stand-in'
+		});
+
+		expect(() => registerDefaultSourceRendererTypes(registry)).not.toThrow();
+
+		expect(
+			registry.getSourceType('screener_results')?.compatibilityDescription,
+			'the already-registered real source type must survive, not be overwritten'
+		).toBe('real contract stand-in');
+		expect(registry.sourceTypeNames().sort()).toEqual([...EXPECTED_SOURCE_TYPES].sort());
+	});
 });

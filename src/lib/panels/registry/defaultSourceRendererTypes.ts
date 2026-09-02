@@ -217,11 +217,21 @@ function buildRendererTypes(): RendererTypeDefinition[] {
 	];
 }
 
+// Skips any renderer/source type a caller already registered, the same way
+// registerDefaultPanelKinds does (see its own comment): a sibling epic's
+// real contract, registered into the same registry first, is never
+// clobbered or duplicate-rejected -- its placeholder is simply never added.
+// Starting from an empty registry (every call site before T-1010-7) is
+// unaffected.
 export function registerDefaultSourceRendererTypes(registry: SourceRendererRegistry): void {
 	for (const rendererType of buildRendererTypes()) {
-		registry.registerRendererType(rendererType);
+		if (registry.getRendererType(rendererType.name) === undefined) {
+			registry.registerRendererType(rendererType);
+		}
 	}
 	for (const sourceType of buildSourceTypes(registry)) {
-		registry.registerSourceType(sourceType);
+		if (registry.getSourceType(sourceType.name) === undefined) {
+			registry.registerSourceType(sourceType);
+		}
 	}
 }

@@ -158,4 +158,36 @@ describe('registerDefaultPanelKinds', () => {
 			).toBe(true);
 		}
 	});
+
+	// T-1010-7: a sibling epic's real definition, registered into the same
+	// registry first, is what makes "each owning epic replaces its kind's
+	// definition by re-registering it, no edit to this file required" (this
+	// file's own header comment) actually true, rather than a promise the
+	// unconditional `register` call would immediately break with a
+	// PanelKindConflictError.
+	it('skips a kind that was already registered, rather than throwing a conflict', () => {
+		const registry = createPanelRegistry();
+		registry.register({
+			kind: 'results_table',
+			defaultTitle: 'Real Results',
+			defaultSize: { colSpan: 1, rowSpan: 1 },
+			minSize: { colSpan: 1, rowSpan: 1 },
+			defaultConfig: () => ({}),
+			validateConfig: () => ({ ok: true, value: {} }),
+			configSchema: { type: 'object', properties: {} },
+			linkChannels: [],
+			bindingTypes: [],
+			defaultRenderer: null,
+			component: async () => () => null
+		});
+
+		expect(() => registerDefaultPanelKinds(registry)).not.toThrow();
+
+		expect(
+			registry.require('results_table').defaultTitle,
+			'the already-registered real definition must survive, not be overwritten by the placeholder'
+		).toBe('Real Results');
+		// Every other placeholder kind still registers normally.
+		expect(registry.names().sort()).toEqual([...EXPECTED_KINDS].sort());
+	});
 });
