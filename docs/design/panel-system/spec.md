@@ -55,6 +55,10 @@ source type, or a renderer type into.
 7. **Register a panel kind, source type, or renderer type** so a new
    kind of panel, a new place data can come from, or a new way to show
    it becomes addable without changing the panel container itself.
+8. **Seed a new workspace with the default layout** — a filter-builder
+   panel, a results-table panel, and a chart panel, pre-arranged on the
+   grid — so a researcher opening a fresh workspace sees a working
+   research layout immediately rather than a blank canvas.
 
 ## Supported panel kinds
 
@@ -178,6 +182,15 @@ source type, or a renderer type into.
 | Happy path | a feature that owns a renderer (a table, a chart) or contributes a way to source panel data | it registers a source type (name, reference shape, the kind/renderer pairs it is compatible with) or a renderer type (name, configuration schema and validator, defaults, accepted source types) | panels can be bound to that source or switched to that renderer without any change to the panel container |
 | Discovery | a set of registered source and renderer types | the agent asks what is available | every registered source and renderer type is listed with its schema and compatibility rules |
 | Duplicate type | a source or renderer type already registered under a name | the same name is registered again | the conflict is reported rather than silently overwriting the first registration |
+
+### Seed a new workspace with the default layout
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Happy path | a newly created, otherwise-empty workspace | the workspace finishes creating | it already contains three panels — `filter_builder` (left), `results_table` (center), and `chart` (right) — pre-arranged on the grid, with no additional agent or user action required |
+| Unbound sources | the seeded panels have nothing to show yet | the workspace is opened | each seeded panel renders its kind's normal empty/not-yet-bound state (e.g. "no screener run yet") rather than an error; binding a source to any of them behaves exactly as it would for a panel added by `create_panel` |
+| Not a template a caller can request | the default layout | an agent calls `apply_layout_template` | it is not registered under any template name — it is create-time-only behavior, not a template the agent can re-apply later; an agent that wants this arrangement again after rearranging the workspace lays it out explicitly or via a named template |
+| Restored/duplicated workspace | a workspace loaded from an existing revision, or a duplicated workspace | it is opened | the default layout is never applied — seeding happens only once, at creation of a genuinely new, empty workspace |
 
 ## Non-Goals
 

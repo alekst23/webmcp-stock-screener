@@ -154,6 +154,18 @@ one exception — it does not mutate the workspace or consume a revision;
 it is rendering-only client state layered over the saved layout (T-1007-4
 AC10).
 
+### Default workspace layout (seeding, not a tool)
+
+Owned entirely by this epic, no change to EPIC-1006's `create_workspace`
+required: the composition root (T-1007-6) watches for a newly created,
+still-empty workspace becoming the active one and immediately runs three
+`createPanel` calls (`filter_builder` left, `results_table` center,
+`chart` right, footprints fitting the 6x4 grid) before first paint, so the
+human never sees the blank intermediate state. Not registered as a named
+layout template — `apply_layout_template` has no entry for it, since
+re-applying it later is a distinct, explicit action (agent lays it out or
+picks an actual template), not this create-time default.
+
 ### Tool surface (`src/lib/webmcp/v2/panelTools.ts`)
 
 Fourteen `ToolSpec`s (`create_panel`, `duplicate_panel`, `remove_panel`,

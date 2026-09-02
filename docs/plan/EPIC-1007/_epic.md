@@ -59,6 +59,7 @@ being unable to undo it.
 | 6 | T-1007-5 | The fourteen panel WebMCP tools | T-1007-4, T-1007-7 | Open |
 | 7 | T-1007-6 | Panel container rendering and tool wiring | T-1007-5 | Open |
 | 8 | T-1007-8 | Fixed, non-scrolling grid bounds | — | Open |
+| 9 | T-1007-9 | Seed new workspaces with the default layout | T-1007-6 | Open |
 
 ## Dependency Graph
 
@@ -66,7 +67,7 @@ being unable to undo it.
 T-1007-1 ──┐
 T-1007-2 ──┼──> T-1007-4 ──┐
 T-1007-3 ──┘               │
-                            ├──> T-1007-5 ──> T-1007-6
+                            ├──> T-1007-5 ──> T-1007-6 ──> T-1007-9
 T-1007-1 ──────> T-1007-7 ──┘
 
 T-1007-8 ──> T-1007-4
@@ -87,6 +88,9 @@ T-1007-8 ──> T-1007-6
 - **Wave 3**: T-1007-5 — tool specs and JSON schemas over the use cases
   and the source/renderer registry
 - **Wave 4**: T-1007-6 — renders the container and registers the tools
+- **Wave 5**: T-1007-9 — seeds a newly created workspace with the default
+  filter-builder/results-table/chart layout; needs T-1007-6's composition
+  root to hook into
 
 ## Acceptance Criteria
 
@@ -163,6 +167,11 @@ T-1007-8 ──> T-1007-6
     panel via `set_panel_renderer`.
 18. The existing 11-tool surface, `src/lib/workspace/store.ts`, and the
     current UI are unmodified, and the app remains deployable.
+19. A newly created, empty workspace is immediately seeded with a
+    `filter_builder`, `results_table`, and `chart` panel in a default
+    left/center/right arrangement, with no extra tool call; loading,
+    restoring, or duplicating a workspace never re-triggers seeding, and
+    the default layout is not reachable through `apply_layout_template`.
 
 ## Design References
 
