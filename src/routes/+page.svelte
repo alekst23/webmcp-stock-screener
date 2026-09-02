@@ -72,7 +72,39 @@
 			(names) => (availableNames = names)
 		);
 	});
+
+	// The tool lists are overlays (see the .tool-menu styles) and <details>
+	// has no native dismissal, so without this an open list sits over the work
+	// area and swallows the next click on a panel beneath it -- the only way
+	// out would be clicking its own summary again.
+	let statusBar = $state<HTMLElement | null>(null);
+
+	function openToolMenus(): HTMLDetailsElement[] {
+		return [...(statusBar?.querySelectorAll<HTMLDetailsElement>('details[open]') ?? [])];
+	}
+
+	function dismissToolMenus(event: PointerEvent): void {
+		for (const menu of openToolMenus()) {
+			if (event.target instanceof Node && menu.contains(event.target)) {
+				continue;
+			}
+			menu.open = false;
+		}
+	}
+
+	function dismissToolMenusOnEscape(event: KeyboardEvent): void {
+		if (event.key !== 'Escape') {
+			return;
+		}
+		for (const menu of openToolMenus()) {
+			menu.open = false;
+			// Escape must not strand focus inside the list it just hid.
+			menu.querySelector<HTMLElement>('summary')?.focus();
+		}
+	}
 </script>
+
+<svelte:window onpointerdown={dismissToolMenus} onkeydown={dismissToolMenusOnEscape} />
 
 <AppShell>
 	{#snippet topBar()}
@@ -82,8 +114,8 @@
 			<span class="protocol">WebMCP</span>
 		</div>
 		{#if webmcpStatus}
-			<div class="webmcp-status">
-				<details class="tool-menu">
+			<div class="webmcp-status" bind:this={statusBar}>
+				<details class="tool-menu" name="tool-menu">
 					<summary>{formatDefinedStatus(webmcpStatus)}</summary>
 					<ul>
 						{#each webmcpStatus.toolNames as name (name)}
@@ -91,7 +123,7 @@
 						{/each}
 					</ul>
 				</details>
-				<details class="tool-menu">
+				<details class="tool-menu" name="tool-menu">
 					<summary>{formatAvailableStatus(availableNames.length)}</summary>
 					{#if availableNames.length}
 						<ul>
@@ -193,7 +225,9 @@
 	}
 
 	/* Anchored so opening a tool list overlays the work area instead of
-	   growing the top bar and shoving the whole page down. */
+	   growing the top bar and shoving the whole page down. Both menus carry
+	   the same `name`, so the browser keeps at most one open and they can
+	   never occlude each other. */
 	.tool-menu {
 		position: relative;
 	}
@@ -218,6 +252,8 @@
 		position: absolute;
 		right: 0;
 		top: calc(100% + var(--space-xs));
+		/* Above AppShell's sticky .top-bar (z-index 10): the list is anchored
+		   inside that header, so anything lower is clipped behind it. */
 		z-index: 20;
 		min-width: 14rem;
 		max-height: 60vh;
@@ -266,7 +302,7 @@
 	}
 
 	/* Synthetic data must not read like real market data at a glance -- the
-	   whole point of showing this line (T-0001-9 AC4). */
+	   whole point of showing this line. */
 	.panel-status.synthetic {
 		display: inline-block;
 		color: var(--synthetic);

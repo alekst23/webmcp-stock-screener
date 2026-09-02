@@ -37,6 +37,8 @@
 	.top-bar {
 		position: sticky;
 		top: 0;
+		/* Menus anchored inside the top bar stack above this (+page.svelte's
+		   .tool-menu uses 20); lowering it would clip them behind the header. */
 		z-index: 10;
 		display: flex;
 		flex-wrap: wrap;
