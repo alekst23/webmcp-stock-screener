@@ -1,7 +1,7 @@
 # T-0016-9: Measure absolute RSS on the deployed container
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: Open
+**Status**: Done -- measured against the deployed container image and the real panel, see Verification below
 **Depends on**: T-0016-6, T-0016-7
 **Blocks**: T-0016-10
 **Issue**: #16
@@ -157,6 +157,110 @@ reading the platform's per-task memory metric. Both are acceptable; if the
 platform metric is used, confirm once against an in-process reading that the
 two agree, because they measure subtly different things and the epic's whole
 premise depends on which.
+
+## Verification
+
+Measured 2026-09-01 by building the exact deployed image
+(`docker build -f backend/Dockerfile backend`) and running
+`backend/scripts/measure_container_memory.py` inside it with
+`docker run --memory=2g --memory-swap=2g --cpus=1` (mirrors the App Runner
+instance configuration exactly) and real, read-only AWS credentials, against
+the real deployed object `s3://webmcp-panel-prod-490284589142/panel.parquet`
+-- the same bucket, key, and code path (`infra/object_store.py`) the running
+`webmcp-prod-api` service uses. All three runs completed without an OOM
+kill under the 2 GB cgroup limit, which is itself evidence no run
+approached the ceiling unnoticed.
+
+**Panel** (identical across all three runs, confirmed from the parsed
+frame, not asserted): 1,999 tickers, 2,338,597 rows, ordinal range
+738034-739860 (2020-07-16 to 2025-08-29), 60,990,506 bytes (58.2 MiB)
+resident, 81,254,506 bytes (77.5 MiB) compressed on S3.
+
+**Stage-by-stage absolute RSS**, no baseline subtracted (AC1-AC3):
+
+| stage | simple (broad) | narrow_simple | complex (realistic) |
+|---|---|---|---|
+| interpreter | 14.7 MB | 14.7 MB | 14.7 MB |
+| + libraries | 112.1 MB | 112.5 MB | 112.2 MB |
+| + app imports | 122.2 MB | 122.2 MB | 122.2 MB |
+| + panel read (compressed bytes) | 240.6 MB | 244.9 MB | 244.8 MB |
+| + parsed | 458.9 MB | 450.7 MB | 436.0 MB |
+| before search (cold start) | 478.4 MB | 470.1 MB | 455.5 MB |
+| **peak during search** | **1,409.9 MB** | **632.3 MB** | **708.2 MB** |
+| anchors / matches | 1,225,899 | 28,715 | 7,884 |
+
+- **complex** (the realistic pattern, AC4): 3 steps / 4 studies --
+  `rel_volume = volume / sma(volume, 20)`,
+  `trend200 = close - sma(close, 200)`,
+  `momentum12 = close - ema(close, 12)`, `vol_atr = atr(14)`; step 1
+  `rel_volume > 3`; step 2 within (1, 10) `trend200 > 0 and momentum12 > 0`;
+  step 3 within (1, 15) `close > highest(high, 20) and vol_atr > 0`
+  (volume-spike anchor -> uptrend confirmation -> breakout).
+- **narrow_simple**: step 1's condition alone, as a complete one-step
+  setup -- same anchor selectivity as complex, zero studies, two fewer
+  steps. This is the controlled pair for AC5: holding selectivity fixed,
+  3 steps/4 studies costs **+12.0%** peak over 1 step/0 studies
+  (632.3 MB -> 708.2 MB) -- real, but far smaller than the +65% figure
+  recorded locally, because that earlier comparison also varied
+  selectivity between its two patterns.
+- **simple** (AC5's literal "deliberately simple pattern," one step, zero
+  studies, no second step to narrow the match set): unexpectedly the
+  **highest peak measured**, at 1,409.9 MB. Not because it is simple --
+  because it is unfiltered: `close > sma(close, 50)` holds on ~52% of
+  rows, and with no second step every one of the 1,225,899 matches becomes
+  a completed `Instance` immediately. **On this container, peak is driven
+  by matched-instance volume at least as much as by expression
+  complexity** -- a finding this measurement exists to surface, not one it
+  set out to find.
+
+**AC6 -- against the 2 GB (2,147,483,648 byte) ceiling:**
+
+| pattern | peak | headroom | headroom % | fits? |
+|---|---|---|---|---|
+| complex (realistic) | 708.2 MB | 1,439.3 MB | 67.0% | yes |
+| narrow_simple | 632.3 MB | 1,515.1 MB | 70.6% | yes |
+| simple (broad, unfiltered) | 1,409.9 MB | 737.6 MB | **34.3%** | yes |
+
+The worst observed case (simple/broad) fits: 34.3% headroom, no OOM. The
+**ceiling is confirmed at 2 GB**, not changed -- every measured pattern
+stays under it. But the epic's own soft alarm line was "~1.4 GB, on a
+complex pattern"; the number that actually lands there (1,409.9 MB) came
+from the simple, unfiltered pattern instead, and the margin against it
+(34.3%) is much thinner than decision 3's ~2.8x/180%-headroom estimate,
+which was built from the local 723 MB figure. A single broad,
+low-selectivity search -- the kind a real user would run first, not a
+contrived worst case -- already sits at 66% of the ceiling with no
+concurrency and no web-server overhead added on top. **Recommendation:**
+keep 2 GB for now since it measurably fits, but treat this margin as thin
+rather than comfortable; if concurrent request handling or a broader
+universe erodes it further, App Runner's 3 GB tier at the same 1 vCPU is
+the one-line Terraform change decision 3 already anticipated.
+
+**EPIC-0015 trigger revision:** its current trigger ("measured peak on the
+deployed container approaches its ceiling") is qualitative and this
+measurement shows why that is not precise enough -- 66% of ceiling from an
+everyday broad search is arguably already "approaching." Recommend
+restating it quantitatively: *re-arm when measured peak (any realistic
+pattern, not only multi-step/multi-study ones) exceeds 70% of the
+configured memory ceiling.* By that reading the trigger is not yet pulled
+(66% < 70%), but it is close, and the closest contributor is match volume,
+which the DuckDB-over-R2 approach (streaming, chunked evaluation) would
+address directly by never materializing all matches at once.
+
+**Cross-reference:** this also closes EPIC-0013's T-0013-6 ACs 2 and 3 on
+the deployed-instance side -- "on the deployed instance" was the only part
+those ACs were blocked on. T-0013-6 itself still states its figures against
+the superseded 512 MB budget; that document's own update is left to
+whoever closes it, per this ticket's instruction not to duplicate.
+
+**Harness correction (AC7):** `measure_universe_scale.py`'s `measure()`
+took a `baseline = peak_rss_bytes()` after imports and the panel were
+already resident, then subtracted it from every later reading. Since
+`ru_maxrss` is a high-water mark that never falls within a process, that
+produced a delta from an already-late point, not the absolute number a
+container's memory limit enforces -- the same error the blocker table
+already records against the 688 MB figure. Fixed: every stage now reports
+the raw, un-subtracted reading.
 
 ## Out of Scope
 

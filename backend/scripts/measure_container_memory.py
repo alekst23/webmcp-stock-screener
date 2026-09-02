@@ -42,8 +42,26 @@ if __package__ in (None, ""):
 # attributable to expression complexity rather than just asserting it, so
 # both patterns run against the identical panel and identical pipeline up to
 # "before search," differing only in the setup passed to find_instances.
+#
+# "simple" is deliberately as trivial as a valid setup gets: one step, zero
+# studies, one condition with no second step to narrow the match set. That
+# turned out to matter more than step/study count did (see the module
+# docstring's result note): with no second step, every one of the ~52% of
+# rows where close sits above its 50-day average becomes a completed
+# instance immediately, so this pattern's cost is dominated by matched-
+# instance volume rather than by expression evaluation. It is kept because
+# a broad, single-condition "quick search" is a realistic thing a user
+# would actually run, not a contrived worst case.
 _SIMPLE_STUDIES: dict[str, str] = {}
 _SIMPLE_STEPS: list[dict[str, Any]] = [{"condition": "close > sma(close, 50)"}]
+
+# "narrow_simple" isolates expression complexity from selectivity: it is
+# _COMPLEX_STEPS' own first condition, alone, as a complete one-step setup --
+# same anchor selectivity as "complex", zero studies and two fewer steps.
+# The complex/narrow_simple pair is the controlled comparison AC5 asks for;
+# the simple/complex pair above is not, because it also varies selectivity.
+_NARROW_SIMPLE_STUDIES: dict[str, str] = {}
+_NARROW_SIMPLE_STEPS: list[dict[str, Any]] = [{"condition": "volume > sma(volume, 20) * 3"}]
 
 # A plausible research pattern, not the simplest expression that will run:
 # a volume-spike anchor, an uptrend-confirmation window, then a breakout
@@ -63,6 +81,7 @@ _COMPLEX_STEPS: list[dict[str, Any]] = [
 
 _PATTERNS: dict[str, tuple[dict[str, str], list[dict[str, Any]]]] = {
     "simple": (_SIMPLE_STUDIES, _SIMPLE_STEPS),
+    "narrow_simple": (_NARROW_SIMPLE_STUDIES, _NARROW_SIMPLE_STEPS),
     "complex": (_COMPLEX_STUDIES, _COMPLEX_STEPS),
 }
 
