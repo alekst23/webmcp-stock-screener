@@ -421,7 +421,8 @@ class TestInstanceSearch:
         # but its confirming step only resolves on day 1 -- one day after
         # to_date. Before this fix, only the anchor's date was ever bounds-
         # checked (pandas_engine.py:179), so this showed up as a completed
-        # match (issue #17); it must now be excluded from completed results.
+        # match; it must now be excluded from completed results and instead
+        # reclassified as a partial match.
         bars = _sequential_bars("LATE", [201, 101])
         engine = PandasPatternResearchEngine.from_price_bars(bars)
         setup = engine.define_setup(
@@ -438,4 +439,13 @@ class TestInstanceSearch:
         assert "LATE" not in completed, (
             f"expected LATE's completion (which resolves after to_date) to be excluded "
             f"from completed matches, got completed tickers {completed}: {result.instances}"
+        )
+        late_instances = [inst for inst in result.instances if inst.ticker == "LATE"]
+        assert len(late_instances) == 1, (
+            f"expected LATE to be reclassified as a partial match rather than silently "
+            f"dropped, got {late_instances}: {result.instances}"
+        )
+        assert late_instances[0].completeness == pytest.approx(0.5), (
+            f"expected LATE's completeness to be 1/2 (anchor satisfied, confirming step "
+            f"unresolved within range), got {late_instances[0].completeness}"
         )
