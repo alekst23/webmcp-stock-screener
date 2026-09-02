@@ -94,10 +94,18 @@ def build_panel(tickers: int, days: int) -> bytes:
 
 
 def measure(data: bytes, pattern: str) -> dict[str, object]:
-    baseline = peak_rss_bytes()
+    """Every *_bytes figure below is an absolute, un-subtracted `ru_maxrss`
+    reading (T-0016-9, AC1/AC7). This function used to take a baseline after
+    the process was already warmed up (imports done, panel bytes on disk)
+    and subtract it from every later reading -- since `ru_maxrss` is a
+    high-water mark that never falls, that produced "growth since an
+    already-late point," not the absolute number a container's memory limit
+    enforces. `process_start_bytes` is recorded for context only; nothing is
+    subtracted with it."""
+    process_start = peak_rss_bytes()
     started = time.perf_counter()
     frame = parquet_bytes_to_panel(data)
-    load_peak = peak_rss_bytes() - baseline
+    load_peak = peak_rss_bytes()
     load_seconds = time.perf_counter() - started
 
     resident = int(frame.memory_usage(deep=True).sum())
@@ -108,7 +116,7 @@ def measure(data: bytes, pattern: str) -> dict[str, object]:
 
     started = time.perf_counter()
     result = engine.find_instances(setup)
-    search_peak = peak_rss_bytes() - baseline
+    search_peak = peak_rss_bytes()
     search_seconds = time.perf_counter() - started
 
     return {
@@ -118,9 +126,10 @@ def measure(data: bytes, pattern: str) -> dict[str, object]:
         "panel_bytes": len(data),
         "resident_bytes": resident,
         "bytes_per_row": round(resident / len(frame), 1),
+        "process_start_bytes": process_start,
         "load_peak_bytes": load_peak,
         "load_seconds": round(load_seconds, 2),
-        "steady_state_bytes": before_search - baseline,
+        "steady_state_bytes": before_search,
         "search_peak_bytes": search_peak,
         "search_seconds": round(search_seconds, 2),
         "anchors": result.complete_count + result.partial_count,
