@@ -95,17 +95,32 @@ inside) `modules/apprunner_service`, adds:
   definition; it is supplied per-invocation via an ECS `RunTask`
   container override (AC6), so the recovery path and the ordinary path
   share one task definition and one role, not two.
-- **Roles reused unchanged, zero edits to `modules/iam`:** `pull_log_role_arn`
+- **Roles reused, one output added to `modules/iam`:** `pull_log_role_arn`
   becomes the ECS *execution* role (image pull + log write — its trust
   policy already lists `ecs-tasks.amazonaws.com` and its log-group ARN
   pattern is already `/ecs/webmcp-*`), `app_role_arn` becomes the ECS *task*
-  role (same S3 `GetObject`/`PutObject`/`ListBucket` and SSM
-  `GetParameter`/`GetParameters`/KMS `Decrypt`/`DescribeKey` grants the API
-  already has). This is AC8 and AC2 together: same image, same identity,
-  same argument parsing, same failure messages, no separately managed
-  credential — and it means T-0016-6's two hard-won IAM lessons (HeadBucket
-  needs `ListBucket`; secret resolution needs the plural `GetParameters` +
-  `kms:DescribeKey`) are inherited for free rather than rediscovered.
+  role (same S3 `GetObject`/`PutObject`/`ListBucket` grant the API already
+  has). This is AC8 and AC2 together: same image, same identity, same
+  argument parsing, same failure messages, no separately managed credential
+  — and it means T-0016-6's HeadBucket lesson (needs `s3:ListBucket`, not
+  just object-level permissions) is inherited for free rather than
+  rediscovered.
+  **One IAM lesson did NOT carry over and had to be rediscovered live:** App
+  Runner resolves `runtime_environment_secrets` on its *instance* role, but
+  ECS resolves a task definition's `secrets` on its *execution* role — the
+  opposite role of the pair. The first on-demand run failed with
+  `ResourceInitializationError` before the container ever started
+  (`pull_log_role` denied `ssm:GetParameters`), because the existing
+  SSM/KMS grant lives on `app_role` (App Runner's instance role) via
+  `modules/secrets`. Fixed by adding one purely-additive output to
+  `modules/iam` (`pull_log_role_name` — no existing resource touched) and
+  attaching the identical least-privilege grant
+  (`ssm:GetParameter`/`GetParameters` + `kms:Decrypt`/`DescribeKey`, scoped
+  to the one parameter and the default SSM KMS key) to the execution role
+  from inside `modules/nightly_job`, the same "attach by role name from
+  outside the module" shape `modules/secrets` already uses.
+  `modules/apprunner_service` and every existing `modules/iam` resource are
+  unmodified.
 - **Networking:** the task launches into T-0016-4's two existing public
   subnets with `assign_public_ip = ENABLED`, behind a task-scoped security
   group with egress-only `0.0.0.0/0` (S3 and EODHD are both outbound HTTPS)

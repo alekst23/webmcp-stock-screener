@@ -47,6 +47,20 @@ variable "rate_limit_default" {
   default     = "60/minute"
 }
 
+# --- T-0016-8: nightly Fargate job inputs -----------------------------------
+
+variable "nightly_schedule_expression" {
+  description = "EventBridge Scheduler cron expression for the nightly delta task (AC1). Default is Render's 06:30 UTC daily, translated to EventBridge's 6-field cron syntax."
+  type        = string
+  default     = "cron(30 6 * * ? *)"
+}
+
+variable "nightly_schedule_enabled" {
+  description = "Whether the nightly schedule actually fires (AC9). False until T-0016-10/T-0016-11's cutover retires the Render cron -- see the nightly_job module and this ticket's Solution Approach for why both must never be enabled at once."
+  type        = bool
+  default     = false
+}
+
 variable "require_real_panel" {
   description = <<-EOT
     REQUIRE_REAL_PANEL equivalent to render.yaml's production value (AC5).

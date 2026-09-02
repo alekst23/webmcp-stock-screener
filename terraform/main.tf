@@ -99,3 +99,26 @@ module "apprunner_service" {
 
   tags = local.common_tags
 }
+
+module "nightly_job" {
+  source = "./modules/nightly_job"
+
+  environment = var.environment
+  region      = var.region
+
+  image_identifier = "${module.registry.repository_url}:${var.apprunner_image_tag}"
+
+  vpc_id              = module.network.vpc_id
+  public_subnet_ids   = module.network.public_subnet_ids
+  execution_role_arn  = module.iam.pull_log_role_arn
+  execution_role_name = module.iam.pull_log_role_name
+  task_role_arn       = module.iam.app_role_arn
+
+  panel_bucket_name           = module.panel_bucket.bucket_name
+  eodhd_api_key_parameter_arn = module.secrets.eodhd_api_key_parameter_arn
+
+  schedule_expression = var.nightly_schedule_expression
+  schedule_enabled    = var.nightly_schedule_enabled
+
+  tags = local.common_tags
+}
