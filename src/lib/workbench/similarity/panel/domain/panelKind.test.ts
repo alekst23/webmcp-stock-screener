@@ -27,8 +27,11 @@ describe('similarOpportunitiesPanelKindDefinition', () => {
 		expect(similarOpportunitiesPanelKindDefinition.defaultRenderer).toBeNull();
 	});
 
-	it('defaults to no run bound', () => {
-		expect(similarOpportunitiesPanelKindDefinition.defaultConfig()).toEqual({ runId: null });
+	it('defaults to no run bound and no comparison view', () => {
+		expect(similarOpportunitiesPanelKindDefinition.defaultConfig()).toEqual({
+			runId: null,
+			comparisonView: null
+		});
 	});
 
 	describe('validateConfig', () => {

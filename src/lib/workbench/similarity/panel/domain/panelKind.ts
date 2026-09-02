@@ -13,6 +13,8 @@ import type {
 	ConfigValidation,
 	PanelKindDefinition
 } from '../../../../panels/registry/panelKindRegistry';
+import type { ComparisonView } from '../../comparison/domain/comparisonView';
+import { isComparisonForm } from '../../comparison/domain/comparisonView';
 
 export const SIMILAR_OPPORTUNITIES_KIND = 'similar_opportunities';
 
@@ -22,10 +24,27 @@ export interface SimilarOpportunitiesConfig extends Record<string, unknown> {
 	// system's existing generic `state.selections` / `set_panel_selection`
 	// mechanism, which already satisfies AC4 for any panel kind.
 	runId: string | null;
+	// T-1012-7's compare_setups tool target: the last comparison view
+	// requested for this panel, or null when none has been.
+	comparisonView: ComparisonView | null;
 }
 
 function defaultConfig(): SimilarOpportunitiesConfig {
-	return { runId: null };
+	return { runId: null, comparisonView: null };
+}
+
+function isComparisonViewShaped(value: unknown): value is ComparisonView {
+	if (typeof value !== 'object' || value === null) {
+		return false;
+	}
+	const v = value as Record<string, unknown>;
+	return (
+		typeof v.runId === 'string' &&
+		typeof v.referenceSetupId === 'string' &&
+		isComparisonForm(v.form) &&
+		Array.isArray(v.candidateIds) &&
+		v.candidateIds.every((id) => typeof id === 'string')
+	);
 }
 
 function validateConfig(input: unknown): ConfigValidation<SimilarOpportunitiesConfig> {
@@ -35,19 +54,32 @@ function validateConfig(input: unknown): ConfigValidation<SimilarOpportunitiesCo
 	const record = input as Record<string, unknown>;
 	const errors: ConfigError[] = [];
 	for (const key of Object.keys(record)) {
-		if (key !== 'runId') {
+		if (key !== 'runId' && key !== 'comparisonView') {
 			errors.push({ field: key, reason: 'not a recognized configuration field' });
 		}
 	}
 	if ('runId' in record && record.runId !== null && typeof record.runId !== 'string') {
 		errors.push({ field: 'runId', reason: 'must be a string run ID or null' });
 	}
+	if (
+		'comparisonView' in record &&
+		record.comparisonView !== null &&
+		record.comparisonView !== undefined &&
+		!isComparisonViewShaped(record.comparisonView)
+	) {
+		errors.push({ field: 'comparisonView', reason: 'must be a valid comparison view or null' });
+	}
 	if (errors.length > 0) {
 		return { ok: false, errors };
 	}
 	return {
 		ok: true,
-		value: { runId: typeof record.runId === 'string' ? record.runId : null }
+		value: {
+			runId: typeof record.runId === 'string' ? record.runId : null,
+			comparisonView: isComparisonViewShaped(record.comparisonView)
+				? (record.comparisonView as ComparisonView)
+				: null
+		}
 	};
 }
 
