@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1010 (Results & Explain)
 **Design**: docs/design/results-and-explain/spec.md
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1010-1, T-1010-2
 **Blocks**: T-1010-7
 
