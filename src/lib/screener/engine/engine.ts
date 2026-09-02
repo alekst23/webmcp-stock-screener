@@ -14,6 +14,7 @@ import type { FilterNode, ScreenerDefinition } from '../definition';
 import type { ScreenerEvaluationPort, ScreenerMarketData } from '../ports';
 import {
 	makeScreenerRun,
+	type RejectedCandidate,
 	type ScreenerMatch,
 	type ScreenerRunOutcome,
 	type ScreenerWarning
@@ -114,21 +115,36 @@ function defaultValidate(
 }
 
 // Evaluates the filter tree for every universe instrument, keeping the full
-// per-instrument TreeEvalResult (nodeEvaluations included) only for
-// instruments that matched -- AC12's memory bound: this map's size is the
-// matched-set size, never the universe size.
+// per-instrument TreeEvalResult (nodeEvaluations included) for the WHOLE
+// universe, not just the matched set -- `allEvaluations` below. This used to
+// keep only matched instruments (bounded by the matched-set size, never the
+// universe size), on the reasoning that a rejected instrument has nothing
+// worth reporting once its verdict is known. EPIC-1010's explain_result
+// proved that reasoning wrong: explaining a rejected candidate (or a
+// candidate that matched but was truncated by the ranking limit) honestly
+// requires exactly this data, and `ScreenerMarketData` being a live port
+// means re-evaluating it after the fact could disagree with what this run
+// actually saw -- the one thing a pinned run must never do. `matched` is
+// kept alongside `allEvaluations` (rather than derived from it) because
+// `applyRanking` below still only wants the passed subset, and index into
+// `matched.keys()` reads more directly than filtering `allEvaluations` by
+// `.passed` at every call site. See T-1010-5's ticket doc ("Solution
+// Approach") for the storage-growth tradeoff this introduces.
 async function evaluateUniverse(
 	filterTree: FilterNode,
 	instrumentIds: readonly string[],
 	deps: ConditionEvalDeps
 ): Promise<{
 	matched: Map<string, TreeEvalResult>;
+	allEvaluations: Map<string, TreeEvalResult>;
 	unavailableNodeCounts: Map<ResourceId, number>;
 }> {
 	const matched = new Map<string, TreeEvalResult>();
+	const allEvaluations = new Map<string, TreeEvalResult>();
 	const unavailableNodeCounts = new Map<ResourceId, number>();
 	for (const instrumentId of instrumentIds) {
 		const result = await evaluateFilterTree(filterTree, instrumentId, deps);
+		allEvaluations.set(instrumentId, result);
 		for (const nodeId of result.unavailableNodeIds) {
 			unavailableNodeCounts.set(nodeId, (unavailableNodeCounts.get(nodeId) ?? 0) + 1);
 		}
@@ -136,7 +152,35 @@ async function evaluateUniverse(
 			matched.set(instrumentId, result);
 		}
 	}
-	return { matched, unavailableNodeCounts };
+	return { matched, allEvaluations, unavailableNodeCounts };
+}
+
+// Every universe instrument evaluateUniverse saw that did not end up among
+// the returned matches -- a genuine filter-tree failure, or a match
+// truncated by the ranking limit. Building this after ranking (rather than
+// inside evaluateUniverse, before matchedInstrumentIds is even ranked) is
+// what lets a truncated-but-matched instrument carry its `rankingValues`
+// (from the full, unsliced `ranking.ranked`) alongside its nodeEvaluations
+// -- ScreenerMatch.rankingValues alone only covers the returned top-N, which
+// engine/ranking.ts's own normalization does not treat as the whole
+// comparison set.
+function buildRejectedEvaluations(
+	allEvaluations: ReadonlyMap<string, TreeEvalResult>,
+	returnedIds: ReadonlySet<string>,
+	rankingValuesByInstrument: ReadonlyMap<string, Record<string, number | null>>
+): Record<string, RejectedCandidate> {
+	const rejected: Record<string, RejectedCandidate> = {};
+	for (const [instrumentId, result] of allEvaluations) {
+		if (returnedIds.has(instrumentId)) {
+			continue;
+		}
+		rejected[instrumentId] = {
+			instrumentId,
+			nodeEvaluations: result.nodeEvaluations,
+			rankingValues: rankingValuesByInstrument.get(instrumentId)
+		};
+	}
+	return rejected;
 }
 
 function buildWarnings(
@@ -193,7 +237,7 @@ async function execute(
 		registry: deps.registry,
 		now: deps.now
 	};
-	const { matched, unavailableNodeCounts } = await evaluateUniverse(
+	const { matched, allEvaluations, unavailableNodeCounts } = await evaluateUniverse(
 		input.definition.filterTree,
 		universeResolution.instrumentIds,
 		conditionDeps
@@ -213,6 +257,15 @@ async function execute(
 		rankingValues: ranked.rankingValues,
 		nodeEvaluations: matched.get(ranked.instrumentId)?.nodeEvaluations ?? {}
 	}));
+	const returnedIds = new Set(matches.map((match) => match.instrumentId));
+	const rankingValuesByInstrument = new Map(
+		ranking.ranked.map((ranked) => [ranked.instrumentId, ranked.rankingValues])
+	);
+	const rejectedEvaluations = buildRejectedEvaluations(
+		allEvaluations,
+		returnedIds,
+		rankingValuesByInstrument
+	);
 
 	const provenance = await deps.marketData.getProvenance();
 	return makeScreenerRun({
@@ -235,6 +288,9 @@ async function execute(
 		),
 		provenance,
 		matches,
+		rejectedEvaluations,
+		filterTree: input.definition.filterTree,
+		rankingSpec: input.definition.ranking,
 		createdAt: deps.now().toISOString()
 	});
 }
