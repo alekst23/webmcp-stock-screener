@@ -39,8 +39,8 @@ overlapping ones, with no capability silently lost and no broken deploy.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1015-1 | Retirement inventory and audit | — | Open |
-| 2 | T-1015-2 | Capability-parity check (deletion gate) | T-1015-1 | Open |
+| 1 | T-1015-1 | Retirement inventory and audit | — | Done |
+| 2 | T-1015-2 | Capability-parity check (deletion gate) | T-1015-1 | Done — verdict: NO-GO, pending user review |
 | 3 | T-1015-3 | Migrate routes onto the new panel/workspace model | T-1015-2 | Open |
 | 4 | T-1015-4 | Backend reconciliation | T-1015-2 | Open |
 | 5 | T-1015-5 | Remove the legacy tool surface | T-1015-3 | Open |

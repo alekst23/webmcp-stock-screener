@@ -1,7 +1,9 @@
 # T-1015-2: Capability-parity check (deletion gate)
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
-**Status**: Open
+**Status**: Done — verdict is **NO-GO**; see
+`docs/plan/EPIC-1015/capability-parity-matrix.md`. Per this epic's own gate,
+T-1015-3/T-1015-4 must not start until the user has reviewed that verdict.
 **Depends on**: T-1015-1
 **Blocks**: T-1015-3, T-1015-4
 

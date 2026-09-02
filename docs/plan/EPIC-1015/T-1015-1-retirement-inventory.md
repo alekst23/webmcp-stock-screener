@@ -1,7 +1,7 @@
 # T-1015-1: Retirement inventory and audit
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
-**Status**: Open
+**Status**: Done — see `docs/plan/EPIC-1015/retirement-inventory.md`
 **Depends on**: —
 **Blocks**: T-1015-2
 
