@@ -14,9 +14,22 @@ remaining tickets stay open but are no longer the critical path.
 
 ## Current Phase
 
-Program build-out: EPIC-1006 through EPIC-1015 implement the new surface in
-new files while the legacy surface keeps `main` deployable. EPIC-1015 cuts
-over and retires the legacy surface last, gated on explicit user approval.
+**EPIC-1006 through EPIC-1014 are now all merged to `main`** (2026-09-02).
+Program build-out is functionally complete behind feature flags — the new
+33-core-tool (+13 follow-up) surface exists in full, in new files, with the
+legacy 11-tool surface still untouched and `main` still deployable. Every
+new-surface tool group ships behind its own flag
+(`WORKBENCH_TOOLS_ENABLED`, `SCREENER_TOOLS_ENABLED`, `CHART_TOOLS_ENABLED`,
+`SIMILARITY_TOOLS_ENABLED`, and EPIC-1014's followup-surface flag), all
+still `false` — nothing in this program is live yet. The remaining phase is
+EPIC-1015: flip the flags on, cut the composition root over, and retire the
+legacy surface, gated on explicit user approval per the 2026-09-01 decision.
+
+**Why this phase:** the user chose full replacement per spec over retrofitting
+the existing tools. The spec's common contract (stable IDs,
+`expected_revision`, `idempotency_key`, the mutation envelope, provenance) is
+shared by every mutating tool, so EPIC-1006 is a hard foundation and the rest
+fan out behind it.
 
 **Why this phase:** the user chose full replacement per spec over retrofitting
 the existing tools. The spec's common contract (stable IDs,
@@ -36,7 +49,7 @@ fan out behind it.
 | EPIC-1011: Chart tools | epic | **merged to `main`** (local merge, no PR, 2026-09-02) | ~~`epic/EPIC-1011-chart-tools`~~ (merged; branch kept, worktree cleaned up) | **Done: all 9 tickets landed.** 1524/1524 tests, typecheck clean across 463 files on `main` after merge. **Captured-setup contract** (EPIC-1012 consumes verbatim): `src/lib/workbench/chart/domain/capturedSetup.ts` — `buildCapturedSetup`, `readCapturedSetup(s)`, `writeCapturedSetup`, `toWireCapturedSetup`, `normalizeCapturedSetup`; records live at `extensions.chart_setups`, copied so reconfiguring/deleting the source panel leaves them byte-identical. **OHLCV bars port:** `src/lib/workbench/chart/domain/seriesPort.ts` — `ChartSeriesPort.fetchSeries(request)`, window is a required explicit `{start,end}` (no unbounded fetch expressible), `appliedPriceAdjustment` can be `null` and must not be defaulted by consumers. Chart-renderer contract registers into EPIC-1006's operation registry as five `chart.*` mutation kinds (not standalone tools, per the 2026-09-01 reconciliation) via `registerChartPanelContract(registry, deps)` — written structurally since EPIC-1007 wasn't on `main` yet when this landed; needs a wiring check once EPIC-1007 and EPIC-1011 are both live. Also fixed a real bug in EPIC-1006's `operationRegistry.ts`: `foldApply` was silently dropping per-operation warnings (mutation-checked test added). Gated behind `CHART_TOOLS_ENABLED = false`. |
 | EPIC-1012: Similarity search | epic | **merged to `main`** (local merge, no PR, 2026-09-02) | ~~`epic/EPIC-1012-similarity-search`~~ (merged; branch kept, worktree cleaned up) | **Done: all 8 tickets landed.** Frontend: 1973/1973 tests, typecheck clean across 548 files. Backend: 198/198 tests (5 pre-existing skips). Similarity feature/scoring contract + pandas-based engine reusing the existing panel-wide `groupby`/`rolling` technique (Python by design, per the ticket — see `docs/plan/EPIC-1012/T-1012-2-similarity-engine.md`), the `similar_opportunities` panel kind, HTTP search/explain API, `find_similar_setups`/`explain_similarity`/`compare_setups` tools, wired behind `SIMILARITY_TOOLS_ENABLED`. Backend wiring is additive-only (`backend/domain/errors.py` +3 exception subclasses, `backend/main.py` +25 lines registering the router). **Real gap found and worked around at the time, since resolved:** flagged `defaultPanelKinds.ts`'s unconditional placeholder registration as having no unregister/replace path in `PanelRegistry` (EPIC-1007); worked around it locally with test-scoped registries. **EPIC-1010 fixed the root cause 2026-09-02** (order-independent real/placeholder precedence) — see Blockers, resolved. |
 | EPIC-1013: Safety layer (preview & apply) | epic | **merged to `main`** (local merge, no PR, 2026-09-02) | ~~`epic/EPIC-1013-safety-preview-apply`~~ (merged; branch kept, worktree cleaned up) | **Done: all 6 tickets landed.** 553/553 tests, typecheck clean across 328 files on `main` after merge (was 403 before). Atomicity: apply commits the candidate document the preview already computed rather than re-folding the batch, clones the pre-apply document, and on any throw mid-commit writes the clone back before rethrowing — closing a real half-applied window in EPIC-1006's `RevisionService.recordSuccess` (calls `repository.put` then `repository.putRevision` with no rollback). Rollback path is proven by a dedicated test (`applyPreviewedChanges: atomicity / rollback (AC8)`) that fails if the rollback call is removed. Registry-genericity proven by source-scan tests: a novel operation kind never appears in `batchEvaluation.ts` or `safetyTools.ts`. One caveat: `registerWorkbenchTools.ts` (EPIC-1006's surface, still gated `WORKBENCH_TOOLS_ENABLED = false`) was modified — sibling epics may conflict there on merge. |
-| EPIC-1014: High-value follow-up tools | epic | specced, **queued behind Waves 2-3** | — (branch not yet created) | 11 tickets. backtest, watchlists, alerts, computed fields, export. Builds on all core epics; launches last. |
+| EPIC-1014: High-value follow-up tools | epic | **merged to `main`** (local merge, no PR, 2026-09-02) | ~~`epic/EPIC-1014-followup-tools`~~ (merged; branch kept, worktree cleaned up) | **Done: all 11 tickets landed.** Frontend: 2913/2913 tests, typecheck clean across 748 files. Backend: 289/289 tests. Typed expression model/validator, computed fields + custom studies, derive-filters-from-captured-setup, similarity-search refinement, backtest evaluation engine + tools, watchlists, alert draft/preview, native human-only activation review gate, export-with-provenance, final 13-tool WebMCP registration. **Both epic-defining safety properties verified with adversarial tests**, not just asserted: no-code-execution (smuggled SQL/JS rejected at every string-accepting expression node, plus a source scan for `eval`/dynamic `Function`); no-silent-arming (a suite sweeps the full 13-tool surface including undo/replay/stale-revision/undo-supersession paths and proves no sequence reaches `armed`; found and fixed one real bug in the process — undoing `disable_alert` could have re-armed an alert). Extended EPIC-1006's `ResourceKind` enum with `backtest`/`export`/`computedfield`/`customstudy`, reviewed before merging; this run also caught and fixed an in-flight inconsistency where one ticket had worked around the same need with a local ID generator instead of the canonical extension. **Known gaps, documented not fixed:** EPIC-1011's chart engine has no rendering path for custom studies yet (`create_custom_study` validates/stores/catalogs correctly; plotting is a follow-up); `ScreenerRun` doesn't pin `UniverseSpec`, only a count. |
 | Provenance contract unification | fix | **merged to `main`** (`b0249ea`, local merge, no PR — 2026-09-02) | ~~`fix/unify-provenance-contract`~~ (merged and deleted) | **Done: 403/403 tests, typecheck clean across 314 files on `main` after the merge** (was 399 before; 4 net-new tests for historical-vs-static, TTM representability, and wire omission of absent optionals). Resolved the Blockers-table contract fork: `src/lib/workbench/domain/provenance.ts` (EPIC-1006) wins as the canonical record; `src/lib/surface/provenance.ts` is reduced to the discovery-specific `DiscoveryEnvelope`/`envelope` extension. Both `'historical'` and `'static'` liveness values are kept (they are genuinely distinct), and the surface union's "delayed implies a stated magnitude" safety property is ported onto the canonical type. Runs in parallel with Wave 2 because it only touches `surface/`, `discovery/`, `catalog/`, `webmcp/discovery/` — files no Wave 2 epic writes. |
 | EPIC-1015: Legacy surface cutover | epic | specced | `epic/EPIC-1015-…` merged to main | 8 tickets. Gated on user approval; runs last |
 | EPIC-0001: WebMCP Pattern Research Workbench | epic | paused | `epic/EPIC-0001-pattern-research-workbench` | 8/10 tickets done. T-0001-2 blocked (needs human + real WebMCP browser). T-0001-10 superseded by #14. **T-0001-9 is implemented, CI-green, and UNMERGED** on `feat/T-0001-9-real-data-pipeline` (`8448059`): EODHD backfill + nightly delta CLIs, R2 object store, universe metadata, `GET /api/research/panel`, and the compact `PanelFrame` (141 -> 25.1 B/row) EPIC-0013 builds on. ACs 1-4 done against recorded shapes; AC5 live run gated on EPIC-0013's T-0013-1/T-0013-2. |
@@ -57,16 +70,22 @@ Dependencies only — everything within a wave runs in parallel.
 
 ## Backlog
 
-1. **Review the Wave 0 ticket breakdown** once all ten epic-creation agents
-   report, then launch implementation Wave 1 (EPIC-1006, EPIC-1008).
-2. Launch Waves 2-4 as their dependencies land.
-3. **EPIC-1015 cutover** — do not launch until the user confirms the new
-   surface is good. It retires the currently-deployed submission's tools.
-4. (Deprioritized) EPIC-0001's remaining tickets: T-0001-2 (live verification,
+1. **EPIC-1015 cutover** — EPIC-1006 through EPIC-1014 are all merged; this
+   is the only remaining item in the program. **Do not launch until the
+   user confirms the new surface is good** (2026-09-01 decision — explicit
+   gate, not automatic). It retires the currently-deployed submission's
+   tools. Real prerequisites surfaced by this run that should be resolved
+   first or explicitly accepted as follow-ups, all in the Blockers table:
+   `get_canvas_state` can't see panel state (closed `PanelKind` union);
+   custom studies have no chart-rendering path; `render.yaml`'s health
+   check still points at the route EPIC-1015 plans to delete; the
+   composition-root wiring ticket itself may not exist yet in any epic
+   (oldest-standing blocker in this table, predates this run).
+2. (Deprioritized) EPIC-0001's remaining tickets: T-0001-2 (live verification,
    needs a human) and T-0001-9 (real data — implemented and CI-green on
    `feat/T-0001-9-real-data-pipeline`, unmerged; its AC1/AC5 live run is
    gated on EPIC-0013's T-0013-1/T-0013-2). T-0001-10 is superseded by #14.
-5. (Low priority) The 9 follow-up tickets left by EPIC-0002/1003/1004/1005 —
+3. (Low priority) The 9 follow-up tickets left by EPIC-0002/1003/1004/1005 —
    T-0002-4/5, T-0003-3/4, T-0004-2, T-0005-3/4/5.
 
 ## Blockers
@@ -92,6 +111,8 @@ Dependencies only — everything within a wave runs in parallel.
 | ~~`defaultPanelKinds.ts`'s unconditional placeholder registration has no unregister/replace path in EPIC-1007's `PanelRegistry`~~ — **RESOLVED 2026-09-02** by EPIC-1010 (T-1010-7's agent). `panelKindRegistry.ts`/`sourceRendererRegistry.ts` now track which entries are placeholders and enforce one order-independent precedence rule: real registration always overwrites a placeholder, real-vs-real still conflicts (duplicate-registration safety net preserved), placeholder registration always skips if anything is present. Proven with bidirectional tests (real-then-default and default-then-real) at both the registry and composition-root level. EPIC-1012's local test-scoped workaround (superseded, not needed post-merge, but harmless to leave in place) is why this affected EPIC-1010/1011/1012 below. | EPIC-1007, EPIC-1010, EPIC-1011, EPIC-1012 (every epic registering a real panel kind) | 2026-09-02 | Found independently by EPIC-1012's agent while implementing T-1012-4/6/7/8.
 | `get_canvas_state` (EPIC-1006) doesn't project panel state for any of EPIC-1007's panel kinds | EPIC-1007, EPIC-1010, EPIC-1011, EPIC-1012 | 2026-09-02 | EPIC-1006's `PanelKind` union is closed and `normalizeWorkspace` silently drops unknown kinds when projecting `doc.extensions['panel_system']` into `doc.panels`/`layout`/`links`. EPIC-1007 worked around it by keeping panel state in `extensions` rather than blocking on an EPIC-1006 change, but the read-model surface an agent would use to inspect the workspace still can't see panels. Needs the union opened (EPIC-1006 change) or a documented alternative read path. Not blocking Wave 2/3 since nothing downstream calls `get_canvas_state` for panel state yet, but must be resolved before EPIC-1015 cutover. |
 
+| EPIC-1011's chart engine has no rendering path for custom studies (`study.custom.*`) | EPIC-1011, EPIC-1014 | 2026-09-02 | Found by EPIC-1014's T-1014-11 agent. `create_custom_study` (T-1014-2) validates, stores, and catalogs a custom study correctly, but there is no way to plot one on a chart — the chart engine only knows the built-in study catalog. A user/agent can author a custom study and never see it rendered. Needs an EPIC-1011 fast-follow: either the chart engine's study-rendering path consults the same catalog `create_custom_study` writes to, or a documented decision that custom studies are data-only (usable in screener conditions, computed fields, etc.) and never chart-rendered. |
+| `ScreenerRun` pins a match/universe **count** but not the `UniverseSpec` itself | EPIC-1009, EPIC-1014 (export/backtest tools that read pinned runs) | 2026-09-02 | Found by EPIC-1014. A pinned run states how many instruments were in its universe but not which universe definition (watchlist, screener criteria, etc.) produced that count — so a run can't fully answer "what universe was this run over" from itself alone, only "how big was it." Minor relative to the retention/filterTree/rankingSpec pinning already done; worth a small follow-up if `export_results`/backtest provenance needs to state the universe definition, not just its size. |
 | `ScreenerRun`'s per-instrument node-evaluation retention is ~80x worst-case storage under the default retention policy | EPIC-1009, EPIC-1010, EPIC-1014 (backtest/export tools that read pinned runs) | 2026-09-02 | EPIC-1010's T-1010-5 extension (retaining evaluations for every evaluated instrument, not just matches, so `explain_result` never falls back to a live re-read) is correct and approved, but the agent measured/flagged the worst-case multiplier. Retention policy is already pluggable (2026-09-01 working assumption: eviction is an explicit error, TTL unset) — this is a tuning question, not a design flaw. Not urgent; revisit if pinned-run memory becomes a measured problem, same trigger pattern as EPIC-0015's parked DuckDB work. |
 
 ## Cross-epic reconciliations pending
@@ -117,6 +138,7 @@ authoritative)._
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-09-02 | **EPIC-1006 through EPIC-1014 all merged to `main` in one `/at-project-go` run** (8 epics, ~59 tickets, plus the provenance contract unification) — the entire new WebMCP tool surface exists in new files, all still behind `false` feature flags | Per explicit user instruction ("implement epic-1007 through 1014, don't stop for PRs, merge all work to main") via `/loop`. Run in three sequential waves respecting real dependencies (1006/1008 already merged before this run; 1007/1009/1011/1013 parallel; 1010/1012 parallel once their contracts landed; 1014 last). All merges done directly by the orchestrator, never by delegate agents — with a second Claude session (`do 0016`) concurrently active in the same checkout, serializing merges through one point was the only safe way to honor "don't stop for PRs" without seven agents racing a moving `main`. `main` verified green after every single merge, not just at the end: 403 -> 553 -> 664/814 (rebase) -> 1113 -> 1524 -> 1884 -> 1973 -> 2195/2284 -> 2913 frontend tests, plus 198 -> 221 -> 289 backend tests, typecheck clean at every step. Several delegate agents hit an account-wide session rate limit mid-run (reset ~5:10am and again ~2:20pm ET) and were resumed with full context rather than restarted -- no work was lost across either interruption. Six real cross-epic contract gaps were found by delegate agents during implementation, each held for explicit orchestrator review before merging rather than self-approved (one delegate agent corrected its own overstated "already approved" language mid-run rather than letting it ride) -- all six approved and landed. Two documented, unfixed follow-ups remain for EPIC-1015 to pick up: no chart-rendering path for custom studies, and `get_canvas_state` can't see panel state. |
 | 2026-09-02 | **EPIC-1010 extends already-merged EPIC-1009 code, again**: adds `filterTree` and `rankingSpec` fields to `ScreenerRun` (`src/lib/screener/run.ts`), pinning the actual filter-tree and ranking content onto the run object rather than relying on `screenerRevision` alone | `explain_result` needs the exact filter tree/ranking config that produced a run to build an explanation, and there is no wired-up revision-indexed store `ScreenerRun` could safely read the definition back from — an existing `main` comment on `run.ts` already flags that path as indirect/fragile. Pinning the content directly is more consistent with the pinned-run's own "never silently recomputed" guarantee than reaching into revision history would be. `toWireScreenerRun` deliberately excludes both fields (caller already has the data), so it's wire-invisible — no payload growth, no wire-compat surface. |
 | 2026-09-02 | **EPIC-1010 extends already-merged EPIC-1007 code**: adds an optional `validateSelection?(input): {ok:true}\|{ok:false,errors}` field to `RendererTypeDefinition` (`src/lib/panels/registry/sourceRendererRegistry.ts`), consulted by `setPanelSelection.ts` before writing a selection | `setPanelSelection()` wrote any string array as a panel's selected IDs with zero validation, unlike its sibling `configurePanelView.ts` which already validates through the renderer registry. T-1010-6's AC6 ("an unknown result ID is rejected, previous selection unchanged") is unsatisfiable without this — the alternative was a results-specific side-channel duplicating `setPanelSelection`'s mutation logic, which risks the two ever disagreeing. Optional field means every existing renderer (`chart_grid` included) has zero behavior change. Mirrors the existing `validateRendererConfig` pattern exactly rather than inventing a new one. |
 | 2026-09-02 | **EPIC-1010 extends already-merged EPIC-1009 code**: `evaluateUniverse`/`ScreenerRun` will retain `nodeEvaluations` for every evaluated instrument, not just matches | EPIC-1010's T-1010-3 agent found that EPIC-1009's engine only stored per-node evaluations for matched instruments (comment cited "AC12" but the actual text was T-1009-7 AC9, written before EPIC-1010's explain-rejected-candidates requirement existed). Explaining a rejected candidate would otherwise require a live re-read of `ScreenerMarketData`, which can disagree with the pinned run — exactly the "silent rerun with different numbers" the epic's core no-silent-rerun guarantee (AC3) forbids. Approved as additive/backward-compatible since EPIC-1009 is merged and not a concurrently active branch. Storage growth tradeoff (universe-bounded, not unbounded, but larger than match-only) to be quantified in T-1010-5's ticket doc so the already-pluggable retention/eviction policy can be tuned against a real number rather than discovered later. |
@@ -508,3 +530,55 @@ Facts established by real API calls, superseding `data-provider.md` estimates:
   EPIC-1006's ownership, then launch EPIC-1007/1009/1011/1013 in parallel.
   Issues #17 (a real engine-correctness bug) and #14 still need an
   interactive triage pass.
+
+## Last Run (2026-09-02, `/at-project-go` via `/loop`, argument "implement epic-1007 through 1014. don't stop for PRs, merge all work to main")
+
+- **The whole program landed.** Resolved the `provenance.ts` fork first
+  (unified into `workbench/domain/provenance.ts`, `surface/provenance.ts`
+  reduced to a thin `DiscoveryEnvelope` extension), then ran EPIC-1007,
+  1009, 1011, 1013 in parallel, then 1010 and 1012 once their contracts
+  landed, then 1014 last. All eight epics plus the provenance fix are now
+  merged to `main`. `main` verified green after every merge: ended at
+  2913/2913 frontend tests (748 files typecheck-clean), 289/289 backend
+  tests — up from 399/311 at the start of this run.
+- **Six real cross-epic contract gaps surfaced during implementation, all
+  reviewed before merging, none self-approved.** Node-evaluation retention
+  and pinned `filterTree`/`rankingSpec` on `ScreenerRun` (EPIC-1010 into
+  EPIC-1009); an optional `validateSelection` hook and real prop-passing to
+  panel-kind components (EPIC-1010 into EPIC-1007); a genuine
+  order-independence bug in panel-kind/renderer registration that EPIC-1012
+  had already hit and worked around — EPIC-1010 fixed the root cause,
+  closing that blocker; four new `ResourceKind` values for EPIC-1014's
+  backtest/export/computed-field/custom-study tools, where this run also
+  caught and fixed an in-flight inconsistency (one ticket had worked around
+  the same need locally instead of using the canonical extension).
+- **Two account-wide session rate limits hit mid-run** (reset ~5:10am and
+  ~2:20pm ET) killed several delegate agents. No work was lost either time
+  — each had committed real progress before the failure, and was resumed
+  with full context rather than restarted once the limit cleared.
+- **Both of EPIC-1014's non-negotiable safety properties verified with
+  adversarial tests**, not just asserted: no arbitrary code execution
+  (smuggled SQL/JS rejected at every expression node, source-scanned for
+  `eval`/dynamic `Function`), no silent alert arming (the full 13-tool
+  surface swept including undo/replay/stale-revision paths, proving no
+  sequence reaches `armed`) — which caught one real bug (undoing
+  `disable_alert` could have re-armed an alert) before merge.
+- **Coordinated with a second concurrently-active Claude session** (`do
+  0016`, working EPIC-0016/AWS) rather than colliding with it — messaged it
+  up front to claim EPIC-1007-1014's branches and disclaim EPIC-0016's, and
+  it stayed off this program's files throughout.
+- **New/updated blockers left for `/at-epic-review` or the next run before
+  EPIC-1015 cutover:** `get_canvas_state` can't see panel state (closed
+  `PanelKind` union in EPIC-1006); no chart-rendering path for custom
+  studies (EPIC-1011 fast-follow); `ScreenerRun` doesn't pin `UniverseSpec`,
+  only a count; `ScreenerRun`'s node-evaluation retention is ~80x
+  worst-case storage under the default policy (tuning question, not
+  urgent); the pre-existing `render.yaml` health-check and
+  composition-root-wiring blockers from before this run are unchanged.
+- **Next run should:** run `/at-epic-review` or a manual review pass across
+  all eight merged epics before touching EPIC-1015 — this run's own
+  delegate agents did real verification (tests, typecheck, targeted
+  mutation checks) but nothing has done a holistic cross-epic architectural
+  read since EPIC-1006/1008's 5-agent review. Then work the EPIC-1015
+  prerequisite list above, in whatever order the user prefers, before
+  requesting the explicit cutover approval EPIC-1015 is gated on.
