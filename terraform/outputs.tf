@@ -62,3 +62,31 @@ output "apprunner_service_url" {
 output "apprunner_service_arn" {
   value = module.apprunner_service.service_arn
 }
+
+# --- T-0016-8: nightly Fargate job -------------------------------------
+
+output "nightly_cluster_name" {
+  description = "For on-demand `aws ecs run-task` invocations (ordinary run and --catch-up)."
+  value       = module.nightly_job.cluster_name
+}
+
+output "nightly_task_definition_arn" {
+  value = module.nightly_job.task_definition_arn
+}
+
+output "nightly_security_group_id" {
+  value = module.nightly_job.security_group_id
+}
+
+output "nightly_log_group_name" {
+  value = module.nightly_job.log_group_name
+}
+
+output "nightly_schedule_arn" {
+  value = module.nightly_job.schedule_arn
+}
+
+output "nightly_schedule_state" {
+  description = "ENABLED or DISABLED -- see var.nightly_schedule_enabled and AC9."
+  value       = module.nightly_job.schedule_state
+}
