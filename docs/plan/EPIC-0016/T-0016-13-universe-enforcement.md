@@ -1,7 +1,7 @@
 # T-0016-13: Universe enforcement
 
 **Epic**: EPIC-0016 (AWS Re-platform)
-**Status**: In Progress
+**Status**: Done -- enforced in code, verified against the live account, see Verification below
 **Depends on**: T-0016-7, T-0016-8, T-0016-9, T-0016-12 (the analysis and the
 production panel this ticket corrects)
 **Blocks**: —
@@ -268,6 +268,123 @@ pipeline).
 
 ## Verification
 
-_Filled in after implementation and the live rebuild; see the report for
-the exact survivor counts, S3 version IDs, read-back stats, and measured
-container peaks._
+### Code (AC1-AC5)
+
+- Ingest: `application/backfill_panel.py::backfill_panel` gained
+  `enforce_floor: bool = False`; the real entry point
+  (`scripts/backfill_panel.py`) opts in by default (`--no-enforce-floor` for
+  rehearsal runs).
+- Nightly delta: `application/append_daily_delta.py::_apply` gates
+  admission on the previously stored `universe_eligibility.csv`, then
+  refreshes it from the merged panel and logs any demotion
+  (`logger.warning`, wired to stdout via `logging.basicConfig` in
+  `scripts/nightly_delta.py`).
+- Backend suite: `123 passed, 5 skipped` baseline -> `148 passed, 5 skipped`
+  after this ticket's 25 new tests, zero regressions.
+
+### Production rebuild (AC6-AC8)
+
+Ran `scripts/enforce_universe_floor.py` against the live bucket
+(`AWS_PROFILE=alekst23`, `OBJECT_STORE_BUCKET=webmcp-panel-prod-490284589142`,
+`OBJECT_STORE_REGION=us-east-1`), dry run first, then `--apply`:
+
+```
+current S3 VersionId for panel.parquet (rollback target): pQvL0Gat8IdDFw2a_Kg6YoxL53QCc5Bo
+current panel: 50,565 tickers, 2,420,825 rows
+enforced-floor panel: 1,648 tickers, 2,009,191 rows
+universe.csv trimmed: 2,000 -> 1,648 entries
+new S3 VersionId for panel.parquet: o6sRuydodjJqyTFQtsqKf4dVJgBNHwyu
+--- verified read-back ---
+ticker_count: 1,648
+row_count: 2,009,191
+as_of: 2026-09-01
+resident_bytes: 52,404,642
+resident_bytes_per_row: 26.08
+ticker code dtype: int16
+```
+
+**Rollback target**: S3 VersionId `pQvL0Gat8IdDFw2a_Kg6YoxL53QCc5Bo` (the
+50,565-ticker panel this replaced). **Combined survivor count at the user's
+exact floor ($25M median 60-session dollar volume, $1 price, 252-session
+history): 1,648 tickers, 2,009,191 rows** -- computed directly from the
+live panel, not extrapolated; matches the $25M-alone figure in
+`docs/reference/universe-scope-analysis.md` (2,615) narrowing further once
+price and history are combined, in line with that document's section 4
+pattern. `resident_bytes_per_row` came in at 26.08, matching the
+`panel_frame.py`-designed ~26.1 B/row target now that the ticker count is
+back under 32,767 and the category codes reverted to `int16` (confirmed
+directly, not inferred). `universe.csv` was also trimmed to the same 1,648
+tickers so the bucket's two objects describe one universe.
+`universe_eligibility.csv` (93,056 bytes) is the new eligibility object the
+nightly delta now consults.
+
+### Container memory re-measurement (AC9)
+
+Built the exact deployed image (`docker build -f backend/Dockerfile
+backend`) and ran `scripts/measure_container_memory.py` inside it via
+`docker run --memory=2g --memory-swap=2g --cpus=1` with real read-only
+credentials (`aws configure export-credentials --profile alekst23`),
+against the rebuilt panel -- T-0016-9's exact method, one process per
+pattern.
+
+| pattern | panel | peak (absolute RSS) | headroom vs 2 GB | fits? |
+|---|---|---|---|---|
+| complex (3-step/4-study, realistic) | 1,648 tickers, 2,009,191 rows | 659,615,744 B (659.6 MB) | 1,487,867,904 B (69.3%) | yes |
+| simple (broad, unfiltered `close > sma(close, 50)`) | 1,648 tickers, 2,009,191 rows | 1,229,500,416 B (1,229.5 MB) | 917,983,232 B (42.7%) | yes |
+
+**These are measured, not extrapolated.** Compared to T-0016-9's own
+measured figures on the prior 1,999-ticker panel (708.2 MB complex / 67.0%
+headroom, 1,409.9 MB simple/broad / 34.3% headroom), both patterns improved:
+complex dropped to 659.6 MB (69.3% headroom), simple/broad dropped to
+1,229.5 MB (42.7% headroom). Against the analysis's own extrapolation for a
+comparably sized candidate ($10M/$1/1yr, 1,780 tickers: ~636.1 MB complex,
+~1,313.4 MB simple/broad worst case) -- the measured complex figure (659.6
+MB) landed slightly above that extrapolation, and the measured simple/broad
+figure (1,229.5 MB) landed meaningfully *below* it. The analysis's own
+stated weak point (linear scaling assumptions, and a ~40x per-match-cost gap
+between the two pattern types) is the likely source of both deltas; neither
+crosses into "does not fit," which is the number that matters here. The 2
+GB ceiling remains confirmed with real headroom on both the realistic and
+worst-case pattern.
+
+### Tests (AC10)
+
+25 new tests across three tiers, all with assertion-context messages,
+factory-pattern fixtures (`_history`/`_bar`/`_record` helpers), and
+`test_<action>_<condition>_<expected_result>` naming:
+
+- `tests/unit/test_universe_floor.py` (8): the pure floor rule and the
+  promotion/demotion set diff.
+- `tests/unit/test_universe_eligibility.py` (8): measuring a panel against
+  the floor, the market-wide (not per-ticker) window, CSV round-trip.
+- `tests/unit/test_panel_io.py` (+2): `panel_frame_to_wire_bytes` round-trip
+  and filtered-subset write-back.
+- `tests/functional/test_universe_enforcement.py` (7): ingest floor
+  enforcement (on by default off, opt-in filtering, writes the eligibility
+  object, refuses an empty result), nightly-delta gating (an off-universe
+  ticker is never admitted; no eligibility object falls back to today's
+  unfiltered behavior), and the demotion/freeze policy (a demoted ticker's
+  prior rows survive, it stops receiving bars on the next run even on a
+  strong night, and the demotion is logged).
+
+**Mutation-check evidence** (each reverted via `git stash push -- <file>`
+for tracked files, a temporary source edit for new/untracked files, tests
+re-run, then restored):
+
+| Reverted | Tests run | Result without the fix |
+|---|---|---|
+| `application/backfill_panel.py` (enforce_floor) | `TestIngestFloor` (4) | 3 failed (TypeError: unexpected kwarg), 1 passed (the off-by-default pin, correctly unaffected) |
+| `application/append_daily_delta.py` (gating+refresh) | `TestNightlyDeltaGating` + `TestDemotionAndPromotionPolicy` (3) | 2 failed, 1 passed (the no-object fallback pin, correctly unaffected) |
+| `domain/universe_floor.py` (`passes_floor` -> always `True`, `diff_eligibility` -> no-op) | `test_universe_floor.py` + `test_universe_eligibility.py` (16) | 9 failed (every "excluded"/"demoted"/"promoted" assertion), 7 passed (the "admits" assertions, correctly unaffected) |
+| `infra/universe_eligibility.py` (window slice removed) | `test_universe_eligibility.py` (8) | 1 failed (the market-wide-window test, exactly the one this mutation should break) |
+| `infra/panel_io.py` (`panel_frame_to_wire_bytes` removed) | `test_panel_io.py::TestPanelFrameToWireBytes` | collection error: `ImportError` |
+
+All reverts were restored and the full suite re-confirmed green
+(`148 passed, 5 skipped`) after each.
+
+### Lint/type gate
+
+`black --check`, `isort --check`, `flake8`, and `mypy` all clean on every
+file this ticket touched (the three pre-existing `domain/contracts/*.py`
+`black` findings predate this branch and are untouched by this ticket, per
+T-0016-7's own note on the same finding).

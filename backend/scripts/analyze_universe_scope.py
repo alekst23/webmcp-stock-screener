@@ -26,7 +26,6 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 if __package__ in (None, ""):
@@ -36,6 +35,7 @@ from infra.object_store import ObjectStoreConfig, S3PanelStore  # noqa: E402
 from infra.pandas_engine import PandasPatternResearchEngine  # noqa: E402
 from infra.panel_frame import PanelFrame  # noqa: E402
 from infra.panel_io import parquet_bytes_to_panel  # noqa: E402
+from infra.universe_eligibility import recent_window_dollar_volume  # noqa: E402
 from scripts.measure_container_memory import (  # noqa: E402
     _COMPLEX_STEPS,
     _COMPLEX_STUDIES,
@@ -112,17 +112,6 @@ def describe_current(frame: pd.DataFrame, compressed_bytes: int) -> dict[str, An
         "rows_per_ticker_mean": round(float(rows_per_ticker.mean()), 1),
         "tickers_below_history_threshold": poison,
     }
-
-
-def recent_window_dollar_volume(frame: pd.DataFrame, window_sessions: int) -> pd.Series:
-    """Median (close * volume) per ticker over the panel's most recent N
-    distinct session dates, market-wide (not per-ticker last-N, so a
-    delisted/stale ticker with no rows in the window correctly drops out
-    rather than reporting a median from years-old activity)."""
-    recent_dates = np.sort(frame["date"].unique())[-window_sessions:]
-    windowed = frame[frame["date"].isin(recent_dates)]
-    dollar_volume = windowed["close"].astype("float64") * windowed["volume"].astype("float64")
-    return dollar_volume.groupby(windowed["ticker"], observed=True).median()
 
 
 def decile_table(series: pd.Series) -> dict[str, float]:

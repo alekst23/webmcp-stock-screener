@@ -151,6 +151,26 @@ class S3PanelStore:
         except (ClientError, BotoCoreError) as exc:
             raise PanelStoreError(f"Could not write {key} to {self._bucket}") from exc
 
+    def object_version(self, key: str) -> str | None:
+        """The object's current S3 VersionId, or None if it does not exist.
+
+        Not part of the `PanelStore` protocol -- an S3-specific capability
+        for scripts that must record a rollback target before overwriting a
+        versioned object (see scripts/enforce_universe_floor.py). None is
+        also returned if the bucket is unversioned, since a HEAD then omits
+        `VersionId` entirely rather than erroring.
+        """
+        try:
+            response = self._client.head_object(Bucket=self._bucket, Key=key)
+        except ClientError as exc:
+            if _is_not_found(exc):
+                return None
+            raise PanelStoreError(f"Could not stat {key} in {self._bucket}") from exc
+        except BotoCoreError as exc:
+            raise PanelStoreError(f"Could not stat {key} in {self._bucket}") from exc
+        version: str | None = response.get("VersionId")
+        return version
+
 
 def _is_not_found(exc: ClientError) -> bool:
     """S3 and R2 disagree on the code for a missing object on HEAD (404 vs

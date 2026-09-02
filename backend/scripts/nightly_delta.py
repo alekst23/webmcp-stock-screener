@@ -18,6 +18,7 @@ missing in one rewrite -- the recovery path after a run of failed nights.
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from datetime import date
 from pathlib import Path
@@ -54,6 +55,12 @@ def main() -> None:
         help="Apply every session missing since the panel's as-of date, not just one",
     )
     args = parser.parse_args()
+
+    # A universe demotion (application/append_daily_delta.py) is logged at
+    # WARNING, not printed -- this is what makes it show up in the cron job's
+    # captured output rather than only in a process that never configures
+    # logging at all.
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     api_key = require_api_key()
     store = require_panel_store()
