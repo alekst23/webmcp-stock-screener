@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1010 (Results & Explain)
 **Design**: docs/design/results-and-explain/spec.md
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1010-5
 
@@ -156,7 +156,19 @@ shape this model:
    `rankingValues` plus the pinned `RankingSpec` reproduces the run's actual
    `compositeScore`.
 
-### Model shape (`src/lib/results/domain/explanation.ts`)
+### Model shape
+
+Implemented across four files under `src/lib/results/domain/` rather than
+one, once the single-file draft passed 600 lines against the project's
+400-line module guidance — split by concern, mirroring EPIC-1009's own
+`conditionEvaluation.ts` / `.catalog.ts` / `.shared.ts` split:
+`explanation.ts` (core shape, outcome resolution, the invariant-enforcing
+constructor), `explanationRestatement.ts` (AC2's restatement/operator
+helpers), `explanationRanking.ts` (AC7's contribution arithmetic), and
+`explanationWire.ts` (snake_case serialization). Shared test fixtures live
+in `explanationTestFixtures.ts` (not itself a `*.test.ts` file, so importing
+it across the four co-located test files never re-executes another file's
+suite).
 
 - `ConditionOutcome = { status: 'pass' } | { status: 'fail' } |
   { status: 'indeterminate'; reason: string }` — a discriminated union so
