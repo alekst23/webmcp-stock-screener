@@ -11,6 +11,7 @@
 	import {
 		resolvePanelBody,
 		type LinkedValueEntry,
+		type PanelBodyProps,
 		type ResolvedPanelBody
 	} from './panelController';
 	import PlaceholderPanelBody from './PlaceholderPanelBody.svelte';
@@ -86,8 +87,8 @@
 					{:else if bodyState.kind === 'error'}
 						<p class="error">{bodyState.message}</p>
 					{:else if bodyState.kind === 'component'}
-						{@const Body = bodyState.component as unknown as Component}
-						<Body />
+						{@const Body = bodyState.component as unknown as Component<PanelBodyProps>}
+						<Body {panel} {linkedValue} {onBroadcast} />
 					{:else if kindDefinition}
 						<PlaceholderPanelBody {panel} {kindDefinition} {linkedValue} {onBroadcast} />
 					{/if}

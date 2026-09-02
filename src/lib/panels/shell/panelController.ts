@@ -27,6 +27,7 @@ import type { OccupiedRect } from '../domain/layout';
 import type { GridRect } from '../domain/grid';
 import type { PanelLinkChannel } from '../domain/channels';
 import { propagationTargets, type PanelLinkGraph } from '../domain/links';
+import type { Panel } from '../domain/panel';
 import type { PanelKindDefinition } from '../registry/panelKindRegistry';
 import type { ToolSpec } from '../../webmcp/types';
 
@@ -166,22 +167,39 @@ export function readSnapshot(
 // Panel body resolution (AC2, AC9)
 // ---------------------------------------------------------------------------
 
+// The per-instance data a REAL, kind-specific body receives -- exactly
+// PlaceholderPanelBody's own prop shape minus `kindDefinition` (redundant
+// there: a real body already knows its own kind statically at registration
+// time, unlike the generic placeholder, which needs it to render an
+// arbitrary kind's dl/broadcast form). `onBroadcast` is included for parity
+// with every future sibling kind even though this epic's own panel doesn't
+// need it (T-1010-6's setPanelSelection already implements real
+// selection-propagation over the link graph; this prop is only the
+// same-page, client-render-only manual broadcast channel placeholders use
+// for testing) -- withholding it selectively would make this fix
+// results-specific instead of generic.
+export interface PanelBodyProps {
+	panel: Panel;
+	linkedValue?: LinkedValueEntry;
+	onBroadcast: (channel: PanelLinkChannel, value: string) => void;
+}
+
 // `component` is always the normalized, directly-renderable function -- a
 // bare-function load is used as-is, a { default: fn } module load is
 // unwrapped -- so the Svelte layer never has to repeat that check.
 export type ResolvedPanelBody =
-	| { kind: 'component'; component: (...args: never[]) => unknown }
+	| { kind: 'component'; component: (props: PanelBodyProps) => unknown }
 	| { kind: 'placeholder' }
 	| { kind: 'error'; message: string };
 
-function normalizeComponent(value: unknown): ((...args: never[]) => unknown) | null {
+function normalizeComponent(value: unknown): ((props: PanelBodyProps) => unknown) | null {
 	if (typeof value === 'function') {
-		return value as (...args: never[]) => unknown;
+		return value as (props: PanelBodyProps) => unknown;
 	}
 	if (typeof value === 'object' && value !== null) {
 		const withDefault = (value as { default?: unknown }).default;
 		if (typeof withDefault === 'function') {
-			return withDefault as (...args: never[]) => unknown;
+			return withDefault as (props: PanelBodyProps) => unknown;
 		}
 	}
 	return null;
