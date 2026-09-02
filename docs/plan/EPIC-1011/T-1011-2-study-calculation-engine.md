@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1011-5, T-1011-6, T-1011-9
 
@@ -54,17 +54,20 @@ changed underneath a saved setup.
 
 ### Shape
 
-Two new domain files, pure and DOM-free:
+New domain files, pure and DOM-free:
 
 - `src/lib/workbench/chart/domain/studyEngine.ts` — the public surface:
-  `STUDY_ENGINE_VERSION`, the input/output types, parameter resolution
-  against the catalog, the calculator lookup keyed by catalog item ID,
-  and warning derivation.
-- `src/lib/workbench/chart/domain/studyEngine/calculators.ts` — the seven
-  pure array-in/array-out calculators, split out so neither file grows
-  past the size limit.
+  `STUDY_ENGINE_VERSION`, the input/output types, the calculator lookup
+  keyed by catalog item ID, bar validation and warning derivation.
+- `studyEngine/calculators.ts` — the pure array-in/array-out kernels.
+- `studyEngine/params.ts` — catalog-driven parameter resolution.
+- `studyEngine/errors.ts` — the three typed rejections.
+- `studyEngine/testSupport.ts` — the checked-in bar fixture, following
+  the existing `testSupport.ts` convention elsewhere in `src/lib`.
 
-Tests sit alongside as `*.test.ts`.
+Split this way so no file approaches the size limit and so the
+arithmetic can be read without the catalog plumbing around it. Tests sit
+alongside as `*.test.ts`.
 
 ### Entry point
 
@@ -118,6 +121,16 @@ supplied. A partially defined multi-output study (MACD with enough bars
 for the line but not the signal) gets a warning naming the outputs that
 are entirely absent.
 
+This resolves a conflict in favour of the design docs, which are
+authoritative. AC4 lists "period longer than the series" among the
+rejections, but spec.md's "Warm-up longer than range" scenario says the
+study is added with a warning that it will plot nothing in the current
+range. A rejection would also make a study's validity depend on the
+chart's current window, so the same parameters would be accepted or
+refused depending on how far the user happened to have scrolled. AC4's
+other cases — non-positive period, non-numeric input, out-of-range
+value — are rejections as written.
+
 ### Arithmetic
 
 Standard published definitions, with the choices that vary between
@@ -133,13 +146,19 @@ calendar month) rather than accumulating across the series.
 
 ### Version constant
 
-`STUDY_ENGINE_VERSION` is the value T-1011-3 puts in
-`MarketDataProvenance.calcEngineVersion`. Bump rule, documented at the
-constant: MAJOR when any calculator's output for a fixed input and fixed
-parameters would change (arithmetic, seeding, warm-up length, anchor
-boundaries, default resolution); MINOR when a study or output is added
-without moving any existing number; PATCH for changes that touch no
-number at all (messages, warnings, types).
+The surface declares exactly one version string — `ENGINE_VERSION` in
+`src/lib/workbench/domain/provenance.ts`, which `makeProvenance()` stamps
+into `engineVersion` — so this module exports `STUDY_ENGINE_VERSION` as
+an alias of it rather than inventing a second constant that could drift
+out of step with the one a payload actually reports.
+
+Bump rule, documented at the alias: **bumping `ENGINE_VERSION` is
+required whenever study arithmetic changes** — a different seeding rule,
+a different warm-up length, a different anchor boundary, or a different
+resolution of defaults all move a number for an unchanged input, and a
+saved setup has no other way to tell that happened. Adding a study
+without touching an existing one, or changing only a message, moves no
+number and needs no bump.
 
 ### Testing
 
