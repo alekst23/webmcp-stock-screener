@@ -81,7 +81,7 @@ const DIRECT_CALL =
 function connectedBody(status: WebmcpStatus): string {
 	return (
 		`this page registers ${status.toolCount} tools via document.modelContext for the ` +
-		`shared Pattern Research Workbench session. Defined tools: ` +
+		`shared MarketPane session. Defined tools: ` +
 		`${status.toolNames.join(', ')}. ${SURFACE_CAVEAT} Query document.modelContext ` +
 		`directly for authoritative live availability and schemas. Call the tools through ` +
 		`the WebMCP protocol to read and modify workspace state a human researcher can see ` +

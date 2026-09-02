@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchPanelStatus, formatPanelStatus, isMockPanel } from './panelStatus';
+import { fetchPanelStatus, formatFreshness, formatPanelStatus, isMockPanel } from './panelStatus';
 
 const REAL_PANEL = {
 	as_of: '2026-08-31',
@@ -126,5 +126,85 @@ describe('panel status', () => {
 
 		expect(status.isStale).toBe(true);
 		expect(status.notices).toEqual(['Panel is 8 sessions behind.']);
+	});
+});
+
+// hotfix/marketpane-rebrand: the header pill that replaces the permanent
+// synthetic-data banner. The critical invariant carried over from that
+// banner is that synthetic data must still be named as synthetic -- these
+// scenarios exist to catch a regression that quietly folds "synthetic" into
+// the same bucket as "stale", which would be the disclosure this feature is
+// required to preserve silently disappearing.
+describe('formatFreshness', () => {
+	const NOW = new Date('2026-09-02T12:00:00Z');
+
+	it('reports unknown with no panel loaded yet, rather than guessing an age', () => {
+		expect(formatFreshness(null, NOW)).toEqual({ state: 'unknown', label: 'checking…' });
+	});
+
+	it('names a synthetic panel as synthetic, not by age', () => {
+		const status = {
+			asOf: '2026-09-02T10:00:00Z',
+			firstDate: '2023-01-03',
+			tickerCount: 25,
+			rowCount: 19550,
+			source: 'mock'
+		};
+
+		const freshness = formatFreshness(status, NOW);
+
+		expect(freshness.state).toBe('synthetic');
+		expect(freshness.label).toBe('Synthetic data');
+	});
+
+	it('marks a real but stale panel as stale rather than presenting it as fresh', () => {
+		const status = {
+			asOf: '2026-09-02T10:00:00Z',
+			firstDate: '2016-01-04',
+			tickerCount: 6268,
+			rowCount: 12_000_000,
+			source: 'object-store',
+			isStale: true
+		};
+
+		const freshness = formatFreshness(status, NOW);
+
+		expect(freshness.state).toBe('stale');
+		expect(freshness.label).toBe('updated 2h ago');
+	});
+
+	// The invariant most at risk of silent regression: a synthetic panel that
+	// also happens to be stale must still read as synthetic, not stale --
+	// syntheticity is the stronger disclosure and must never be demoted to
+	// an ordinary staleness warning.
+	it('keeps a synthetic panel distinguishable from a merely stale one, even when both are old', () => {
+		const stalePanel = {
+			asOf: '2026-08-20T10:00:00Z',
+			firstDate: '2016-01-04',
+			tickerCount: 6268,
+			rowCount: 12_000_000,
+			source: 'object-store',
+			isStale: true
+		};
+		const staleSyntheticPanel = { ...stalePanel, source: 'mock' };
+
+		const staleFreshness = formatFreshness(stalePanel, NOW);
+		const syntheticFreshness = formatFreshness(staleSyntheticPanel, NOW);
+
+		expect(staleFreshness.state).toBe('stale');
+		expect(syntheticFreshness.state).toBe('synthetic');
+		expect(syntheticFreshness.state).not.toBe(staleFreshness.state);
+	});
+
+	it('reports fresh for a recent, non-stale real panel', () => {
+		const status = {
+			asOf: '2026-09-02T11:55:00Z',
+			firstDate: '2016-01-04',
+			tickerCount: 6268,
+			rowCount: 12_000_000,
+			source: 'object-store'
+		};
+
+		expect(formatFreshness(status, NOW)).toEqual({ state: 'fresh', label: 'updated 5m ago' });
 	});
 });

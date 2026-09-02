@@ -68,3 +68,54 @@ export function formatPanelStatus(status: PanelStatus): string {
 export function isMockPanel(status: PanelStatus): boolean {
 	return status.source === 'mock';
 }
+
+// hotfix/marketpane-rebrand: the header now shows a freshness pill instead
+// of a permanent synthetic-data banner. `synthetic` stays a distinct state
+// from `stale` -- collapsing them would let the one disclosure the spec
+// calls "critical to preserve" (mock data must never read like real data)
+// drown in an ordinary staleness warning.
+export type FreshnessState = 'unknown' | 'synthetic' | 'stale' | 'fresh';
+
+export interface Freshness {
+	state: FreshnessState;
+	label: string;
+}
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+// Coarse buckets rather than exact durations -- a researcher scanning the
+// header wants "is this fresh enough to trust", not a stopwatch.
+function formatElapsed(elapsedMs: number): string {
+	const clamped = Math.max(elapsedMs, 0);
+	if (clamped < MINUTE_MS) {
+		return 'just now';
+	}
+	if (clamped < HOUR_MS) {
+		return `${Math.floor(clamped / MINUTE_MS)}m ago`;
+	}
+	if (clamped < DAY_MS) {
+		return `${Math.floor(clamped / HOUR_MS)}h ago`;
+	}
+	return `${Math.floor(clamped / DAY_MS)}d ago`;
+}
+
+// Replaces the permanent synthetic-data warning banner (T-0001-9 AC4) now
+// that the app serves real market data by default. `status === null` covers
+// both "still fetching" and "backend has no panel" -- either way, claiming
+// an age would be worse than admitting the pill doesn't know one yet.
+export function formatFreshness(status: PanelStatus | null, now: Date = new Date()): Freshness {
+	if (!status) {
+		return { state: 'unknown', label: 'checking…' };
+	}
+	// A mock panel is disclosed by name rather than dated: an age next to
+	// "synthetic" would still tempt a glance-read as if it were a real,
+	// merely-old, data pull.
+	if (isMockPanel(status)) {
+		return { state: 'synthetic', label: 'Synthetic data' };
+	}
+	const elapsedMs = now.getTime() - new Date(status.asOf).getTime();
+	const label = `updated ${formatElapsed(elapsedMs)}`;
+	return { state: status.isStale ? 'stale' : 'fresh', label };
+}

@@ -7,8 +7,8 @@
 	import { resolveApiBaseUrl } from '$lib/workspace/apiConfig';
 	import {
 		fetchPanelStatus,
+		formatFreshness,
 		formatPanelStatus,
-		isMockPanel,
 		type PanelStatus
 	} from '$lib/workspace/panelStatus';
 	import { startBridgeSession } from '$lib/webmcp/session';
@@ -28,6 +28,7 @@
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
 	import ChartToolbar from '$lib/workspace/ChartToolbar.svelte';
 	import SnapshotPicker from '$lib/workspace/SnapshotPicker.svelte';
+	import TickerSearch from '$lib/workspace/TickerSearch.svelte';
 
 	const apiConfig = { baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL) };
 
@@ -56,6 +57,18 @@
 	// is being fetched, and left null when the backend has no panel at all --
 	// claiming an unknown as-of date would be worse than showing none.
 	let panelStatus = $state<PanelStatus | null>(null);
+
+	// Lifted out of ChartToolbar (hotfix/marketpane-rebrand): the header's
+	// collapsed TickerSearch and the toolbar's "Show monthly" action both
+	// read/write this one value now, so moving where it's typed cannot
+	// change what the next search does.
+	let tickers = $state('MOCK02, MOCK03');
+
+	// Derived rather than computed inline in the template ({@const} may only
+	// sit directly inside a block/snippet, not a plain <div>) -- recomputes
+	// whenever panelStatus changes, same as everything else the header reads
+	// off it.
+	let freshness = $derived(formatFreshness(panelStatus));
 
 	onMount(() => {
 		webmcpStatus = buildWebmcpStatus(buildTools(engine));
@@ -109,10 +122,22 @@
 
 <AppShell>
 	{#snippet topBar()}
-		<div class="identity">
-			<span class="mark" aria-hidden="true"></span>
-			<h1>Pattern Research Workbench</h1>
-			<span class="protocol">WebMCP</span>
+		<div class="identity-group">
+			<div class="identity">
+				<span class="mark" aria-hidden="true"></span>
+				<h1>MarketPane</h1>
+				<span class="protocol">WebMCP</span>
+			</div>
+			<span
+				class="freshness-pill"
+				class:synthetic={freshness.state === 'synthetic'}
+				class:stale={freshness.state === 'stale'}
+				class:unknown={freshness.state === 'unknown'}
+				title={panelStatus ? formatPanelStatus(panelStatus) : undefined}
+			>
+				{freshness.label}
+			</span>
+			<TickerSearch bind:value={tickers} />
 		</div>
 		{#if webmcpStatus}
 			<div class="webmcp-status" bind:this={statusBar}>
@@ -144,22 +169,9 @@
 		{/if}
 	{/snippet}
 
-	{#if panelStatus}
-		<p class="panel-status" class:synthetic={isMockPanel(panelStatus)}>
-			{formatPanelStatus(panelStatus)}
-		</p>
-	{/if}
-	<p class="intro">
-		WebMCP Pattern Research Workbench lets a trader or researcher and an AI agent turn a vague chart
-		pattern into a tested hypothesis together, in the same browser tab. They share one visible
-		research session — defining patterns, searching price history, and measuring outcomes — that
-		persists in this browser across reloads.
-		<a href="/dev">Dev control surface →</a>
-	</p>
-
 	<SnapshotPicker store={workspaceStore} onload={() => (focusedView = null)} />
 
-	<ChartToolbar {engine} activity={activityStore} onclear={() => (focusedView = null)} />
+	<ChartToolbar {engine} activity={activityStore} {tickers} onclear={() => (focusedView = null)} />
 
 	{#each $workspaceStore.panels as panel (panel.id + ':' + panel.instanceSetId)}
 		{#if panel.kind === 'grid'}
@@ -183,6 +195,14 @@
 </AppShell>
 
 <style>
+	.identity-group {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-sm) var(--space-md);
+		min-width: 0;
+	}
+
 	.identity {
 		display: flex;
 		align-items: baseline;
@@ -295,29 +315,39 @@
 		padding: 0 var(--space-xs);
 	}
 
-	.panel-status {
-		margin: 0 0 var(--space-md);
+	/* Replaces the permanent synthetic-data warning banner: the header's one
+	   freshness/status indicator (docs/design/terminal-ui-theme/spec.md's
+	   "Data-freshness pill"). Base treatment covers `fresh`; `unknown` and
+	   the two disclosure states below override colour only. */
+	.freshness-pill {
+		display: inline-block;
 		font-family: var(--font-mono);
-		font-size: var(--font-size-sm);
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		color: var(--text-secondary);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		padding: 0 var(--space-xs);
+		white-space: nowrap;
+	}
+
+	.freshness-pill.unknown {
 		color: var(--text-muted);
 	}
 
-	/* Synthetic data must not read like real market data at a glance -- the
-	   whole point of showing this line. */
-	.panel-status.synthetic {
-		display: inline-block;
-		color: var(--synthetic);
-		background: var(--synthetic-bg);
-		border: 1px solid var(--synthetic);
-		border-radius: var(--radius-sm);
-		padding: var(--space-xs) var(--space-sm);
+	/* A stale pull must not carry the same visual weight as a fresh one. */
+	.freshness-pill.stale {
+		color: var(--warning);
+		border-color: var(--warning);
 	}
 
-	.intro {
-		max-width: 62ch;
-		margin: 0 0 var(--space-lg);
-		font-size: var(--font-size-sm);
-		color: var(--text-secondary);
+	/* Synthetic data must not read like real market data at a glance -- the
+	   disclosure the old permanent banner existed to make, now carried by
+	   the pill instead. */
+	.freshness-pill.synthetic {
+		color: var(--synthetic);
+		background: var(--synthetic-bg);
+		border-color: var(--synthetic);
 	}
 
 	@media (max-width: 680px) {
