@@ -174,7 +174,7 @@ describe('unavailableInstrumentDirectory', () => {
 		expect(result.provenance.sourceId, 'provenance must mark the source unconfigured').toBe(
 			UNCONFIGURED_SOURCE_ID
 		);
-		expect(result.provenance.delivery, 'an unconfigured source is not a live feed').toBe('static');
+		expect(result.provenance.liveness, 'an unconfigured source is not a live feed').toBe('static');
 		expect(
 			result.warnings.join(' '),
 			`expected a warning naming the missing source, got ${JSON.stringify(result.warnings)}`

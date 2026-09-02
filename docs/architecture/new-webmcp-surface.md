@@ -43,14 +43,21 @@ whole surface, rather than per-epic:
 | Module | Provides | Notes |
 |--------|----------|-------|
 | `src/lib/surface/ids.ts` | `makeInstrumentId`/`isInstrumentId` (`inst:<MIC>:<SYMBOL>`), `makeCatalogItemId`/`isCatalogItemId` (`<prefix>.<segment>` for field/op/study/indicator/pattern/interval/universe/template) | No workspace/panel/screener/run ID makers yet — that's expected to land as EPIC-1006 extends this module rather than starting a second one |
-| `src/lib/surface/provenance.ts` | `Provenance` type, `makeProvenance()`, `envelope<T>()` | Covers every field tool-spec.md's common contract requires for market-data results |
+| `src/lib/surface/provenance.ts` | `DiscoveryEnvelope<T>`, `envelope<T>()`, plus re-exports of EPIC-1006's `MarketDataProvenance`/`makeProvenance()` | Covers every field tool-spec.md's common contract requires for market-data results |
 
 Both modules were built by EPIC-1008 (Discovery & Catalog), whose own tools
 needed them first, but they're deliberately scoped to the whole surface, not
 to discovery — sibling epics are expected to extend `ids.ts` with their own
-resource-ID makers and reuse `Provenance`/`envelope<T>()` rather than each
+resource-ID makers and reuse `MarketDataProvenance`/`envelope<T>()` rather than each
 defining their own version. Whether that reuse actually happens as each
 epic lands is worth checking at each epic's review.
+
+The provenance record itself lives one layer in, at
+`src/lib/workbench/domain/provenance.ts`: EPIC-1006 owns the common tool
+contract, and for a while the two epics shipped two incompatible provenance
+types in parallel. `src/lib/surface/provenance.ts` now re-exports the
+canonical one and adds only what is genuinely discovery-specific — the
+`warnings` array on `DiscoveryEnvelope<T>`.
 
 ## The composition root — currently unowned
 

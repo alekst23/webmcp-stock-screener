@@ -112,7 +112,7 @@ describe('buildDiscoveryTools', () => {
 				'asOf',
 				'sourceId',
 				'sourceLabel',
-				'delivery',
+				'liveness',
 				'timezone',
 				'engineVersion'
 			]) {

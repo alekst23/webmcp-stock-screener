@@ -134,7 +134,7 @@ describe('search_catalog', () => {
 		expect(provenance.sourceId, `expected the built-in catalog, got ${provenance.sourceId}`).toBe(
 			'src.catalog.builtin'
 		);
-		expect(provenance.delivery, 'a shipped catalog is static, not live').toBe('static');
+		expect(provenance.liveness, 'a shipped catalog is static, not live').toBe('static');
 		expect(provenance.engineVersion, 'the engine version must be stated').toBeTruthy();
 	});
 

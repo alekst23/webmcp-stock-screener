@@ -93,14 +93,15 @@ fields the spec requires are:
 | Field | Type | Description |
 |-------|------|-------------|
 | `as_of` | ISO timestamp | data currency |
-| `source` | string | provider identifier |
-| `delivery` | enum | `live` or `delayed` |
-| `delay_minutes` | number, present when delayed | |
+| `source_id` | string | stable provider identifier |
+| `source_label` | string | human-readable provider name |
+| `liveness` | enum | `live`, `delayed`, `end_of_day`, `historical` or `static` |
+| `delay_seconds` | number, present when and only when `delayed` | |
 | `timezone` | IANA zone | exchange timezone the timestamps are in |
-| `currency` | ISO 4217 | the prices' currency |
-| `price_adjustment` | enum | the policy **actually applied**, which may differ from the one requested |
-| `fundamentals_period` | string, optional | reporting period, present only when fundamentals contributed |
-| `calc_engine_version` | string | study calculation engine version (T-1011-2) |
+| `currency` | ISO 4217, optional | the prices' currency |
+| `price_adjustment` | enum, optional | the policy **actually applied**, which may differ from the one requested |
+| `reporting_period` | object, optional | present only when fundamentals contributed |
+| `engine_version` | string | study calculation engine version (T-1011-2) |
 
 ## Chart state contracts
 

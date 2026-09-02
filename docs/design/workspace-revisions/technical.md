@@ -178,26 +178,44 @@ failures.
 
 ## T-1006-3 — Market-data provenance
 
+This is the one provenance contract for the whole tool surface; discovery
+extends it in `src/lib/surface/provenance.ts` rather than redefining it.
+
 ```ts
-export interface MarketDataProvenance {
-  asOf: string;                 // ISO 8601 instant the data describes
-  source: string;               // provider identifier
-  liveness: 'live' | 'delayed' | 'end_of_day' | 'historical';
-  delaySeconds: number | null;  // set when liveness is 'delayed'
-  timezone: string;             // IANA, e.g. 'America/New_York'
-  currency: string;             // ISO 4217
-  priceAdjustment: 'adjusted' | 'unadjusted' | 'not_applicable';
-  fundamentalsPeriod: {
-    fiscalYear: number; fiscalPeriod: 'FY' | 'Q1' | 'Q2' | 'Q3' | 'Q4';
-    periodEnd: string; restated: boolean;
-  } | null;
-  calcEngineVersion: string;
+export const ENGINE_VERSION: string;
+
+export type ProvenanceLiveness =
+  'live' | 'delayed' | 'end_of_day' | 'historical' | 'static';
+
+interface ProvenanceCore {
+  asOf: string;         // ISO 8601 instant the data describes
+  sourceId: string;     // stable machine identifier, e.g. 'eodhd'
+  sourceLabel: string;  // human-readable name for the same source
+  timezone: string;     // IANA, e.g. 'America/New_York'
+  currency?: string;    // ISO 4217; absent when there is no monetary content
+  priceAdjustment?: 'adjusted' | 'unadjusted' | 'not_applicable';
+  reportingPeriod?: {
+    basis: 'point_in_time' | 'trailing_twelve_months' | 'fiscal_quarter' | 'fiscal_year';
+    periodEnd: string; fiscalYear: number; fiscalQuarter?: number; restated?: boolean;
+  };
+  engineVersion: string;
 }
 
+// A union, so "delayed but we won't say by how much" does not compile.
+export type MarketDataProvenance =
+  | (ProvenanceCore & { liveness: 'delayed'; delaySeconds: number })
+  | (ProvenanceCore & { liveness: Exclude<ProvenanceLiveness, 'delayed'>; delaySeconds?: never });
+
+export function makeProvenance(input: ProvenanceInput): MarketDataProvenance;
 export interface WithProvenance<T> { data: T; provenance: MarketDataProvenance; }
 export function withProvenance<T>(data: T, provenance: MarketDataProvenance): WithProvenance<T>;
 export function toWireProvenance(p: MarketDataProvenance): Record<string, unknown>; // snake_case
 ```
+
+`historical` and `static` are distinct claims: historical data ticked once
+and a later window returns different data; static data never ticks. A
+`reportingPeriod` states a basis rather than a fiscal-period enum so a
+trailing-twelve-month figure is expressible without lying about it.
 
 Port for the separate reference/fundamental-data workstream — this epic
 defines it and does **not** implement a provider:
