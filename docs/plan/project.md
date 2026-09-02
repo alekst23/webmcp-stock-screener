@@ -28,9 +28,9 @@ fan out behind it.
 
 | Item | Type | Status | Branch | Notes |
 |------|------|--------|--------|-------|
-| EPIC-1006: Workspace, revisions & common tool contract | epic | **in progress (`/at-epic-run`, this session)** | `epic/EPIC-1006-…` (per-ticket worktrees for T-1006-1/2/3, Wave 1) | 8 tickets, zero code as of launch. Foundation: envelope, revisions, idempotency, undo, operation registry; owns `get_canvas_state` (renamed from `get_workspace`). Reconciliations #1/#2 resolved by working assumption. Mid-run, flagged it to reuse EPIC-1008's `src/lib/surface/ids.ts`/`provenance.ts` rather than building a second stable-ID/provenance scheme — see Decisions Log. |
+| EPIC-1006: Workspace, revisions & common tool contract | epic | **in progress — live agent, NOT this session** (`.claude/worktrees/agent-ab5c9b313859dd4b5`, locked, pid 41191, branch `t-1006-3-market-data-provenance`) | epic branch itself still 0 commits ahead of main; real work is on the live worktree | 2026-09-01's three `worktree-agent-T-1006-{1,2,3}-EPIC-1006-44344-20875` branches under `.worktrees/` are stale/crashed — each carries only a stray `project.md` diff, no real code, not locked, no live process. The *actual* live implementation is a different, currently-running agent (started today 18:10, still active) with 3 real commits (mutation envelope T-1006-2, provenance contract T-1006-3, workspace-model reconciliation flag) plus uncommitted new files (`src/lib/workbench/domain/{ids,workspace}.ts` + tests). **`/at-project-go` deliberately did not launch or touch EPIC-1006 this run** — it's already in flight elsewhere; duplicating it would race the same files. Re-check next run: if that agent has finished/exited, resume or relaunch remaining T-1006 tickets. |
 | EPIC-1007: Panel system | epic | specced | `epic/EPIC-1007-…` merged to main | 7 tickets. 14 tools; owns panel-kind registry and source/renderer contract registry |
-| EPIC-1008: Discovery & catalog | epic | **PR open** ([#18](https://github.com/alekst23/webmcp-stock-screener/pull/18)) | `epic/EPIC-1008-discovery-and-catalog`, pushed | 7/8 tickets Done; T-1008-8 filed as a non-blocking follow-up (fragile string-matched unavailable-source detection). CI passed (224 frontend tests, was 117; 60 backend; typecheck/black/isort/flake8 clean). 5-agent epic review passed after triage, no blocking findings. New `docs/architecture/` tree created, documenting the program-wide composition model. Not wired into the live page — composition root still unowned across the whole program, not an EPIC-1008 gap; see Blockers. Reconciliation #4 (OHLCV bars port) resolved by working assumption to unblock this close. Awaiting merge. |
+| EPIC-1008: Discovery & catalog | epic | **PR open, fully ready — awaiting merge decision** ([#18](https://github.com/alekst23/webmcp-stock-screener/pull/18)) | `epic/EPIC-1008-discovery-and-catalog`, pushed (`2a677ef`) | Re-verified 2026-09-01 (`/at-project-go`): PR MERGEABLE, only configured check (Cloudflare Workers Build) passes, merge-queue trial-merge to `main` is a clean PASS with no conflicts. All 7 core tickets confirmed `Done` on the branch, T-1008-8 filed Open as the recorded non-blocking follow-up, `docs/architecture/{README,discovery-and-catalog,new-webmcp-surface}.md` committed. Nothing left in the close pipeline — `/at-epic-close` never merges to `main` on its own, so this needs an explicit user merge, not another automated pass. |
 | EPIC-1009: Screener core | epic | specced | `epic/EPIC-1009-…` merged to main | 10 tickets. 6 tools; 8 filter-condition types |
 | EPIC-1010: Results & explain | epic | specced | `epic/EPIC-1010-…` merged to main | 8 tickets. 2 tools + table-renderer contract registered into EPIC-1007; no-silent-rerun guarantee |
 | EPIC-1011: Chart tools | epic | specced | `epic/EPIC-1011-…` merged to main | 9 tickets. 3 tools + chart-renderer contract registered into EPIC-1007; owns captured-setup contract |
@@ -362,3 +362,44 @@ Facts established by real API calls, superseding `data-provider.md` estimates:
   in. EPIC-1008 and EPIC-0013 already have unmerged, implemented branches
   awaiting `/at-epic-close` — check those first since they may be quicker
   wins than starting EPIC-1006 cold.
+
+## Last Run (2026-09-01, `/at-project-go` via `/loop`, argument "implement tool revision epics 1006 to 1012")
+
+- **Trigger:** `/loop /at-project-go implement tool revision epics 1006 to
+  1012` (dynamic/no-interval mode, autonomous — Steps 3b/5b skipped).
+- **Assessment before acting:** `.claude/worktrees/agent-ab5c9b313859dd4b5`
+  is a **live, locked, currently-running agent** (pid 41191, started
+  18:10 today) actively implementing EPIC-1006's tickets on branch
+  `t-1006-3-market-data-provenance` — 3 real commits (T-1006-2 mutation
+  envelope, T-1006-3 provenance contract, a T-1006-1 reconciliation flag)
+  plus uncommitted new domain files. Separately, two other long-running
+  local `claude` CLI processes (pid 7557, pid 43367 — 23.5h CPU time) are
+  active on this machine; their target repos/branches weren't
+  investigated, out of caution against interfering. Per "respect
+  in-flight work," **this run did not launch or touch EPIC-1006** — no
+  duplicate `/at-epic-run EPIC-1006` was started.
+- **Shipped:** Docs only — corrected the plan's stale claim that
+  EPIC-1006 had "zero code" (it doesn't; see above), and re-verified
+  EPIC-1008's PR #18 is fully ready (mergeable, clean merge-queue
+  trial-merge, all gates the close pipeline checks already passed in an
+  earlier session). Ran `/at-epic-close EPIC-1008` in-session; it found
+  Steps 3-9 (CI, status updates, review, docs, PR) already complete on
+  `origin/epic/EPIC-1008-discovery-and-catalog` (`2a677ef`) from a prior
+  session my local clone hadn't fetched. The skill never merges to `main`
+  itself, so no further automated action exists here — **PR #18 needs an
+  explicit user merge decision**, not another pass of this skill.
+- **Not launched, and why:** EPIC-1007/1009/1011/1012 (the rest of the
+  1006-1012 range) all consume EPIC-1006's shared contract
+  (`ids.ts`/`provenance.ts`/mutation envelope), which is only landing on
+  a worktree branch right now, not on `main` or even the epic branch —
+  starting them would either race the live EPIC-1006 agent's files or
+  build against a contract that doesn't exist yet. Real dependency, not
+  false caution.
+- **In-flight at close:** The live EPIC-1006 agent (see above) — left
+  running, not managed by this session.
+- **Next run should:** Re-check whether the live EPIC-1006 agent
+  (`.claude/worktrees/agent-ab5c9b313859dd4b5`) has finished or exited.
+  If EPIC-1006's contract has landed (epic branch or `main`), launch
+  EPIC-1007, EPIC-1009, and EPIC-1011 in parallel (Wave 2 of the 1006-1012
+  range; EPIC-1012 waits on EPIC-1011's `capture_chart_setup`). If PR #18
+  has been merged by the user, mark EPIC-1008 Completed in this plan.
