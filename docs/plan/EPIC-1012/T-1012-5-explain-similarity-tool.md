@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1012 (Similarity Search)
 **Design**: docs/design/similarity-search/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1012-3
 **Blocks**: T-1012-8
 
@@ -84,3 +84,49 @@ rather than on trust.
 - Visualizing the contribution breakdown — the panel (T-1012-6) surfaces
   the top contributing families; rich per-feature charts are not in this
   epic.
+
+## Solution Approach
+
+**AC6 needs a field `SimilarityExplanation` doesn't carry.** T-1012-1's
+`SimilarityExplanation` (both encodings) has no `normalization` or
+`provenance` field — those live on `SimilarityRun`, and T-1012-3's
+`/explanation` endpoint returns a bare `SimilarityExplanation`. To satisfy
+AC6, this tool also reads the pinned run (`GET /api/similarity/runs/{id}`,
+already built by T-1012-3) for its `normalization`/`provenance`/`scope`,
+and states them alongside the explanation in one tool response. Added
+`getRun(runId): Promise<SimilarityRun>` to `SimilarityApiPort`/
+`httpSimilarityApi.ts` (T-1012-4's shared port, extended here rather than
+duplicated) — reusing the existing `fromWireRun` parser unchanged, since a
+`SimilarityRunPage` response is a strict superset of what a full run
+carries.
+
+**AC7 vs AC8 disambiguation:** T-1012-3's route returns 404 for both "run
+not found" and "candidate not found," distinguishable only by message
+text, not status code — the same limitation this epic's other 422
+responses already have (T-1012-4's Solution Approach noted the same thing
+for `/search`). Rather than parsing message text, this tool calls
+`getRun(runId)` FIRST: if that 404s, the run itself is unavailable (AC8,
+stating "a new search is required," never silently starting one); only if
+the run resolves does it call `explain(runId, candidateId)`, so a 404
+from THAT call is unambiguously AC7 (a real run, wrong candidate) with no
+message-parsing needed either way. Two sequential reads, never `search` --
+AC4's "never re-runs the search" holds by construction, since nothing in
+this tool's path calls `SimilarityApiPort.search`.
+
+**Files:** `src/lib/workbench/similarity/tools/explainSimilarity.ts` +
+test. `apiPort.ts`/`httpSimilarityApi.ts` extended (not duplicated) with
+`getRun`.
+
+**Read-only (AC9):** no `commitPanelChange`, no mutation envelope, no
+`expected_revision`/`idempotency_key` in the input schema at all --
+distinct from every other tool in this epic.
+
+**Testing:** the tool tested against a fake `SimilarityApiPort` with real
+per-call behavior (not name-keyed). AC3's reconciliation check uses a
+non-uniform weight set (per this ticket's own Technical Considerations --
+a uniform-weight fixture could pass by coincidence even with the
+underlying math wrong) and is mutation-checked by perturbing one
+contribution and confirming the test goes red. AC4 ("never re-runs the
+search") is mutation-checked by having the fake's `search` throw if
+called at all, so any regression that accidentally invokes it fails
+loudly rather than silently passing.

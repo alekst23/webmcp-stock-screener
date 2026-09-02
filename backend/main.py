@@ -27,11 +27,13 @@ from starlette.types import ASGIApp
 from api.routes.health import HEALTH_PATH
 from api.routes.health import router as health_router
 from api.routes.research import router as research_router
+from api.routes.similarity import router as similarity_router
 from api.routes.spike import router as spike_router
 from application.load_panel import load_panel
 from domain.models.panel import PanelStatus
 from infra.object_store import S3PanelStore, config_from_env
 from infra.pandas_engine import PandasPatternResearchEngine
+from infra.similarity_engine import PandasSimilarityEngine
 
 PANEL_PATH = Path(__file__).resolve().parent / "data" / "mock" / "panel.parquet"
 
@@ -65,26 +67,30 @@ def _require_real_panel() -> bool:
     return os.environ.get("REQUIRE_REAL_PANEL", "").strip().lower() in {"1", "true"}
 
 
-def _load_engine() -> tuple[PandasPatternResearchEngine | None, PanelStatus | None]:
+def _load_engine() -> (
+    tuple[PandasPatternResearchEngine | None, PandasSimilarityEngine | None, PanelStatus | None]
+):
     """Load the panel into memory once at startup (docs/plan.md: 'loaded into
     memory at startup for low-latency reads'), preferring the real
     object-store panel over T-0001-1's mock one.
 
-    Returns (None, None) when no panel exists anywhere -- api/routes/
-    research.py's dependency then surfaces a clear 503 instead of crashing
-    app startup, mirroring the spike endpoint's own guard. That fallback is
-    itself refused when REQUIRE_REAL_PANEL is set and no object store is
-    configured -- see `_require_real_panel` and `load_panel`."""
+    Returns (None, None, None) when no panel exists anywhere -- api/routes/
+    research.py's and api/routes/similarity.py's dependencies then surface a
+    clear 503 instead of crashing app startup, mirroring the spike
+    endpoint's own guard. That fallback is itself refused when
+    REQUIRE_REAL_PANEL is set and no object store is configured -- see
+    `_require_real_panel` and `load_panel`."""
     loaded = load_panel(_panel_store(), PANEL_PATH, require_object_store=_require_real_panel())
     if loaded is None:
-        return None, None
+        return None, None, None
     engine = PandasPatternResearchEngine(loaded.panel, loaded.universe)
-    return engine, loaded.status
+    similarity_engine = PandasSimilarityEngine(loaded.panel, loaded.status)
+    return engine, similarity_engine, loaded.status
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    app.state.engine, app.state.panel_status = _load_engine()
+    app.state.engine, app.state.similarity_engine, app.state.panel_status = _load_engine()
     yield
 
 
@@ -160,6 +166,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(spike_router)
 app.include_router(research_router)
+app.include_router(similarity_router)
 
 
 def main() -> None:

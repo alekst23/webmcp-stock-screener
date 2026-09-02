@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1012 (Similarity Search)
 **Design**: docs/design/similarity-search/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1012-2, T-1012-6
 
@@ -103,3 +103,92 @@ by a panel is provably the same object throughout.
 - Computing feature vectors from real price data (T-1012-2).
 - Any HTTP route, tool registration, or rendering.
 - Learning or adjusting weights from feedback (EPIC-1014).
+
+## Solution Approach
+
+Design-gate skip authorized for this epic (spec.md + detailed ACs stand in
+for a written design doc); this section is the required substitute written
+before implementation.
+
+**Files (new only):**
+- `backend/domain/models/similarity.py` — `FeatureFamily` (str Enum, the six
+  families), `InstrumentRef`/`WindowRef` (minimal Pydantic mirrors scoped to
+  this module — the existing `Instance`/`InstanceWindow` models are a
+  different shape and belong to the old surface), `MarketDataProvenance`
+  (no Python-side provenance model exists anywhere in `backend/domain/` yet —
+  grepped for it; this is the first), `FeatureWeightSet`, `FeatureVector`
+  (`dict[FeatureFamily, tuple[float, ...]]`), `SimilarityCandidate`,
+  `SimilarityExplanation`, `SimilarityRun`, and the pure functions
+  `per_family_similarity()` and `score_candidate()`.
+- `backend/tests/unit/test_similarity_models.py`.
+- `src/lib/workbench/similarity/domain/contract.ts` — the same conceptual
+  entities, reusing `MarketDataProvenance` from `../../domain/provenance.ts`
+  and `Normalization`/`InstrumentRef` from `../../chart/domain/instrument.ts`
+  rather than redefining either.
+- `src/lib/workbench/similarity/domain/contract.test.ts`.
+
+**Scoring rule (AC5, AC6):** `score_candidate(reference, candidate, weights)`
+takes two `FeatureVector`s (one embedding per available family) and a
+`FeatureWeightSet`. For each family present in *both* vectors it computes a
+bounded `[0, 1]` per-family similarity (cosine similarity of the two
+embeddings, rescaled from `[-1, 1]`), renormalizes the weight set over just
+the available families (so a missing family's weight doesn't silently
+vanish or get to a family that can't use it), and defines that family's
+contribution as `normalized_weight * similarity`. The overall score is
+literally `sum(contributions.values())` — not a separately computed number
+that happens to match — so AC5 holds by construction, not by coincidence.
+Families present in neither vector, or in only one, are reported in
+`unavailable_families` and excluded from both the weight renormalization and
+the contributions (this is what T-1012-2's AC12 degradation path needs).
+Both the Python and TS implementations follow this identical rule
+independently; exact cross-language numeric parity is not required by this
+ticket (out of scope — no shared computation path exists), only that each
+side's own test suite proves its own AC5 reconciliation, including with a
+non-uniform weight set.
+
+**Weight set (AC2, AC10):** `FeatureWeightSet.from_partial(dict[str, float])`
+(Python classmethod) / `makeFeatureWeightSet(partial)` (TS function) builds a
+complete set from a caller-supplied partial one, defaulting every
+unspecified family to `1/6` (Open Question 3's assumption). Rejects an
+unknown family name or a negative weight by raising/returning an error
+naming the offending entry; rejects an all-zero result (nothing to
+normalize). The returned value is a plain, round-trippable value (Python:
+frozen Pydantic model; TS: a plain readonly object), not a stateful builder.
+
+**IDs:** `SimilarityRun.run_id` reuses the existing `'run'` `ResourceKind`
+from `src/lib/workbench/domain/ids.ts` via
+`ids.next('run', 'similarity')` at the call site that constructs a run (not
+in this ticket — this ticket only types the field as `ResourceId`).
+`SimilarityCandidate.candidate_id` is deliberately **not** a new
+`ResourceKind` — extending the closed `ResourceKind` union in `ids.ts` would
+be an edit to EPIC-1006's shared contract file, which this ticket avoids per
+"new files only" and per EPIC-1006 owning that scheme. Instead a candidate
+ID is a plain, stable, run-scoped string with a documented grammar:
+`` `${run_id}_candidate_${n}` ``, still never a bare ticker (AC3), still
+opaque and stable across reads of the same pinned run (AC8 in T-1012-2/3).
+Flagging this as a finding for whoever wires the engine (T-1012-2) and API
+(T-1012-3): if a real `ResourceKind` extension is wanted later, that is a
+coordinated EPIC-1006 change, not a local one. On the Python side there is
+no ID-minting infra at all (backend's existing models use plain `str` id
+fields, e.g. `InstanceSet.id`), so `run_id`/`candidate_id` are plain `str`
+there too, following the same grammar for consistency with the TS side.
+
+**Provenance (AC9):** TS side reuses
+`src/lib/workbench/domain/provenance.ts`'s `MarketDataProvenance` outright —
+no new type. Python side has no equivalent anywhere in `backend/domain/`
+(confirmed by grep), so this ticket adds a minimal mirror with the same
+field set (`as_of`, `source_id`, `source_label`, `liveness`,
+`delay_seconds`, `timezone`, `currency`, `price_adjustment`,
+`engine_version`), validated so `delay_seconds` is present exactly when
+`liveness == "delayed"` — the same invariant the TS discriminated union
+enforces at the type level, enforced here with a Pydantic model validator
+since Python has no equivalent tagged-union ergonomics.
+
+**Mutation-check plan:** each AC5/AC10/AC6 test will be run once against the
+real implementation (green) and once against a deliberately reverted/broken
+version of the specific behavior it covers (red), per family: reconciliation
+test reverted by changing `overall` to a hardcoded value independent of
+`contributions`; weight-rejection tests reverted by removing the
+validation branch; purity is structural (no clock/random/IO imported) rather
+than test-provable by mutation, so it is enforced by code review of the
+module's imports instead.
