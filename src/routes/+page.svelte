@@ -4,6 +4,7 @@
 	import { workspaceStore } from '$lib/workspace/store';
 	import { activityStore, clearActivity } from '$lib/workspace/activity';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
+	import { resolveApiBaseUrl } from '$lib/workspace/apiConfig';
 	import {
 		fetchPanelStatus,
 		formatPanelStatus,
@@ -28,7 +29,7 @@
 	import ChartToolbar from '$lib/workspace/ChartToolbar.svelte';
 	import SnapshotPicker from '$lib/workspace/SnapshotPicker.svelte';
 
-	const apiConfig = { baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' };
+	const apiConfig = { baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL) };
 
 	// The real fetch-based ResearchEngine (T-0001-5), the same one an agent's
 	// WebMCP tool calls resolve against -- registered here so a real

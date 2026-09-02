@@ -3,6 +3,7 @@
 	import { dev } from '$app/environment';
 	import { workspaceStore } from '$lib/workspace/store';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
+	import { resolveApiBaseUrl } from '$lib/workspace/apiConfig';
 	import { buildTools } from '$lib/webmcp/tools';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
@@ -15,7 +16,7 @@
 	// human view reads from (AC4) and the same live backend an agent's tool
 	// calls would hit.
 	const engine = createApiEngine(workspaceStore, {
-		baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+		baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL)
 	});
 	const tools = buildTools(engine);
 
@@ -87,7 +88,7 @@
 				<GridPanel
 					{panel}
 					{engine}
-					config={{ baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' }}
+					config={{ baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL) }}
 					store={workspaceStore}
 					onselect={(view) => (focusedView = view)}
 				/>
