@@ -82,6 +82,9 @@ function fakeApi(
 			}
 			return run;
 		},
+		async getRun() {
+			throw new Error('not used by this tool');
+		},
 		async explain() {
 			throw new Error('not used by this tool');
 		}

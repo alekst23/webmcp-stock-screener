@@ -85,8 +85,15 @@ export function buildCompareSetupsTool(deps: PanelUseCaseDeps): ToolSpec {
 				return ok(toWireEnvelope(envelope));
 			} catch (err) {
 				if (err instanceof CandidateSelectionError) {
+					// panels/tools/results.ts's shared fail() sets `error` to
+					// `message` before spreading `extra` in -- an `extra.error`
+					// discriminator here would otherwise silently clobber the
+					// human-readable text unless `extra` restates it under
+					// `message` too, matching PanelOperationError's own
+					// toWireError() shape.
 					return fail(err.message, {
 						error: 'unknown_candidate',
+						message: err.message,
 						run_id: err.runId,
 						candidate_ids: err.unknownCandidateIds
 					});

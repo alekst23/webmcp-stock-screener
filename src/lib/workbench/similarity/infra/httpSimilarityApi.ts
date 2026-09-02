@@ -214,6 +214,15 @@ export function createHttpSimilarityApi(config: HttpSimilarityApiConfig): Simila
 			return fromWireRun(body);
 		},
 
+		async getRun(runId: string): Promise<SimilarityRun> {
+			// SimilarityRunPage is a strict superset of a full run (paged
+			// candidates plus total_candidates/offset/next_offset) -- fromWireRun
+			// reads the fields it needs and ignores the rest, so no separate
+			// parser is needed.
+			const body = await get(`/api/similarity/runs/${encodeURIComponent(runId)}`, 'not_found_run');
+			return fromWireRun(body);
+		},
+
 		async explain(runId: string, candidateId: string): Promise<SimilarityExplanation> {
 			const body = await get(
 				`/api/similarity/runs/${encodeURIComponent(runId)}/candidates/${encodeURIComponent(candidateId)}/explanation`,

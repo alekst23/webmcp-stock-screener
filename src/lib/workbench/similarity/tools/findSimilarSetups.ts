@@ -50,9 +50,15 @@ function ok(payload: unknown): ToolResult {
 	return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
 }
 
+// `message` is set before the spread and never overwritten by `extra`, even
+// when `extra` carries its own `error` discriminator code -- a caller
+// passing `{ error: 'some_code', ... }` as extra must not silently clobber
+// the human-readable text this function was actually given.
 function fail(message: string, extra?: Record<string, unknown>): ToolResult {
 	return {
-		content: [{ type: 'text', text: JSON.stringify({ error: message, ...extra }, null, 2) }],
+		content: [
+			{ type: 'text', text: JSON.stringify({ error: message, message, ...extra }, null, 2) }
+		],
 		isError: true
 	};
 }

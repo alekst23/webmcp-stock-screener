@@ -144,6 +144,10 @@ describe('compare_setups tool', () => {
 		expect(result.isError).toBe(true);
 		const body = await parseResult(result);
 		expect(body.error).toBe('unknown_candidate');
+		// Regression check: an earlier version of this call site let the
+		// `error` discriminator silently clobber the human-readable text
+		// (both were merged under the same "error" wire key).
+		expect(body.message).toContain('NOT_A_CANDIDATE');
 		expect(body.candidate_ids).toEqual(['NOT_A_CANDIDATE']);
 	});
 });

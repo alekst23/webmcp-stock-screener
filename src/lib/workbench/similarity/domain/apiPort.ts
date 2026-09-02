@@ -49,6 +49,11 @@ export class SimilarityApiError extends Error {
 
 export interface SimilarityApiPort {
 	search(request: SimilaritySearchRequest): Promise<SimilarityRun>;
+	// Reads a previously pinned run back, unchanged -- never re-runs the
+	// search (T-1012-3 AC3). T-1012-5 uses this to state a run's
+	// normalization/provenance/scope alongside an explanation, which
+	// SimilarityExplanation itself does not carry.
+	getRun(runId: string): Promise<SimilarityRun>;
 	explain(runId: string, candidateId: string): Promise<SimilarityExplanation>;
 }
 

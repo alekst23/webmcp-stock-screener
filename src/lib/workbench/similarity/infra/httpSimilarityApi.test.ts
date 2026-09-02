@@ -133,6 +133,30 @@ describe('createHttpSimilarityApi', () => {
 		});
 	});
 
+	describe('getRun', () => {
+		it('gets the run endpoint and parses the paged response as a full run', async () => {
+			const { impl, calls } = stubFetch(() =>
+				jsonResponse({ ...WIRE_RUN, total_candidates: 1, offset: 0, next_offset: null })
+			);
+			const api = createHttpSimilarityApi({ baseUrl: 'https://backend.test', fetchImpl: impl });
+
+			const run = await api.getRun('similarity_run_1');
+
+			expect(calls[0]?.url).toBe('https://backend.test/api/similarity/runs/similarity_run_1');
+			expect(run.runId).toBe('similarity_run_1');
+			expect(run.normalization).toEqual({ mode: 'percent_change', anchor: 'window_start' });
+		});
+
+		it('maps a 404 to a not_found_run SimilarityApiError', async () => {
+			const { impl } = stubFetch(() =>
+				jsonResponse({ detail: { message: 'not found' } }, { status: 404 })
+			);
+			const api = createHttpSimilarityApi({ baseUrl: 'https://backend.test', fetchImpl: impl });
+
+			await expect(api.getRun('bogus')).rejects.toMatchObject({ reason: 'not_found_run' });
+		});
+	});
+
 	describe('explain', () => {
 		it('gets the explanation endpoint and parses the response', async () => {
 			const { impl, calls } = stubFetch(() =>
