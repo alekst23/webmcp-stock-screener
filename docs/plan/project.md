@@ -28,7 +28,7 @@ fan out behind it.
 
 | Item | Type | Status | Branch | Notes |
 |------|------|--------|--------|-------|
-| EPIC-1006: Workspace, revisions & common tool contract | epic | **in progress — relaunched via `/at-epic-run` (this session, background agent `a44143593a1888d8c`)** | fresh worktree off `main`, per-ticket branches TBD | The 2026-09-01 live agent at `.claude/worktrees/agent-ab5c9b313859dd4b5` (branch `t-1006-3-market-data-provenance`) is confirmed **crashed**: process pid 41191 no longer exists, worktree unlocked, no file activity for 6+ hours (last commit 18:11:47, checked again at 00:25 the next day). Left untouched (3 commits + uncommitted domain files still sit there, recoverable if anyone wants to salvage/reconcile them later) rather than deleted or built on. Relaunched EPIC-1006 fresh from `main` instead of waiting indefinitely — ticket docs are the source of truth and all 8 still read `Status: Open`. Delegate agent instructed to reuse EPIC-1008's `src/lib/surface/ids.ts`/`provenance.ts` if present on `main`. |
+| EPIC-1006: Workspace, revisions & common tool contract | epic | **PR open, fully ready — awaiting merge decision** ([#19](https://github.com/alekst23/webmcp-stock-screener/pull/19)) | `epic/EPIC-1006-workspace-revisions-common-tool-contract`, pushed (`e8027cc`) | Relaunched fresh (2026-09-02, `/at-project-go`) after the 2026-09-01 live agent was confirmed crashed (see Decisions Log); all 8 tickets implemented sequentially in one worktree, 235/235 tests green, typecheck clean. 5-agent `/at-epic-review` found **3 critical, verified bugs**, all fixed on the branch before PR: `save_workspace` bypassed idempotency replay and change-history recording; change-history pruning never actually evicted anything in ordinary (no-undo) usage, silently defeating the documented 200-record cap; a failed `localStorage` write was swallowed while the envelope still reported success. Warning/nit findings (read-tool wire-casing inconsistency, untyped registry-registration error, missing boundary logging, undocumented cross-tab write race) filed as non-blocking follow-ups T-1006-9/10/11. Architecture docs committed (`docs/architecture/{README,workspace-revisions}.md` — **new tree, will conflict with EPIC-1008 PR #18's own new `docs/architecture/README.md` on whichever merges second**, a routine one-file conflict, not a blocker). Merge-queue trial-merge clean. Tests 239/239 after fixes. Crashed 2026-09-01 agent's stray branch (`t-1006-3-market-data-provenance`) left untouched, not merged/deleted. Nothing left in the close pipeline besides the user's merge decision. |
 | EPIC-1007: Panel system | epic | specced | `epic/EPIC-1007-…` merged to main | 7 tickets. 14 tools; owns panel-kind registry and source/renderer contract registry |
 | EPIC-1008: Discovery & catalog | epic | **PR open, fully ready — awaiting merge decision** ([#18](https://github.com/alekst23/webmcp-stock-screener/pull/18)) | `epic/EPIC-1008-discovery-and-catalog`, pushed (`2a677ef`) | Re-verified 2026-09-01 (`/at-project-go`): PR MERGEABLE, only configured check (Cloudflare Workers Build) passes, merge-queue trial-merge to `main` is a clean PASS with no conflicts. All 7 core tickets confirmed `Done` on the branch, T-1008-8 filed Open as the recorded non-blocking follow-up, `docs/architecture/{README,discovery-and-catalog,new-webmcp-surface}.md` committed. Nothing left in the close pipeline — `/at-epic-close` never merges to `main` on its own, so this needs an explicit user merge, not another automated pass. |
 | EPIC-1009: Screener core | epic | specced | `epic/EPIC-1009-…` merged to main | 10 tickets. 6 tools; 8 filter-condition types |
@@ -403,3 +403,52 @@ Facts established by real API calls, superseding `data-provider.md` estimates:
   EPIC-1007, EPIC-1009, and EPIC-1011 in parallel (Wave 2 of the 1006-1012
   range; EPIC-1012 waits on EPIC-1011's `capture_chart_setup`). If PR #18
   has been merged by the user, mark EPIC-1008 Completed in this plan.
+
+## Last Run (2026-09-02, `/at-project-go` via `/loop`, continued — EPIC-1006 relaunch and close)
+
+- **Trigger:** Continuation of the same `/loop /at-project-go implement
+  tool revision epics 1006 to 1012` run — woken by the EPIC-1006 agent's
+  own crashed-process finding from the previous tick.
+- **Confirmed dead, relaunched:** The 2026-09-01 agent at
+  `.claude/worktrees/agent-ab5c9b313859dd4b5` was confirmed crashed (pid
+  41191 gone, worktree unlocked, no file activity in 6+ hours) rather than
+  paused work. Relaunched EPIC-1006 fresh via a background `/at-epic-run`
+  agent, which implemented all 8 tickets sequentially in one worktree
+  (the skill's own parallel-worktree pattern hit a sandbox constraint) —
+  9 commits, 235/235 tests, typecheck clean.
+- **Ran the full close pipeline in-session:** CI (typecheck + 239 tests
+  after fixes + prettier on touched files, all clean), merge-queue check
+  (clean), a 5-agent `/at-epic-review` (5 parallel review agents covering
+  conceptual soundness/intent, wiring, orchestration, architecture, best
+  practices), triaged every finding, fixed the 3 critical ones directly on
+  the epic branch, filed 3 follow-up tickets (T-1006-9/10/11) for the
+  warning/nit findings, ran `/at-epic-docs` (new `docs/architecture/` tree
+  — first doc tree on a branch that will actually merge, since EPIC-1008's
+  own new architecture docs are still on an unmerged PR), then pushed and
+  opened **PR #19**.
+- **The 3 critical bugs fixed** (see EPIC-1006's Active Work row above for
+  detail): `save_workspace` bypassing idempotency replay and change-history
+  recording; change-history pruning silently never enforcing its documented
+  cap; a swallowed storage-write failure that let the mutation envelope lie
+  about success. All three were caught by *reading the actual code*, not
+  inferred from ticket docs — exactly the failure mode whole-epic review
+  exists to catch that per-ticket AC checks miss.
+- **Deliberately did not merge either PR.** Both PR #18 (EPIC-1008) and PR
+  #19 (EPIC-1006) are fully ready — CI green, review passed, mergeable,
+  no conflicts with `main` individually. `/at-epic-close` never merges on
+  its own by design, and merging is a shared-visibility, less-reversible
+  action outside what an autonomous loop should do unprompted.
+- **In-flight at close:** Nothing. The relaunch worktree
+  (`.claude/worktrees/agent-a44143593a1888d8c`) is left in place (needed
+  while PR #19 is open) but idle.
+- **Next run should:** Check whether the user has merged PR #18 and/or
+  #19. **This is now the real blocker for the rest of the 1006-1012
+  range** — EPIC-1007/1009/1011/1012 all consume EPIC-1006's shared
+  contract modules, which only exist on an unmerged branch; starting them
+  before merge risks building against a contract that later changes, or
+  each inventing its own copy (the exact mistake the Decisions Log already
+  flagged once for EPIC-1006 vs. EPIC-1008's `ids.ts`/`provenance.ts`).
+  Once both land on `main`, launch EPIC-1007, EPIC-1009, and EPIC-1011 in
+  parallel. Note both PRs touch `docs/architecture/README.md` with
+  different new content — expect a routine, easy conflict on whichever
+  merges second.
