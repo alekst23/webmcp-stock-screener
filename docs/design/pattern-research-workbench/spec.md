@@ -147,6 +147,14 @@ at every step.
 | Tool names revealed on request                           | the page loads                                                                                              | the researcher clicks either count                                                                  | the corresponding tool names are revealed — all defined names, or just the currently-callable ones. Names are not rendered until requested; neither list is shown by default                                                                                                                                                                                                                                                                           |
 | Agent context comment states callability                 | the page loads                                                                                              | an agent (or anything else reading the page's HTML source, not the rendered view) inspects the page | an HTML comment lists every defined tool name and states plainly whether they are callable in this session, distinguishing all four bridge states. When no bridge is present, or registration failed, it says they are not callable and directs the reader to the page's visible UI controls, which perform the same operations; while the connection is still in flight it says so rather than reporting a bridge that is not yet known to be missing |
 
+### Backend address resolution
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Happy path | a configured backend address | the workbench makes any backend request | it is sent to that address |
+| Padded configuration | a configured address carrying leading or trailing whitespace (as deployment consoles and `.env` files commonly introduce) | the workbench makes any backend request | the surrounding whitespace is ignored and the request reaches the intended host, rather than failing to resolve a host name that has the whitespace embedded in it |
+| Blank configuration | a configured address that is absent, empty, or only whitespace | the workbench makes any backend request | it falls back to the local development default rather than issuing a request against an empty address |
+
 ### Progressive tool availability
 
 | Scenario   | Given                          | When                                     | Then                                                                                                                                                    |
@@ -208,4 +216,4 @@ at every step.
 
 ---
 
-_Implemented by: EPIC-0001, EPIC-0002, EPIC-0003, EPIC-0004, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status_
+_Implemented by: EPIC-0001, EPIC-0002, EPIC-0003, EPIC-0004, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status, hotfix/api-base-url-trim_

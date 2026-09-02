@@ -11,8 +11,11 @@
 	// this one instance's window on its own.
 	let { view }: { view: InstanceWindowView } = $props();
 
-	const CHART_WIDTH = 480;
-	const CHART_HEIGHT = 220;
+	// Sized for the shell's full-width work area: the SVG is stretched to the
+	// container, so a viewBox near the rendered pixel width keeps axis labels
+	// and stroke widths at their intended scale.
+	const CHART_WIDTH = 960;
+	const CHART_HEIGHT = 320;
 
 	const RANGES: { key: ChartRange; label: string }[] = [
 		{ key: '5d', label: '5D' },
@@ -36,7 +39,7 @@
 	);
 </script>
 
-<section class="focus-chart">
+<section class="focus-chart panel-card">
 	<h2>
 		{aligned.ticker} — {aligned.date}
 		{#if aligned.isPartial}<span class="partial-tag">partial match</span>{/if}
@@ -72,50 +75,60 @@
 
 <style>
 	.focus-chart {
-		margin-bottom: 1.5rem;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		padding: 0.75rem;
+		margin-bottom: var(--space-lg);
 	}
 	h2 {
-		font-size: 1.1rem;
-		margin-bottom: 0.5rem;
+		margin: 0 0 var(--space-sm);
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: var(--font-size-lg);
+		color: var(--text-primary);
 	}
 	.partial-tag {
-		font-size: 0.75rem;
-		color: #c90;
-		border: 1px solid #c90;
-		border-radius: 3px;
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--warning);
+		border: 1px solid var(--warning);
+		border-radius: var(--radius-sm);
 		padding: 0.1rem 0.4rem;
-		margin-left: 0.5rem;
+		margin-left: var(--space-sm);
+		vertical-align: middle;
 	}
 	.range-tabs {
 		display: flex;
-		gap: 0.75rem;
-		margin-bottom: 0.5rem;
-		border-bottom: 1px solid #eee;
+		gap: var(--space-md);
+		margin-bottom: var(--space-sm);
+		border-bottom: 1px solid var(--separator);
 	}
 	.range-tabs button {
 		border: none;
 		background: none;
 		font: inherit;
-		font-size: 0.85rem;
-		color: #666;
-		padding: 0.3rem 0.1rem 0.5rem;
+		font-size: var(--font-size-sm);
+		letter-spacing: var(--tracking-label);
+		color: var(--text-muted);
+		padding: var(--space-xs) var(--space-xs) var(--space-sm);
 		cursor: pointer;
 	}
+	.range-tabs button:hover {
+		color: var(--text-primary);
+	}
 	.range-tabs button.active {
-		color: #06c;
+		color: var(--accent);
 		font-weight: 600;
-		border-bottom: 2px solid #06c;
+		box-shadow: inset 0 -2px 0 0 var(--accent);
 	}
 	.empty {
-		color: #888;
+		color: var(--text-muted);
 		font-style: italic;
 	}
 	.range {
-		font-size: 0.8rem;
-		color: #666;
-		margin-top: 0.25rem;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: var(--font-size-xs);
+		color: var(--text-muted);
+		margin: var(--space-xs) 0 0;
 	}
 </style>

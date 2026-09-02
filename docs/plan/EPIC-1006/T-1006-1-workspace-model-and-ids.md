@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1006 (Workspace, Revisions & the Common Tool Contract)
 **Design**: docs/design/workspace-revisions/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1006-4, T-1006-5
 
@@ -66,6 +66,33 @@ else's do, and reordering never changes what an ID points at.
   replaces in spirit; note its `PanelSummary` for prior art.
 - `src/lib/workspace/store.ts` — `normalizeWorkspace`'s
   never-throw-on-corrupt-data pattern to follow.
+
+## Solution Approach
+
+Two pure-domain modules, no I/O. `ids.ts` implements `mintId`/`parseId` over
+a fixed `'<kind>_<discriminator?>_<seq>'` string grammar (discriminator
+omitted when not given, e.g. `workspace_1` vs `panel_chart_1`); `parseId`
+returns `null` (never throws) on anything that doesn't match the grammar or
+whose kind isn't in `ResourceKind`. `createIdSequencer(seed?)` holds a
+`Record<ResourceKind, number>` counter per kind (keyed further by
+discriminator so `panel_chart_*` and `panel_grid_*` don't share a counter),
+seeded from a persisted workspace's high-water marks so restarts never
+reuse a sequence number — satisfying "never reused after deletion" because
+the sequencer only ever increments, regardless of what still exists.
+
+`workspace.ts` defines `WorkspaceDocument`/`PanelRecord`/`LayoutEntry`/
+`PanelLink` exactly per `technical.md`, plus `emptyWorkspace` (revision 1,
+empty arrays, `extensions: {}`) and `normalizeWorkspace`, which follows
+`src/lib/workspace/store.ts`'s `normalizeWorkspace` precedent: defensively
+default every array/object field, drop malformed panel/layout/link entries
+rather than throwing, and pass `extensions` through untouched (even unknown
+keys) so a sibling epic's state round-trips even when this module has no
+idea what's in it.
+
+**Contracts introduced:** `ResourceKind`, `ResourceId`, `ParsedId`,
+`IdSequencer`, `WorkspaceDocument`, `PanelRecord`, `LayoutEntry`,
+`PanelLink` — all in `src/lib/workbench/domain/`, per `technical.md`'s
+module layout.
 
 ## Technical Considerations
 

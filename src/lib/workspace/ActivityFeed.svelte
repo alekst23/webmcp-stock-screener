@@ -19,7 +19,9 @@
 <section class="activity-feed">
 	<div class="header-row">
 		<h2>Activity log ({events.length})</h2>
-		<button type="button" onclick={clear} disabled={events.length === 0}>Clear log</button>
+		<button type="button" class="control" onclick={clear} disabled={events.length === 0}>
+			Clear log
+		</button>
 	</div>
 	{#if events.length === 0}
 		<p class="empty">No activity yet.</p>
@@ -39,40 +41,29 @@
 </section>
 
 <style>
-	.activity-feed {
-		margin: 1rem 0 1.5rem;
-		padding: 0.75rem 0;
-		border-top: 1px solid #ddd;
-		border-bottom: 1px solid #ddd;
-	}
 	.header-row {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 0.5rem;
-		margin-bottom: 0.25rem;
+		gap: var(--space-sm);
+		margin-bottom: var(--space-sm);
 	}
 	h2 {
-		font-size: 1rem;
 		margin: 0;
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--text-secondary);
 	}
 	.header-row button {
-		border: 1px solid #999;
-		border-radius: 4px;
-		padding: 0.3rem 0.6rem;
-		background: #fff;
-		color: #111;
-		font: inherit;
-		font-size: 0.8rem;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.header-row button:disabled {
-		opacity: 0.6;
-		cursor: default;
+		color: var(--text-secondary);
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
 	}
 	.empty {
-		color: #888;
+		margin: 0;
+		color: var(--text-muted);
 		font-style: italic;
 	}
 	ol {
@@ -81,35 +72,49 @@
 		margin: 0;
 		max-height: 220px;
 		overflow-y: auto;
-		border: 1px solid #ddd;
-		border-radius: 4px;
+		background: var(--bg-app);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
 	}
 	li {
-		padding: 0.35rem 0.5rem;
-		border-bottom: 1px solid #eee;
-		font-size: 0.85rem;
+		padding: var(--space-xs) var(--space-sm);
+		border-bottom: 1px solid var(--separator);
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
 	}
 	li:last-child {
 		border-bottom: none;
 	}
-	time {
-		color: #888;
-		margin-right: 0.5rem;
-		font-variant-numeric: tabular-nums;
+	li strong {
+		color: var(--text-primary);
 	}
+	time {
+		color: var(--text-muted);
+		margin-right: var(--space-sm);
+	}
+	/* Actor colour, not actor background: on a dark ground a tinted chip with
+	   a coloured label reads at a glance without a white-on-saturated pairing
+	   that would fall under the contrast floor. */
 	.actor {
 		display: inline-block;
 		min-width: 3.5rem;
-		margin-right: 0.4rem;
-		padding: 0.05rem 0.35rem;
-		border-radius: 3px;
-		font-size: 0.75rem;
+		margin-right: var(--space-xs);
+		padding: 0.05rem var(--space-xs);
+		border-radius: var(--radius-sm);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
 		font-weight: 600;
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
 		text-align: center;
-		color: #fff;
-		background: #6b7280;
+		color: var(--actor-agent);
+		border: 1px solid var(--actor-agent);
+		background: var(--bg-elevated);
 	}
 	.actor-human {
-		background: #2563eb;
+		color: var(--actor-human);
+		border-color: var(--actor-human);
 	}
 </style>

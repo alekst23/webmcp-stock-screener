@@ -8,8 +8,21 @@ example URLs are current.
 
 | Service | Platform | URL |
 |---|---|---|
-| Backend (FastAPI) | Render | <https://webmcp-pattern-research-api.onrender.com> |
+| Backend (FastAPI) | AWS App Runner | <https://awiz9fcu3b.us-east-1.awsapprunner.com> |
+| Backend (FastAPI, retired) | Render | <https://webmcp-pattern-research-api.onrender.com> |
 | Frontend (SvelteKit static) | Cloudflare Workers | <https://webmcp-stock-screener.alekst23.workers.dev/> |
+
+The backend moved to AWS App Runner during the EPIC-0016 re-platform; the
+Render URL is kept above only so older references resolve to something. The
+frontend's `PUBLIC_API_BASE_URL` must point at the App Runner address.
+
+> **Set that variable with no surrounding whitespace.** It is concatenated
+> into request URLs, so a trailing space is encoded as `%20` inside the host
+> name and every request fails DNS resolution, surfacing as "Failed to fetch"
+> with a healthy backend. The app now trims the value
+> (`src/lib/workspace/apiConfig.ts`), but the deployed `/_app/env.js` is
+> generated at build time — correcting the variable requires a redeploy to
+> take effect.
 
 ## T-0001-8 verification status (2026-08-31)
 

@@ -39,7 +39,7 @@
 		a real agent in a WebMCP-capable browser.
 	</p>
 
-	<section>
+	<section class="panel-card">
 		<h2>Status</h2>
 		<ul>
 			<li>
@@ -52,10 +52,10 @@
 		</ul>
 	</section>
 
-	<section>
+	<section class="panel-card">
 		<h2>Manual check (no agent required)</h2>
 		<p>Calls the same code the tool's <code>execute()</code> runs, directly from this page.</p>
-		<button onclick={runManualCheck}>Call spikePing() directly</button>
+		<button class="control" onclick={runManualCheck}>Call spikePing() directly</button>
 		{#if manualResult}
 			<pre class:error={!manualResult.ok}>{manualResult.text}</pre>
 		{/if}
@@ -65,17 +65,49 @@
 <style>
 	main {
 		max-width: 720px;
-		margin: 2rem auto;
-		padding: 0 1rem;
-		font-family: system-ui, sans-serif;
+		margin: 0 auto;
+		padding: var(--space-lg) var(--space-lg) var(--space-xl);
+	}
+	h1 {
+		font-size: var(--font-size-xl);
+		margin: 0 0 var(--space-sm);
+	}
+	h2 {
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--text-secondary);
+		margin: 0 0 var(--space-sm);
+	}
+	p {
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
+	}
+	section {
+		margin-top: var(--space-lg);
+	}
+	ul {
+		margin: 0;
+		padding-left: var(--space-lg);
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
+	}
+	button {
+		font-size: var(--font-size-sm);
 	}
 	pre {
 		white-space: pre-wrap;
-		background: #f5f5f5;
-		padding: 0.5rem;
+		background: var(--bg-app);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		color: var(--text-secondary);
+		padding: var(--space-sm);
 		font-size: 0.85em;
+		margin: var(--space-sm) 0 0;
 	}
 	pre.error {
-		background: #fee;
+		background: var(--error-bg);
+		border-color: var(--error);
+		color: var(--error);
 	}
 </style>

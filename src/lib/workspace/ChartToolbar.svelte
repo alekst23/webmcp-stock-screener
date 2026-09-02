@@ -64,18 +64,20 @@
 	}
 </script>
 
-<section class="chart-toolbar" aria-label="Chart controls">
+<section class="chart-toolbar panel-card" aria-label="Chart controls">
 	<label>
 		<span>Tickers</span>
-		<input bind:value={tickers} disabled={busy} />
+		<input class="field" bind:value={tickers} disabled={busy} />
 	</label>
 	<label>
 		<span>End date</span>
-		<input type="date" bind:value={date} disabled={busy} />
+		<input class="field" type="date" bind:value={date} disabled={busy} />
 	</label>
 	<div class="actions">
-		<button type="button" onclick={clearPanels} disabled={busy}>Clear panels</button>
-		<button type="button" onclick={showMonthly} disabled={busy}>Show monthly</button>
+		<button type="button" class="control" onclick={clearPanels} disabled={busy}>Clear panels</button
+		>
+		<button type="button" class="control" onclick={showMonthly} disabled={busy}>Show monthly</button
+		>
 	</div>
 	{#if error}
 		<p class="error">{error}</p>
@@ -86,51 +88,36 @@
 	.chart-toolbar {
 		display: grid;
 		grid-template-columns: minmax(180px, 1fr) minmax(150px, auto) auto;
-		gap: 0.75rem;
+		gap: var(--space-md);
 		align-items: end;
-		margin: 1rem 0 1.5rem;
-		padding: 0.75rem 0;
-		border-top: 1px solid #ddd;
-		border-bottom: 1px solid #ddd;
+		margin: 0 0 var(--space-lg);
 	}
 	label {
 		display: grid;
-		gap: 0.25rem;
-		font-size: 0.8rem;
-		color: #555;
+		gap: var(--space-xs);
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--text-muted);
 	}
 	input {
 		box-sizing: border-box;
 		width: 100%;
-		border: 1px solid #bbb;
-		border-radius: 4px;
-		padding: 0.45rem 0.55rem;
-		font: inherit;
-		color: #111;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 	}
 	.actions {
 		display: flex;
-		gap: 0.5rem;
-	}
-	button {
-		border: 1px solid #999;
-		border-radius: 4px;
-		padding: 0.45rem 0.65rem;
-		background: #fff;
-		color: #111;
-		font: inherit;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	button:disabled,
-	input:disabled {
-		opacity: 0.6;
-		cursor: default;
+		gap: var(--space-sm);
 	}
 	.error {
 		grid-column: 1 / -1;
 		margin: 0;
-		color: #b00;
+		color: var(--error);
+		background: var(--error-bg);
+		border: 1px solid var(--error);
+		border-radius: var(--radius-sm);
+		padding: var(--space-xs) var(--space-sm);
 	}
 
 	@media (max-width: 680px) {

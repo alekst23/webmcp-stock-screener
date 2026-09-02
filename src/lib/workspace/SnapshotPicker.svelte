@@ -76,7 +76,7 @@
 	}
 </script>
 
-<details class="snapshot-picker">
+<details class="snapshot-picker panel-card">
 	<summary>
 		Workspaces {snapshots.length ? `(${snapshots.length})` : '(none saved)'}
 	</summary>
@@ -84,9 +84,9 @@
 	<div class="save-row">
 		<label>
 			<span>Workspace name</span>
-			<input bind:value={name} placeholder="e.g. gap-fade-research" />
+			<input class="field" bind:value={name} placeholder="e.g. gap-fade-research" />
 		</label>
-		<button type="button" onclick={save}>Save workspace</button>
+		<button type="button" class="control" onclick={save}>Save workspace</button>
 	</div>
 
 	{#if error}
@@ -97,13 +97,13 @@
 		<ul>
 			{#each snapshots as snapshot (snapshot.name)}
 				<li>
-					<button type="button" class="load" onclick={() => load(snapshot.name)}>
+					<button type="button" class="load control" onclick={() => load(snapshot.name)}>
 						{snapshot.name}
 					</button>
 					<span class="saved-at">{new Date(snapshot.savedAt).toLocaleString()}</span>
 					<button
 						type="button"
-						class="delete"
+						class="control"
 						aria-label={`Delete workspace ${snapshot.name}`}
 						onclick={() => remove(snapshot.name)}
 					>
@@ -119,80 +119,80 @@
 
 <style>
 	.snapshot-picker {
-		margin: 0.5rem 0 0.75rem;
-		padding: 0.3rem 0;
-		border-top: 1px solid #ddd;
-		border-bottom: 1px solid #ddd;
+		margin: 0 0 var(--space-md);
 	}
 	summary {
 		cursor: pointer;
-		font-size: 0.85rem;
-		color: #555;
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--text-secondary);
 		user-select: none;
 	}
 	.snapshot-picker[open] summary {
-		margin-bottom: 0.4rem;
+		margin-bottom: var(--space-sm);
+		padding-bottom: var(--space-sm);
+		border-bottom: 1px solid var(--separator);
 	}
 	.save-row {
 		display: flex;
-		gap: 0.4rem;
+		gap: var(--space-xs);
 		align-items: end;
-		margin-top: 0.4rem;
+		margin-top: var(--space-xs);
 	}
 	label {
 		display: grid;
-		gap: 0.15rem;
-		font-size: 0.8rem;
-		color: #555;
+		gap: var(--space-xs);
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--text-muted);
 		flex: 1;
 	}
 	input {
 		box-sizing: border-box;
 		width: 100%;
-		border: 1px solid #bbb;
-		border-radius: 4px;
-		padding: 0.3rem 0.45rem;
-		font: inherit;
-		color: #111;
+		text-transform: none;
+		letter-spacing: normal;
 	}
 	button {
-		border: 1px solid #999;
-		border-radius: 4px;
-		padding: 0.3rem 0.55rem;
-		background: #fff;
-		color: #111;
-		font: inherit;
-		cursor: pointer;
-		white-space: nowrap;
+		font-size: var(--font-size-sm);
 	}
 	ul {
 		list-style: none;
 		margin: 0;
 		padding: 0;
 		display: grid;
-		gap: 0.2rem;
+		gap: var(--space-xs);
 	}
 	li {
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: var(--space-xs);
 	}
 	.load {
 		flex: 1;
 		text-align: left;
 	}
 	.saved-at {
-		font-size: 0.75rem;
-		color: #666;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: var(--font-size-xs);
+		color: var(--text-muted);
 		white-space: nowrap;
 	}
 	.empty {
 		margin: 0;
-		font-size: 0.85rem;
-		color: #666;
+		font-size: var(--font-size-sm);
+		font-style: italic;
+		color: var(--text-muted);
 	}
 	.error {
-		margin: 0;
-		color: #b00;
+		margin: 0 0 var(--space-sm);
+		color: var(--error);
+		background: var(--error-bg);
+		border: 1px solid var(--error);
+		border-radius: var(--radius-sm);
+		padding: var(--space-xs) var(--space-sm);
 	}
 </style>

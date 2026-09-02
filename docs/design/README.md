@@ -11,6 +11,9 @@ feature spec may be touched by multiple epics as it evolves.
 - [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
   workspace under a name and recall/switch between saved snapshots,
   local to one browser.
+- [Market Data Storage](market-data-storage/spec.md) — how the historical
+  price panel is stored, loaded, and queried so memory is bounded by the
+  query rather than the size of the dataset.
 
 ## New WebMCP Surface (full replacement, in progress)
 
@@ -48,3 +51,9 @@ alongside the Core Product surface above and cut over at the end.
 - [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — retire the
   original 11-tool surface once the above reaches capability parity,
   keeping the WebMCP transport layer.
+
+## Presentation
+
+- [Terminal UI Theme](terminal-ui-theme/spec.md) — the single dark,
+  high-density visual treatment shared by every route: the named palette,
+  the measured contrast floor, and the shell the workbench lays out in.

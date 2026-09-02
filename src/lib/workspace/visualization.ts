@@ -144,4 +144,3 @@ export function sliceBarsForRange(bars: BackendPriceBar[], range: ChartRange): B
 	const days = RANGE_TRADING_DAYS[range];
 	return bars.slice(Math.max(0, bars.length - days));
 }
-

@@ -3,6 +3,7 @@
 	import { dev } from '$app/environment';
 	import { workspaceStore } from '$lib/workspace/store';
 	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
+	import { resolveApiBaseUrl } from '$lib/workspace/apiConfig';
 	import { buildTools } from '$lib/webmcp/tools';
 	import GridPanel from '$lib/workspace/GridPanel.svelte';
 	import FocusChart from '$lib/workspace/FocusChart.svelte';
@@ -15,7 +16,7 @@
 	// human view reads from (AC4) and the same live backend an agent's tool
 	// calls would hit.
 	const engine = createApiEngine(workspaceStore, {
-		baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+		baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL)
 	});
 	const tools = buildTools(engine);
 
@@ -61,14 +62,16 @@
 		<section class="tools">
 			{#each tools as tool (tool.name)}
 				{@const isAvailable = tool.available($workspaceStore)}
-				<article class:disabled={!isAvailable}>
+				<article class="panel-card" class:disabled={!isAvailable}>
 					<h3>
 						{tool.name}{#if !isAvailable}
 							(locked){/if}
 					</h3>
 					<p>{tool.description}</p>
-					<textarea bind:value={inputs[tool.name]} rows="4" disabled={!isAvailable}></textarea>
-					<button onclick={() => run(tool.name)} disabled={!isAvailable}>Run</button>
+					<textarea class="field" bind:value={inputs[tool.name]} rows="4" disabled={!isAvailable}
+					></textarea>
+					<button class="control" onclick={() => run(tool.name)} disabled={!isAvailable}>Run</button
+					>
 					{#if results[tool.name]}
 						<!-- TS can't narrow an index access across two separate reads of
 						     results[tool.name]; the `!` is safe under the #if guard above. -->
@@ -85,7 +88,7 @@
 				<GridPanel
 					{panel}
 					{engine}
-					config={{ baseUrl: env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000' }}
+					config={{ baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL) }}
 					store={workspaceStore}
 					onselect={(view) => (focusedView = view)}
 				/>
@@ -100,38 +103,69 @@
 
 <style>
 	main {
-		max-width: 960px;
-		margin: 2rem auto;
-		padding: 0 1rem;
-		font-family: system-ui, sans-serif;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: var(--space-lg) var(--space-lg) var(--space-xl);
+	}
+	h1 {
+		font-size: var(--font-size-xl);
+		margin: 0 0 var(--space-sm);
+	}
+	h2 {
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--text-secondary);
+		margin: 0 0 var(--space-sm);
+	}
+	main > p {
+		max-width: 72ch;
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
 	}
 	.tools {
 		display: grid;
-		gap: 1rem;
+		gap: var(--space-md);
 		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		margin-bottom: 2rem;
+		margin-bottom: var(--space-xl);
 	}
-	article {
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		padding: 0.75rem;
+	article h3 {
+		margin: 0 0 var(--space-xs);
+		font-family: var(--font-mono);
+		font-size: var(--font-size-md);
+		color: var(--accent);
+	}
+	article p {
+		margin: 0;
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
 	}
 	article.disabled {
 		opacity: 0.5;
 	}
 	textarea {
 		width: 100%;
-		font-family: monospace;
-		margin: 0.5rem 0;
 		box-sizing: border-box;
+		margin: var(--space-sm) 0;
+		font-family: var(--font-mono);
+		font-size: var(--font-size-sm);
+	}
+	button {
+		font-size: var(--font-size-sm);
 	}
 	pre {
 		white-space: pre-wrap;
-		background: #f5f5f5;
-		padding: 0.5rem;
+		background: var(--bg-app);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		color: var(--text-secondary);
+		padding: var(--space-sm);
 		font-size: 0.8em;
+		margin: var(--space-sm) 0 0;
 	}
 	pre.error {
-		background: #fee;
+		background: var(--error-bg);
+		border-color: var(--error);
+		color: var(--error);
 	}
 </style>

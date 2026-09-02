@@ -4,7 +4,7 @@
 	let { state }: { state: WorkspaceState } = $props();
 </script>
 
-<section>
+<section class="panel-card">
 	<h2>Studies ({state.studies.length})</h2>
 	{#if state.studies.length === 0}
 		<p class="empty">No studies defined yet.</p>
@@ -17,7 +17,7 @@
 	{/if}
 </section>
 
-<section>
+<section class="panel-card">
 	<h2>Setups ({state.setups.length})</h2>
 	{#if state.setups.length === 0}
 		<p class="empty">No setups defined yet.</p>
@@ -41,7 +41,7 @@
 	{/if}
 </section>
 
-<section>
+<section class="panel-card">
 	<h2>Instance sets ({state.instanceSets.length})</h2>
 	{#if state.instanceSets.length === 0}
 		<p class="empty">No instance sets yet.</p>
@@ -57,7 +57,7 @@
 	{/if}
 </section>
 
-<section>
+<section class="panel-card">
 	<h2>Panels ({state.panels.length})</h2>
 	{#if state.panels.length === 0}
 		<p class="empty">No panels open yet.</p>
@@ -73,7 +73,7 @@
 	{/if}
 </section>
 
-<section>
+<section class="panel-card">
 	<h2>Focus</h2>
 	{#if state.focus === null}
 		<p class="empty">Nothing focused.</p>
@@ -93,17 +93,22 @@
 
 <style>
 	section {
-		margin-bottom: 1.5rem;
+		margin-bottom: var(--space-lg);
 	}
 	h2 {
-		font-size: 1rem;
-		margin-bottom: 0.25rem;
+		margin: 0 0 var(--space-xs);
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--text-secondary);
 	}
 	.empty {
-		color: #888;
+		margin: 0;
+		color: var(--text-muted);
 		font-style: italic;
 	}
 	code {
 		font-size: 0.85em;
+		color: var(--accent);
 	}
 </style>

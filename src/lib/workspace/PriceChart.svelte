@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { axisTickIndices, axisTicks, computeChartGeometry, nearestBarIndex } from './visualization';
+	import {
+		axisTickIndices,
+		axisTicks,
+		computeChartGeometry,
+		nearestBarIndex
+	} from './visualization';
 	import type { BackendPriceBar } from './apiEngine';
 
 	// Shared chart body for both the grid's small-multiples cells and the
@@ -19,6 +24,13 @@
 		height: number;
 		variant?: 'mini' | 'detail';
 	} = $props();
+
+	// Unique per instance, not per variant: twelve mini-charts across three
+	// panels would otherwise share one gradient id, and the first per-panel
+	// fill override would repaint all of them with whichever gradient the
+	// document happened to define first.
+	const uid = $props.id();
+	const gradientId = $derived(`price-chart-fill-${variant}-${uid}`);
 
 	const geometry = $derived(computeChartGeometry(bars, width, height));
 	const anchorXPos = $derived(geometry.x(anchorIndex));
@@ -47,9 +59,7 @@
 	}
 
 	const hoverBar = $derived(hoverIndex !== null ? (bars[hoverIndex] ?? null) : null);
-	const tooltipLeftPct = $derived(
-		hoverIndex !== null ? (geometry.x(hoverIndex) / width) * 100 : 0
-	);
+	const tooltipLeftPct = $derived(hoverIndex !== null ? (geometry.x(hoverIndex) / width) * 100 : 0);
 </script>
 
 <div class="price-chart price-chart--{variant}">
@@ -63,9 +73,9 @@
 		onpointerleave={handlePointerLeave}
 	>
 		<defs>
-			<linearGradient id="price-chart-fill-{variant}" x1="0" y1="0" x2="0" y2="1">
-				<stop offset="0%" stop-color="#2a6" stop-opacity="0.25" />
-				<stop offset="100%" stop-color="#2a6" stop-opacity="0" />
+			<linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+				<stop offset="0%" class="fill-from" stop-opacity="0.3" />
+				<stop offset="100%" class="fill-to" stop-opacity="0" />
 			</linearGradient>
 		</defs>
 		{#each yTickValues as tick (tick)}
@@ -77,7 +87,7 @@
 			{/if}
 		{/each}
 		{#if bars.length > 0}
-			<path d={geometry.areaPath} class="area" fill="url(#price-chart-fill-{variant})" />
+			<path d={geometry.areaPath} class="area" fill="url(#{gradientId})" />
 			<path d={geometry.linePath} class="line" />
 			<line x1={anchorXPos} y1="0" x2={anchorXPos} y2={height} class="anchor" />
 		{/if}
@@ -120,11 +130,20 @@
 		touch-action: none;
 	}
 	.price-chart--detail svg {
-		background: #fafafa;
+		background: var(--bg-app);
+		border-radius: var(--radius-sm);
+	}
+	/* Gradient stops take their colour from a class rather than a presentation
+	   attribute so the fill is tokenised like every other colour. */
+	.fill-from {
+		stop-color: var(--chart-fill-from);
+	}
+	.fill-to {
+		stop-color: var(--chart-fill-to);
 	}
 	.line {
 		fill: none;
-		stroke: #2a6;
+		stroke: var(--chart-line);
 		stroke-width: 1.5;
 	}
 	.price-chart--detail .line {
@@ -134,40 +153,44 @@
 		stroke: none;
 	}
 	.anchor {
-		stroke: #999;
+		stroke: var(--chart-anchor);
 		stroke-width: 1;
 		stroke-dasharray: 2 2;
 	}
 	.grid {
-		stroke: #e5e5e5;
+		stroke: var(--chart-grid);
 		stroke-width: 1;
 	}
 	.axis-label {
+		font-family: var(--font-mono);
 		font-size: 6px;
-		fill: #888;
+		fill: var(--chart-axis);
 	}
 	.price-chart--detail .axis-label {
 		font-size: 9px;
 	}
 	.crosshair {
-		stroke: #666;
+		stroke: var(--chart-crosshair);
 		stroke-width: 1;
 		stroke-dasharray: 2 2;
 	}
 	.dot {
-		fill: #2a6;
-		stroke: #fff;
+		fill: var(--chart-line);
+		stroke: var(--chart-tooltip-bg);
 		stroke-width: 1;
 	}
 	.tooltip {
 		position: absolute;
 		top: 2px;
 		transform: translateX(-50%);
-		background: #222;
-		color: #fff;
-		border-radius: 3px;
+		background: var(--chart-tooltip-bg);
+		color: var(--chart-tooltip-text);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
 		padding: 0.15rem 0.4rem;
-		font-size: 0.65rem;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: var(--font-size-xs);
 		line-height: 1.3;
 		white-space: nowrap;
 		pointer-events: none;
@@ -176,7 +199,7 @@
 		align-items: center;
 	}
 	.price-chart--detail .tooltip {
-		font-size: 0.75rem;
+		font-size: var(--font-size-sm);
 		padding: 0.25rem 0.5rem;
 	}
 </style>
