@@ -4,8 +4,13 @@
 // src/lib/screener/filterTree.ts; this module only translates the wire input,
 // reads/writes the screener inside `mutate(doc)`, and maps a rejection to the
 // program's typed error shapes.
+import { builtinCatalogRegistry, type CatalogRegistry } from '../../catalog/registry';
+import {
+	findDisallowedConditionFields,
+	validateCondition
+} from '../../screener/conditionValidation';
 import { normalizeCondition, type Condition } from '../../screener/conditions';
-import type { FilterNode, GroupOp } from '../../screener/definition';
+import type { FilterNode, GroupOp, UniverseSpec } from '../../screener/definition';
 import {
 	addFilterNode,
 	groupFilterNodes,
@@ -90,7 +95,29 @@ function toRejection(result: Extract<FilterTreeOpResult, { ok: false }>): Operat
 
 type ParsedCondition = { ok: true; condition: Condition } | FilterTreeOpFailure;
 
-function parseConditionInput(raw: unknown): ParsedCondition {
+// T-1009-6, AC9/AC11: a condition is rejected here -- before addFilterNode /
+// updateFilterCondition ever touch the tree -- when it either carries a
+// field no condition variant declares (AC11's "no raw SQL/JavaScript"
+// property, checked against the raw payload before normalizeCondition would
+// otherwise silently drop the stray key) or names a field, operator, study,
+// pattern, or interval absent from the catalog, or a parameter outside its
+// declared range (AC9/AC10). Every rejection reuses FilterTreeOpFailure, so
+// the caller's existing OperationValidationError path (AC9's "tree is left
+// unchanged") needs no second error shape.
+function parseConditionInput(
+	raw: unknown,
+	registry: CatalogRegistry,
+	universe: UniverseSpec
+): ParsedCondition {
+	const disallowed = findDisallowedConditionFields(raw);
+	if (disallowed.length > 0) {
+		return {
+			ok: false,
+			message:
+				`condition carries field(s) not part of its condition model: ${disallowed.join(', ')}. ` +
+				'No condition variant accepts a free-form expression, query, or code string.'
+		};
+	}
 	const condition = normalizeCondition(raw);
 	if (!condition) {
 		return {
@@ -98,18 +125,24 @@ function parseConditionInput(raw: unknown): ParsedCondition {
 			message: 'condition did not parse into one of the eight known condition types.'
 		};
 	}
+	const problems = validateCondition(condition, { registry, universe });
+	if (problems.length > 0) {
+		return { ok: false, message: problems.map((problem) => problem.message).join(' ') };
+	}
 	return { ok: true, condition };
 }
 
 function runAdd(
 	tree: FilterNode,
 	ids: IdSequencer,
-	input: EditFilterTreeInput
+	input: EditFilterTreeInput,
+	registry: CatalogRegistry,
+	universe: UniverseSpec
 ): FilterTreeOpResult {
 	if (input.condition === undefined) {
 		return { ok: false, message: 'add requires "condition".' };
 	}
-	const parsed = parseConditionInput(input.condition);
+	const parsed = parseConditionInput(input.condition, registry, universe);
 	if (!parsed.ok) {
 		return parsed;
 	}
@@ -119,14 +152,19 @@ function runAdd(
 	});
 }
 
-function runUpdate(tree: FilterNode, input: EditFilterTreeInput): FilterTreeOpResult {
+function runUpdate(
+	tree: FilterNode,
+	input: EditFilterTreeInput,
+	registry: CatalogRegistry,
+	universe: UniverseSpec
+): FilterTreeOpResult {
 	if (!input.node_id) {
 		return { ok: false, message: 'update requires "node_id".' };
 	}
 	if (input.condition === undefined) {
 		return { ok: false, message: 'update requires "condition".' };
 	}
-	const parsed = parseConditionInput(input.condition);
+	const parsed = parseConditionInput(input.condition, registry, universe);
 	if (!parsed.ok) {
 		return parsed;
 	}
@@ -175,13 +213,15 @@ function runOperation(
 	tree: FilterNode,
 	input: EditFilterTreeInput,
 	ids: IdSequencer,
-	operation: Operation
+	operation: Operation,
+	registry: CatalogRegistry,
+	universe: UniverseSpec
 ): FilterTreeOpResult {
 	switch (operation) {
 		case 'add':
-			return runAdd(tree, ids, input);
+			return runAdd(tree, ids, input, registry, universe);
 		case 'update':
-			return runUpdate(tree, input);
+			return runUpdate(tree, input, registry, universe);
 		case 'remove':
 			return runRemove(tree, input);
 		case 'group':
@@ -202,13 +242,21 @@ function mutateFilterTree(
 	screenerId: string,
 	input: EditFilterTreeInput,
 	operation: Operation,
-	ids: IdSequencer
+	ids: IdSequencer,
+	registry: CatalogRegistry
 ) {
 	const screener = readScreener(doc, screenerId);
 	if (!screener) {
 		throw new OperationValidationError([`Unknown screener id: ${screenerId}.`]);
 	}
-	const result = runOperation(screener.filterTree, input, ids, operation);
+	const result = runOperation(
+		screener.filterTree,
+		input,
+		ids,
+		operation,
+		registry,
+		screener.universe
+	);
 	if (!result.ok) {
 		throw toRejection(result);
 	}
@@ -224,7 +272,7 @@ function mutateFilterTree(
 	};
 }
 
-function editFilterTree(deps: WorkbenchDeps) {
+function editFilterTree(deps: WorkbenchDeps, registry: CatalogRegistry) {
 	return async (rawInput: unknown): Promise<ToolResult> => {
 		const input = (rawInput ?? {}) as EditFilterTreeInput;
 		if (!input.screener_id) {
@@ -255,7 +303,7 @@ function editFilterTree(deps: WorkbenchDeps) {
 					},
 					operationKind: 'screener.edit_filter_tree',
 					requestInput: input,
-					mutate: (doc) => mutateFilterTree(doc, screenerId, input, operation, deps.ids)
+					mutate: (doc) => mutateFilterTree(doc, screenerId, input, operation, deps.ids, registry)
 				}
 			);
 			return ok(toWireEnvelope(envelope));
@@ -304,16 +352,23 @@ const INPUT_SCHEMA = {
 	required: ['screener_id', 'operation']
 };
 
-export function createEditFilterTreeTool(deps: WorkbenchDeps): ToolSpec {
+// `registry` defaults to the built-in catalog (T-1009-6) so existing call
+// sites need not change; tests can inject a fixture registry instead.
+export function createEditFilterTreeTool(
+	deps: WorkbenchDeps,
+	registry: CatalogRegistry = builtinCatalogRegistry
+): ToolSpec {
 	return {
 		name: 'edit_filter_tree',
 		description:
 			'Add, update, remove, group, enable/disable, or reorder nodes in a filter tree by node ' +
 			'id. Groups nest AND/OR/NOT to arbitrary depth; a "not" group must hold exactly one ' +
-			'child. Node ids never change except for the node removed or newly created. Returns the ' +
-			'mutation envelope; accepts expected_revision and idempotency_key.',
+			'child. add/update reject a condition naming a field, operator, study, pattern, or ' +
+			'interval absent from the catalog, or a parameter outside its declared range. Node ids ' +
+			'never change except for the node removed or newly created. Returns the mutation ' +
+			'envelope; accepts expected_revision and idempotency_key.',
 		inputSchema: INPUT_SCHEMA,
 		available: () => true,
-		execute: editFilterTree(deps)
+		execute: editFilterTree(deps, registry)
 	};
 }

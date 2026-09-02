@@ -39,8 +39,11 @@ function payload(result: ToolResult): Record<string, unknown> {
 	return JSON.parse(text) as Record<string, unknown>;
 }
 
+// Real seeded catalog IDs (src/lib/catalog/items.ts) -- edit_filter_tree now
+// validates add/update against the built-in registry (T-1009-6), so a
+// fixture condition must name things that genuinely exist there.
 function scalarCondition(fieldId: string, value: number) {
-	return { type: 'scalar', fieldId, operator: 'gt', value, unit: null };
+	return { type: 'scalar', fieldId, operator: 'op.greater_than', value, unit: null };
 }
 
 function collectIds(node: FilterNode, out: string[] = []): string[] {
@@ -107,7 +110,7 @@ describe('createEditFilterTreeTool', () => {
 		const result = await tool().execute({
 			screener_id: screenerId,
 			operation: 'add',
-			condition: scalarCondition('price', 10)
+			condition: scalarCondition('field.price.close', 10)
 		});
 		expect(result.isError, 'add is accepted').toBeUndefined();
 		const body = payload(result) as {
@@ -131,14 +134,14 @@ describe('createEditFilterTreeTool', () => {
 			await t.execute({
 				screener_id: screenerId,
 				operation: 'add',
-				condition: scalarCondition('price', 10)
+				condition: scalarCondition('field.price.close', 10)
 			})
 		) as { affected_ids: string[] };
 		const second = payload(
 			await t.execute({
 				screener_id: screenerId,
 				operation: 'add',
-				condition: scalarCondition('volume', 100)
+				condition: scalarCondition('field.volume', 100)
 			})
 		) as { affected_ids: string[] };
 		const nodeA = first.affected_ids[0]!;
@@ -164,7 +167,7 @@ describe('createEditFilterTreeTool', () => {
 				screener_id: screenerId,
 				operation: 'add',
 				parent_node_id: newGroupId,
-				condition: scalarCondition('rsi', 40)
+				condition: scalarCondition('field.price.close', 40)
 			})
 		) as { affected_ids: string[] };
 		const deepNodeId = addedDeep.affected_ids[0]!;
@@ -188,7 +191,7 @@ describe('createEditFilterTreeTool', () => {
 			await t.execute({
 				screener_id: screenerId,
 				operation: 'add',
-				condition: scalarCondition('price', 10)
+				condition: scalarCondition('field.price.close', 10)
 			})
 		) as { affected_ids: string[] };
 		const nodeId = added.affected_ids[0]!;
@@ -197,7 +200,7 @@ describe('createEditFilterTreeTool', () => {
 			screener_id: screenerId,
 			operation: 'update',
 			node_id: nodeId,
-			condition: scalarCondition('price', 99)
+			condition: scalarCondition('field.price.close', 99)
 		});
 		expect(result.isError).toBeUndefined();
 
@@ -208,7 +211,7 @@ describe('createEditFilterTreeTool', () => {
 		expect(
 			updated?.kind === 'condition' && updated.condition,
 			'condition payload replaced'
-		).toEqual(scalarCondition('price', 99));
+		).toEqual(scalarCondition('field.price.close', 99));
 	});
 
 	it('remove_dropsTheNodeAndReportsItInAffectedIds', async () => {
@@ -217,7 +220,7 @@ describe('createEditFilterTreeTool', () => {
 			await t.execute({
 				screener_id: screenerId,
 				operation: 'add',
-				condition: scalarCondition('price', 10)
+				condition: scalarCondition('field.price.close', 10)
 			})
 		) as { affected_ids: string[] };
 		const nodeId = added.affected_ids[0]!;
@@ -238,7 +241,7 @@ describe('createEditFilterTreeTool', () => {
 			await t.execute({
 				screener_id: screenerId,
 				operation: 'add',
-				condition: scalarCondition('price', 10)
+				condition: scalarCondition('field.price.close', 10)
 			})
 		) as { affected_ids: string[] };
 		const nodeId = added.affected_ids[0]!;
@@ -261,14 +264,14 @@ describe('createEditFilterTreeTool', () => {
 			await t.execute({
 				screener_id: screenerId,
 				operation: 'add',
-				condition: scalarCondition('price', 10)
+				condition: scalarCondition('field.price.close', 10)
 			})
 		) as { affected_ids: string[] };
 		const b = payload(
 			await t.execute({
 				screener_id: screenerId,
 				operation: 'add',
-				condition: scalarCondition('volume', 5)
+				condition: scalarCondition('field.volume', 5)
 			})
 		) as { affected_ids: string[] };
 		const revisionBefore = deps.repository.get(workspaceId)?.revision;
@@ -292,7 +295,7 @@ describe('createEditFilterTreeTool', () => {
 			screener_id: screenerId,
 			operation: 'update',
 			node_id: 'filter_bogus',
-			condition: scalarCondition('price', 10)
+			condition: scalarCondition('field.price.close', 10)
 		});
 		expect(result.isError).toBe(true);
 		const body = payload(result) as { error: string; issues: string[] };
@@ -318,7 +321,7 @@ describe('createEditFilterTreeTool', () => {
 		const result = await tool().execute({
 			screener_id: screenerId,
 			operation: 'add',
-			condition: scalarCondition('price', 10),
+			condition: scalarCondition('field.price.close', 10),
 			expected_revision: 999
 		});
 		expect(result.isError).toBe(true);
@@ -332,7 +335,7 @@ describe('createEditFilterTreeTool', () => {
 		const args = {
 			screener_id: screenerId,
 			operation: 'add',
-			condition: scalarCondition('price', 10),
+			condition: scalarCondition('field.price.close', 10),
 			idempotency_key: 'add-once'
 		};
 		const first = payload(await t.execute(args)) as { change_id: string };
@@ -341,5 +344,103 @@ describe('createEditFilterTreeTool', () => {
 
 		const root = currentTree() as GroupNode;
 		expect(root.children, 'the condition was added only once').toHaveLength(1);
+	});
+
+	// T-1009-6 AC9: add/update reject a condition naming a field, operator,
+	// study, pattern, or interval absent from the catalog registry, and the
+	// tree is left unchanged.
+	it('add_rejectsUnknownField_leavesTreeAndRevisionUnchanged', async () => {
+		const revisionBefore = deps.repository.get(workspaceId)?.revision;
+		const before = currentTree();
+		const result = await tool().execute({
+			screener_id: screenerId,
+			operation: 'add',
+			condition: scalarCondition('field.does_not_exist', 10)
+		});
+		expect(result.isError, 'unknown field is rejected').toBe(true);
+		const body = payload(result) as { error: string; issues: string[] };
+		expect(body.error).toBe('operation_validation_error');
+		expect(body.issues.join(' '), 'issue names the unknown field').toContain(
+			'field.does_not_exist'
+		);
+		expect(currentTree(), 'tree is unchanged').toEqual(before);
+		expect(deps.repository.get(workspaceId)?.revision, 'workspace revision does not advance').toBe(
+			revisionBefore
+		);
+	});
+
+	it('add_rejectsOutOfRangeParameter_leavesTreeAndRevisionUnchanged', async () => {
+		const revisionBefore = deps.repository.get(workspaceId)?.revision;
+		const before = currentTree();
+		const result = await tool().execute({
+			screener_id: screenerId,
+			operation: 'add',
+			condition: scalarCondition('field.price.close', -10)
+		});
+		expect(result.isError, 'a price below its declared range (min 0) is rejected').toBe(true);
+		const body = payload(result) as { error: string; issues: string[] };
+		expect(body.error).toBe('operation_validation_error');
+		expect(
+			body.issues.join(' '),
+			'issue names the offending value and its permitted range'
+		).toContain('range');
+		expect(currentTree(), 'tree is unchanged').toEqual(before);
+		expect(deps.repository.get(workspaceId)?.revision, 'workspace revision does not advance').toBe(
+			revisionBefore
+		);
+	});
+
+	it('update_rejectsInvalidCondition_leavesTreeAndRevisionUnchanged', async () => {
+		const t = tool();
+		const added = payload(
+			await t.execute({
+				screener_id: screenerId,
+				operation: 'add',
+				condition: scalarCondition('field.price.close', 10)
+			})
+		) as { affected_ids: string[] };
+		const nodeId = added.affected_ids[0]!;
+		const before = currentTree();
+		const revisionBefore = deps.repository.get(workspaceId)?.revision;
+
+		const result = await t.execute({
+			screener_id: screenerId,
+			operation: 'update',
+			node_id: nodeId,
+			condition: scalarCondition('field.does_not_exist', 10)
+		});
+		expect(result.isError, 'update with an unknown field is rejected').toBe(true);
+		expect(currentTree(), 'tree is unchanged by the rejected update').toEqual(before);
+		expect(deps.repository.get(workspaceId)?.revision, 'workspace revision does not advance').toBe(
+			revisionBefore
+		);
+	});
+
+	// T-1009-6 AC11: no condition variant exposes a field that is parsed or
+	// evaluated as code -- a payload carrying a free-form expression key is
+	// rejected outright rather than having the key silently dropped.
+	it('add_rejectsConditionCarryingRawExpressionField_leavesTreeUnchanged', async () => {
+		const before = currentTree();
+		const revisionBefore = deps.repository.get(workspaceId)?.revision;
+		const result = await tool().execute({
+			screener_id: screenerId,
+			operation: 'add',
+			condition: {
+				type: 'scalar',
+				fieldId: 'field.price.close',
+				operator: 'op.greater_than',
+				value: 10,
+				unit: null,
+				expression: 'DROP TABLE instruments; --'
+			}
+		});
+		expect(result.isError, 'a condition carrying a raw expression field is rejected').toBe(true);
+		const body = payload(result) as { error: string; issues: string[] };
+		expect(body.error).toBe('operation_validation_error');
+		expect(body.issues.join(' '), 'issue names the disallowed field').toContain('expression');
+		expect(currentTree(), 'tree is unchanged').toEqual(before);
+		expect(deps.repository.get(workspaceId)?.revision, 'workspace revision does not advance').toBe(
+			revisionBefore
+		);
 	});
 });
