@@ -97,6 +97,14 @@ export interface GroupExplanation {
 	enabled: boolean;
 	children: FilterNodeExplanation[];
 	outcome: ConditionOutcome | null;
+	// Present (T-1010-5, AC11) when a response-size bound forced this
+	// group's `children` to be cut short -- names how many trailing child
+	// nodes beneath this group were omitted, rather than silently dropping
+	// them or returning an unbounded tree. Absent (never present-but-zero)
+	// when nothing under this group was truncated. Applied by
+	// explanationBound.ts strictly after this shape has already been
+	// validated by makeResultExplanation, never re-checked by it.
+	truncatedChildCount?: number;
 }
 
 export type FilterNodeExplanation = ConditionExplanation | GroupExplanation;
