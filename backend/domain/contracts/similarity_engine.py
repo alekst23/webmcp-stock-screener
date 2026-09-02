@@ -33,6 +33,7 @@ class SimilarityEngine(Protocol):
         normalization: NormalizationRef | None = None,
         limit: int = 20,
         min_score: float = 0.0,
+        reference_setup_id: str | None = None,
     ) -> SimilarityRun:
         """Runs a similarity search and pins the result under a stable run
         ID (`SimilarityRun.run_id`).
@@ -41,7 +42,10 @@ class SimilarityEngine(Protocol):
         omitted (T-1012-1's `FeatureWeightSet.from_partial(None)`).
         `normalization` defaults to no-op ("none" / "window_start") when
         omitted, but the value actually applied is always the one recorded
-        on the returned run.
+        on the returned run. `reference_setup_id` names the captured setup
+        this search was run from, when the caller has one (T-1012-3
+        resolves it before calling in); defaults to `instrument_id` when
+        omitted so the field is always populated.
 
         Raises:
             domain.errors.SimilarityReferenceUnavailableError: the
