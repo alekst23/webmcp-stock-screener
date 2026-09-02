@@ -63,6 +63,38 @@ so that I never silently clobber the human's change or duplicate my own.
   the `RevisionService`, `MutationDraft` and `IdempotencyCache`
   signatures.
 
+## Solution Approach
+
+`idempotency.ts`: `createIdempotencyCache({maxEntries=200, ttlMs=3.6e6})`
+is a `Map<key, {fingerprint, envelope, expiresAt}>` with insertion-order
+eviction once over `maxEntries` and lazy expiry-check on `lookup`.
+`lookup(key, fingerprint)` returns the stored envelope on a fingerprint
+match, throws `IdempotencyConflictError` on a mismatch, and returns `null`
+on a miss (new or evicted key) — an evicted retry is therefore
+indistinguishable from a first call, satisfying AC7. The fingerprint
+itself is computed by the caller (`revisionService.ts`) as a stable hash
+(sorted-key JSON stringify, not raw `JSON.stringify`, so key order never
+matters) of `{operationKind, input}`.
+
+`revisionService.ts`'s `commit` is decomposed to stay under 30-40 lines:
+a `checkExpectedRevision` guard (throws `RevisionConflictError` with both
+revisions on mismatch), a `checkIdempotency` guard (returns the replayed
+envelope or proceeds), and the core apply step — call `mutate(currentDoc)`,
+catch any throw and rethrow after guaranteeing no repository write
+happened, then on success: bump `revision`, stamp `updatedAt`, `repository.put`,
+`repository.putRevision`, mint a change ID via `ids.next('change')`, mint an
+undo token via `ids.next('undo')` only when `draft.inverse` is present,
+append the missing-`expected_revision` warning when
+`context.expectedRevision` is `undefined`, then `idempotency.remember(...)`
+and return `buildEnvelope(...)`. Time comes from an injected `Clock` port
+(`{ now(): string }`) and IDs from the injected `IdSequencer`, never
+`Date.now()`/`crypto.randomUUID()` directly, so tests are deterministic.
+
+**Contracts introduced:** `RevisionService`, `MutationDraft`,
+`createRevisionService`, `IdempotencyCache`, `createIdempotencyCache`,
+`Clock` (port) — `src/lib/workbench/application/revisionService.ts` and
+`.../application/idempotency.ts`; `Clock` port in `domain/ports.ts`.
+
 ## Technical Considerations
 
 - Modules: `src/lib/workbench/application/revisionService.ts` and

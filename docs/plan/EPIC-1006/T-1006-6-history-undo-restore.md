@@ -64,6 +64,41 @@ so that experimenting with the agent is cheap instead of frightening.
 - `docs/plan/EPIC-1006/_epic.md` — Open Question 3 records why undo is
   restricted to the newest un-undone change.
 
+## Solution Approach
+
+`changeHistory.ts`'s `createChangeHistory()` holds an in-memory
+`Map<workspaceId, ChangeRecord[]>` (append-only, newest pushed to the
+end; `list` reverses/slices for the newest-first + `limit`/`before`
+contract) capped at 200 per workspace via oldest-first pruning that skips
+any record whose `undoState === 'available'` (AC12) — since restore/undo
+themselves append rather than mutate history, a record's snapshot is
+covered by T-1006-4's own 100-per-workspace retention, which the ticket
+notes must stay consistent with this 200-record cap (history can reference
+more revisions than snapshots retain only for records already fully
+redeemed, which need no snapshot).
+
+`undoChange(token, deps)`: `history.findByUndoToken` locates the record;
+missing → `UndoTokenError('unknown')`; `undoState !== 'available'` →
+`'already_redeemed'`; record is not `history`'s newest entry for that
+workspace → `'superseded'` (message names `restore_workspace_revision`).
+On success, `deps.revisionService.commit({ mutate: () => storedInverseDraft })`
+is called — going through T-1006-5's `commit`, not the repository directly
+— then `history.markRedeemed(token)` and `history.append(...)` record the
+reversal itself as a new `ChangeRecord` with its own undo token (the
+forward draft's inverse, i.e. undoing the undo redoes the original).
+
+`restoreRevision(workspaceId, revision, context, deps)`: loads the target
+snapshot via the repository (missing → a clear `OperationValidationError`),
+and commits a draft whose `document` is that snapshot's content with
+`revision`/`updatedAt` left for `commit` to stamp forward — never copying
+the old revision number back (AC9). The inverse draft is "restore back to
+the revision that was current before this restore," so restoring is itself
+undoable.
+
+**Contracts introduced:** `ChangeRecord`, `ChangeHistory`,
+`createChangeHistory`, `undoChange`, `restoreRevision` —
+`src/lib/workbench/application/changeHistory.ts`.
+
 ## Technical Considerations
 
 - Module: `src/lib/workbench/application/changeHistory.ts`.

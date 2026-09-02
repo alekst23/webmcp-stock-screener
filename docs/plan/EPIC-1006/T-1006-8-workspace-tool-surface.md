@@ -68,6 +68,40 @@ anything on my behalf.
 - `src/lib/webmcp/status.ts` — how the app reports whether tools are
   actually callable; the new tools must be counted correctly.
 
+## Solution Approach
+
+`tools/index.ts` exports `buildWorkbenchTools(deps: WorkbenchDeps):
+ToolSpec[]`, one `ToolSpec` literal per tool from `technical.md`'s table,
+matching the existing `src/lib/webmcp/tools.ts` shape (`name`,
+`description`, `inputSchema` with snake_case properties, `available`,
+`execute`). Read tools (`get_app_context`, `get_canvas_state`,
+`get_change_history`) call straight into `deps.repository`/`deps.history`
+and return plain JSON via the existing `ToolResult` shape; mutating tools
+(`create_workspace`, `save_workspace`, `undo_change`,
+`restore_workspace_revision`) build a `MutationContext` from
+`expected_revision`/`idempotency_key`/a fixed `actor: 'agent'`, call the
+matching application-layer function (`revisionService.commit`,
+`changeHistory.undoChange`/`restoreRevision`), and return
+`toWireEnvelope(...)` on success or `{ isError: true, content: [...
+JSON.stringify(err.toWireError()) ] }` on a caught typed error from
+T-1006-2 (AC9).
+
+`get_app_context`'s `permissions` field is a static object per Open
+Question 7 (`{ trading: false, ... }`), not backed by any real permission
+check yet. Composition happens in a new small module (e.g.
+`src/lib/workbench/tools/registerWorkbenchTools.ts`) that constructs the
+real `WorkbenchDeps` (local repository, revision service, change history,
+shared operation registry, a fixed-value `ProvenanceSource`, real `Clock`)
+and calls the existing `register.ts` path — gated behind a feature flag
+(module-level constant, e.g. `WORKBENCH_TOOLS_ENABLED`) per the ticket's
+own dead-code-policy note, defaulting off so `main` stays deployable while
+this call site is wired in without yet being invoked from app startup.
+Nothing here imports `src/lib/webmcp/tools.ts` or
+`src/lib/workspace/store.ts`, and neither is modified.
+
+**Contracts introduced:** `WorkbenchDeps`, `buildWorkbenchTools` —
+`src/lib/workbench/tools/index.ts`.
+
 ## Technical Considerations
 
 - Modules under `src/lib/workbench/tools/`, with `index.ts` exporting

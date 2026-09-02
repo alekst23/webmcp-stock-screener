@@ -52,6 +52,27 @@ so that I do not act on a stale or incomparable figure.
 - `docs/reference/data-provider.md` — the existing provider notes, for the
   vocabulary the separate data workstream is likely to use.
 
+## Solution Approach
+
+`provenance.ts` defines `MarketDataProvenance` with every field the design
+doc names non-optional except `delaySeconds` (`number | null`, non-null
+only when `liveness === 'delayed'`) and `fundamentalsPeriod` (`{...} | null`,
+present only for results carrying fundamentals) — encoding AC3/AC5's
+presence rules in the type itself rather than in a comment. `withProvenance`
+is a generic one-liner wrapper (`{ data, provenance }`); `toWireProvenance`
+snake_cases the record's own keys the same way T-1006-2's
+`toWireEnvelope` does, including the nested `fundamentalsPeriod` object.
+
+The `ProvenanceSource` port goes in `domain/ports.ts` alongside T-1006-4's
+repository port (same file, both are domain ports with no implementation
+here). No adapter ships in this ticket; tests use a fixed in-file fake
+(e.g. `{ current: () => FIXED_PROVENANCE }`) purely to exercise
+`withProvenance`/`toWireProvenance`, not to model a real provider.
+
+**Contracts introduced:** `MarketDataProvenance`, `WithProvenance<T>`,
+`withProvenance`, `toWireProvenance`, `ProvenanceSource` —
+`src/lib/workbench/domain/provenance.ts` (port in `.../domain/ports.ts`).
+
 ## Technical Considerations
 
 - Modules: `src/lib/workbench/domain/provenance.ts`, with the port added to

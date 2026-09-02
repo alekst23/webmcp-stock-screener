@@ -64,6 +64,32 @@ instead of each epic persisting its own state.
 - `src/lib/workspace/store.test.ts` — the in-memory `Storage` test helper
   pattern to reuse.
 
+## Solution Approach
+
+`domain/ports.ts` gains the `WorkspaceRepository` interface (no
+`localStorage` mention — a server-backed implementation must be able to
+satisfy it unchanged). `infra/workspaceRepository.ts` implements
+`createLocalWorkspaceRepository(storage?)` following `store.ts`'s explicit-
+`Storage`-parameter and never-throw-on-corrupt-data pattern: three keys
+(`workbench-workspaces`, `workbench-revisions`, `workbench-active`), each
+read through a `readPersisted`-style helper that returns an empty
+default on missing/corrupt/foreign data rather than throwing, and every
+document coming back out is passed through T-1006-1's `normalizeWorkspace`
+before being handed to the caller (AC9, the "hand-edited or older stored
+document" requirement).
+
+`putRevision` stores snapshots keyed by `${workspaceId}:${revision}` so
+storing the same revision twice replaces rather than duplicates (AC7); a
+pruning pass on every write drops the oldest unnamed snapshots per
+workspace once the count exceeds 100, skipping any snapshot with a
+non-null `name`. A write is done as read-modify-write-catch: if
+`JSON.stringify`/`setItem` throws (e.g. quota), the write is abandoned and
+the previously-stored value is left in place — never a partial write.
+
+**Contracts introduced:** `WorkspaceRepository` (port, `domain/ports.ts`),
+`SavedRevision`, `WorkspaceSummary`, `createLocalWorkspaceRepository` —
+`src/lib/workbench/infra/workspaceRepository.ts`.
+
 ## Technical Considerations
 
 - Port in `src/lib/workbench/domain/ports.ts`; implementation in
