@@ -52,12 +52,13 @@ being unable to undo it.
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
 | 1 | T-1007-1 | Panel entity and typed panel-kind registry | — | Open |
-| 2 | T-1007-2 | Logical grid layout model | — | Open |
+| 2 | T-1007-2 | Logical grid layout model | — | Open — **Superseded note:** AC2 ("rows are unbounded") contradicts the 2026-09-02 spec update (fixed 6x4 grid). T-1007-8 delivers the corrected row-bound behavior; this ticket's other ACs (column bounds, min-size, overlap, deterministic placement, hidden-panel exclusion) are unaffected. |
 | 3 | T-1007-3 | Panel link graph | — | Open |
 | 4 | T-1007-4 | Panel mutation use cases over the common contract | T-1007-1, T-1007-2, T-1007-3 | Open |
 | 5 | T-1007-7 | Panel source and renderer contract registry | T-1007-1 | Open |
 | 6 | T-1007-5 | The fourteen panel WebMCP tools | T-1007-4, T-1007-7 | Open |
 | 7 | T-1007-6 | Panel container rendering and tool wiring | T-1007-5 | Open |
+| 8 | T-1007-8 | Fixed, non-scrolling grid bounds | — | Open |
 
 ## Dependency Graph
 
@@ -67,12 +68,18 @@ T-1007-2 ──┼──> T-1007-4 ──┐
 T-1007-3 ──┘               │
                             ├──> T-1007-5 ──> T-1007-6
 T-1007-1 ──────> T-1007-7 ──┘
+
+T-1007-8 ──> T-1007-4
+T-1007-8 ──> T-1007-6
 ```
 
 ## Wave Plan
 
-- **Wave 1** (parallel): T-1007-1, T-1007-2, T-1007-3 — three independent
-  pure-domain modules with no dependency on each other
+- **Wave 1** (parallel): T-1007-1, T-1007-2, T-1007-3, T-1007-8 — four
+  independent pure-domain modules with no dependency on each other;
+  T-1007-8 corrects T-1007-2's row-bound AC and extends T-1007-6's
+  rendering AC, but has no dependency of its own, so it runs alongside
+  T-1007-2 rather than after it
 - **Wave 2** (parallel): T-1007-4 — composes all three over EPIC-1006's
   workspace, revision, envelope, and undo contracts; T-1007-7 — the
   source/renderer contract registry, which only needs T-1007-1's panel
@@ -207,17 +214,20 @@ T-1007-1 ──────> T-1007-7 ──┘
 Carried from `docs/design/panel-system/spec.md`, each with a stated
 assumption already applied to the tickets — none blocks implementation:
 
-1. Grid column count is unspecified in the tool spec — assuming a fixed
-   12-column, unbounded-row grid.
-2. Link directionality is unspecified — assuming symmetric per-channel
+_Resolved 2026-09-02 — Grid dimensions: fixed, non-scrolling 6-column by
+4-row grid (24 cells), always filling the viewport exactly. Replaces the
+"12-column, unbounded-row" assumption. See T-1007-8 and the Superseded
+note on T-1007-2._
+
+1. Link directionality is unspecified — assuming symmetric per-channel
    link groups.
-3. "Bound resource" is not enumerated — assuming an opaque
+2. "Bound resource" is not enumerated — assuming an opaque
    `{ type, id }` reference validated by the panel kind.
-4. Overlap policy is unspecified — assuming overlap is rejected rather
+3. Overlap policy is unspecified — assuming overlap is rejected rather
    than auto-reflowed.
-5. Hidden-vs-removed semantics are unspecified — assuming a hidden panel
+4. Hidden-vs-removed semantics are unspecified — assuming a hidden panel
    keeps its state and stored position but does not reserve grid space.
-6. **The "collection" kind.** `docs/reference/tool-spec.md`'s `create_panel`
+5. **The "collection" kind.** `docs/reference/tool-spec.md`'s `create_panel`
    example uses `"kind": "collection"`, which does not match any of the
    eight registered kinds (a `collection` reads as many items sharing one
    `chart_grid`/heatmap renderer — e.g. the top nine matches from a

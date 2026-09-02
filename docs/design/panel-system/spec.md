@@ -46,9 +46,10 @@ source type, or a renderer type into.
    symbol list, or panel it shows — independent of how it is rendered.
 4. **Change a panel's renderer** — table, chart grid, heatmap, scatter
    plot — independent of its source.
-5. **Lay out panels** on a logical grid — position and size in grid
-   cells, never pixels; apply a named layout template; split a panel's
-   region; temporarily maximize one without changing the saved layout.
+5. **Lay out panels** on a fixed, non-scrolling 6-column by 4-row logical
+   grid — position and size in grid cells, never pixels; apply a named
+   layout template; split a panel's region; temporarily maximize one
+   without changing the saved layout.
 6. **Link and unlink panels** so that a change in one propagates to the
    others on a named channel, including a selected result.
 7. **Register a panel kind, source type, or renderer type** so a new
@@ -83,6 +84,7 @@ source type, or a renderer type into.
 | Unknown kind | a workspace | the agent adds a panel of a kind that is not registered | the call fails, changes nothing, and the error lists every kind that *is* registered |
 | Invalid configuration | a workspace | the agent adds a panel with configuration its kind rejects | the call fails, changes nothing, and the error says which configuration values were rejected and why |
 | No room at the requested spot | a panel already occupies the requested cells | the agent adds a panel there | the call fails with an overlap error naming the occupying panel, and nothing is created |
+| Grid is full | the fixed 6x4 grid has no free rect of the requested size anywhere | the agent adds a panel without an explicit position | the call fails, changes nothing, and the error says the grid is full — nothing overflows past row 4 and no existing panel is displaced |
 | Replay | a mutation was already applied under an idempotency key | the same call is repeated with that key | the original result is returned and no second panel is created |
 
 ### Duplicate a panel
@@ -127,7 +129,7 @@ source type, or a renderer type into.
 |----------|-------|------|------|
 | Move and resize | one or more existing panels | the agent sets grid positions and sizes for them | all of them move/resize together as one change, or none of them do |
 | Below minimum size | a panel kind that declares a minimum size | the agent sets a smaller size | the call fails naming the minimum, and no panel moves |
-| Out of bounds | the grid's column count | the agent places a panel past the last column | the call fails naming the grid bounds, and no panel moves |
+| Out of bounds | the grid's fixed 6x4 bounds | the agent places a panel past the last column or row | the call fails naming the grid bounds, and no panel moves |
 | Overlap within one call | a batch of placements | two of them would occupy the same cell | the whole call fails identifying the conflicting pair, and no panel moves |
 | Partial ID set | a workspace with several panels | the agent lays out only some of them | the named panels move; the unnamed panels stay exactly where they are |
 | Unaffected by hidden panels | a hidden panel occupying cells | the agent places a visible panel over those cells | the placement is accepted — hidden panels reserve their stored position but do not block placement |
@@ -197,30 +199,34 @@ source type, or a renderer type into.
 
 ## Open Questions
 
-1. **Grid dimensions.** The tool spec says "logical grid coordinates
-   rather than pixels" but does not fix a column count.
-   *Assumption:* a fixed 12-column grid with unbounded rows; row height
-   is a rendering concern, not part of the model.
-2. **Link directionality.** The tool spec does not say whether a link is
+_Resolved 2026-09-02 — Grid dimensions: the page is a fixed, non-scrolling
+6-column by 4-row grid (24 cells total) that always exactly fills the
+viewport — a panel spanning N rows occupies N/4 of the page's height, M
+columns occupies M/6 of its width. Replaces the earlier "12-column,
+unbounded-row" assumption; see the "Lay out panels" behavioral
+specifications for the resulting "grid is full" rejection case, new now
+that the grid has a hard capacity._
+
+1. **Link directionality.** The tool spec does not say whether a link is
    directed (source → target) or symmetric.
    *Assumption:* symmetric per channel — `link_panels` maintains
    undirected link *groups*, one per channel, since "synchronize" reads
    as mutual.
-3. **Bound resource types.** "Bound resource" is not enumerated.
+2. **Bound resource types.** "Bound resource" is not enumerated.
    *Assumption:* an opaque typed reference (`{ type, id }`) to a stable
    ID owned by another feature — screener, run, instrument, watchlist,
    captured setup — validated by the panel kind, not by the container.
-4. **Overlap policy.** The spec does not state whether panels may
+3. **Overlap policy.** The spec does not state whether panels may
    overlap.
    *Assumption:* they may not; overlapping placements are rejected rather
    than auto-reflowed, so the agent gets a clear error instead of a
    surprising rearrangement.
-5. **Hidden vs. removed.** The spec lists visibility as a
+4. **Hidden vs. removed.** The spec lists visibility as a
    `configure_panel_view` field, implying hiding is not removal.
    *Assumption:* a hidden panel keeps its ID, configuration, links, and
    stored position, and does not reserve grid space against new
    placements.
-6. **The "collection" kind.** `docs/reference/tool-spec.md`'s `create_panel`
+5. **The "collection" kind.** `docs/reference/tool-spec.md`'s `create_panel`
    example uses `"kind": "collection"`, which does not match any of the
    eight registered kinds above (a `collection` reads as many items
    sharing one `chart_grid`/heatmap renderer — e.g. the top nine matches
@@ -231,7 +237,7 @@ source type, or a renderer type into.
    item or a collection. This is a stated assumption, not a resolved
    decision — confirm before T-1007-1's placeholder registrations are
    finalized.
-7. **Where title/visibility/collapsed-state live.** The `update_panel`
+6. **Where title/visibility/collapsed-state live.** The `update_panel`
    tool that used to own these no longer exists in the revised tool
    surface, and `configure_panel_view`'s stated purpose ("columns,
    studies, axes, sorting, grouping, formatting") does not name them.
