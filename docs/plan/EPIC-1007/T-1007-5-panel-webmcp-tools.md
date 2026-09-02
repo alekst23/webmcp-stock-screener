@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1007 (Panel System)
 **Design**: docs/design/panel-system/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1007-4, T-1007-7
 **Blocks**: T-1007-6
 
@@ -116,3 +116,71 @@ loop.
 
 Registering the tools against `document.modelContext` and rendering
 (T-1007-6), and the use-case logic itself (T-1007-4).
+
+## Solution Approach
+
+**Location.** `docs/design/panel-system/technical.md`'s "Tool surface"
+section names `src/lib/webmcp/v2/panelTools.ts`, but the working
+instructions for this ticket are explicit and repeated: new files only
+under `src/lib/panels/tools/`, nothing under `src/lib/webmcp/`. Building
+there — a design-doc/instruction conflict the technical.md text did not
+anticipate (it predates the `panels/` package layout actually landing).
+Noted for T-1007-6/EPIC-1015 wiring, not resolved here.
+
+**Files** (all new, under `src/lib/panels/tools/`):
+
+- `wire.ts` — snake_case ⇄ camelCase plumbing shared by every tool:
+  `parseContext` (`expected_revision`/`idempotency_key` → `MutationContext`),
+  `fromWireRect`/`toWireRect` (`col_span`/`row_span` ⇄ `colSpan`/`rowSpan`),
+  `toWireOccupiedRect`.
+- `results.ts` — local `ok`/`fail` (not imported from
+  `src/lib/webmcp/tools.ts`, per the ticket's explicit instruction) plus
+  `toErrorResult`, which maps `PanelOperationError`, `RevisionConflictError`,
+  `IdempotencyConflictError`, and `StorageWriteError` through their shared
+  `toWireError()` — mirroring, not importing,
+  `src/lib/workbench/tools/index.ts`'s `toErrorResult`.
+- `schemas.ts` — every JSON-Schema fragment built from the registries at
+  call time: kind/source-type/renderer-type/template-name enums, the grid
+  rect fragment (integers only, described bounds, no unit), and
+  `x-kind-config-schemas`/`x-renderer-config-schemas`/`x-source-ref-schemas`
+  side-channel properties on `create_panel` (and `x-source-ref-schemas` on
+  `bind_panel_source`, `x-renderer-config-schemas` on `set_panel_renderer`/
+  `configure_panel_view`) carrying each registered definition's own
+  `configSchema`/`refSchema` verbatim — this is what makes AC3 hold without
+  hand-written per-kind branches. `configure_chart_grid`'s field schema is
+  generated too: it reads the `chart_grid` `RendererTypeDefinition`'s own
+  `configSchema.properties` from the registry and snake_cases each key,
+  rather than listing `rows`/`columns`/... by hand.
+- `lifecycleTools.ts` — `create_panel`, `duplicate_panel`, `remove_panel`.
+- `layoutTools.ts` — `set_panel_layout`, `apply_layout_template`,
+  `split_panel`, `maximize_panel`. `maximize_panel` reads the current
+  document straight off `deps.repository` (no `commitPanelChange`, no
+  `MutationContext` in its schema) and drives the injected
+  `deps.maximized` handle.
+- `sourceRendererTools.ts` — `bind_panel_source`, `set_panel_renderer`,
+  `configure_chart_grid`, `configure_panel_view`.
+- `linkTools.ts` — `link_panels`, `unlink_panels`, `set_panel_selection`.
+- `maximizedState.ts` — `createMaximizedPanelState()`, a trivial in-memory
+  implementation of the `MaximizedPanelHandle` shape, for T-1007-6 and
+  tests to use so no module-global survives.
+- `panelTools.ts` — `PanelToolDeps` (`PanelUseCaseDeps & { maximized:
+  MaximizedPanelHandle }`) and `buildPanelTools(deps): ToolSpec[]`,
+  assembling the five tool-group builders. `available: () => true` for
+  all fourteen, per instruction.
+
+**Error mapping (AC9/AC10).** Every revisioned tool's `execute` wraps its
+use-case call in `try { ... } catch (err) { return toErrorResult(err); }`.
+`toErrorResult` never rebuilds a payload — every closed-set catalog
+(registered kinds, source/renderer types, template names, supported
+channels, grid bounds/occupant, rejected field paths) already lives on
+`PanelOperationError.details` via `toWireError()`, and `RevisionConflictError`/
+`IdempotencyConflictError` carry `error: 'revision_conflict'` /
+`'idempotency_conflict'` themselves — surfaced, not reproduced.
+
+**Testing.** Colocated `*.test.ts` per source file, using
+`createPanelTestHarness()`. `panelTools.test.ts` covers the cross-cutting
+ACs (1, 2, 8, 9 generic shape, 10, 11) and AC3's extensibility test: build
+an isolated `PanelRegistry`/`SourceRendererRegistry`/`LayoutTemplateRegistry`,
+register one fictional kind/source type/renderer type/template, rebuild
+`buildPanelTools`, and assert the new names surface in `create_panel`'s
+enums and `x-*-schemas`, with no edit to any file in `tools/`.

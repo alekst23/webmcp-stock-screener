@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1013 (Safety layer (preview & apply))
 **Design**: docs/design/safety-preview-apply/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1013-1
 **Blocks**: T-1013-5
 
@@ -48,6 +48,88 @@ exactly that outcome rather than recomputing it.
 10. Evaluation performs no I/O, reads no clock, and generates no IDs.
 11. A test registers an operation kind that the evaluation code does not
     reference and drives it through evaluation successfully.
+
+## Implementation Plan
+
+### Module
+
+New file `src/lib/workbench/domain/batchEvaluation.ts`, exporting:
+
+- `interface BatchEvaluation` — `{ candidate, outcomes, failures, warnings,
+  affectedIds, fragments }`, where `candidate` is `WorkspaceDocument | null`
+  and is `null` whenever `failures` is non-empty (AC6), so a caller holding
+  a `BatchEvaluation` for an inapplicable batch has literally nothing it
+  could commit.
+- `function evaluateBatch(batch, document, deps): BatchEvaluation` with
+  `deps: { registry: OperationRegistry; ids: IdSequencer }`.
+
+`OperationRegistry` is a **type-only** import from
+`../application/operationRegistry`; no value crosses the layer boundary, so
+the domain-never-imports-application rule holds.
+
+This is a new, independent evaluation path. EPIC-1006's `foldForPreview`
+and `foldApply` stay exactly as they are; nothing in
+`operationRegistry.ts` is touched.
+
+### The fold
+
+1. Empty batch → `throw SafetyError.invalidInput(...)` before any work
+   (AC8). An empty batch is a caller mistake, not an outcome to report.
+2. Walk the batch left to right, carrying a `current` document, so each
+   operation validates and applies against the state its predecessors
+   produced (AC2).
+3. Per operation, resolve the handler with `registry.get(op.kind)` — the
+   only dispatch mechanism in the module. There is no list, map, switch or
+   conditional naming any particular kind (AC3, AC11).
+4. Three failure paths — unknown kind, non-empty `validate()` issues, and
+   any exception from `validate` / `describe` / `apply` — each produce an
+   `OperationFailure` carrying `index` and `kind`, and the fold **continues**
+   from the last known-good document so later independent failures are
+   reported too (AC4, AC5).
+5. On success, `draft.affectedIds` accumulate into a deduplicated,
+   first-appearance-ordered list; `draft.warnings` become per-operation
+   `OperationWarning`s; `draft.diffSummary` becomes the operation's
+   fragment and `def.describe(...)` the outcome's `describe`.
+6. `candidate = failures.length === 0 ? current : null`.
+
+### Non-mutation strategy: clone per operation
+
+Project decision (2026-09-01): registry handlers are **not** guaranteed
+pure — they may have side effects and may mutate the document they are
+handed. So the caller's document is never handed to a handler at all.
+Each operation receives its own `structuredClone` of the current state:
+
+- The caller's live document and revision are untouched for every input,
+  including batches that fail (AC7) — verified by deep comparison in the
+  tests, including against a deliberately impure handler.
+- A handler that mutates its input and *then* throws cannot corrupt the
+  last-known-good document the fold continues from, because what it
+  mutated was a private copy.
+
+This is technical.md's explicit clone fallback, promoted to the mandatory
+path. The `WHY` is recorded in a comment in the module.
+
+### On AC10 ("generates no IDs")
+
+`evaluateBatch` itself never calls `ids.next()`. It accepts an
+`IdSequencer` only because EPIC-1006's
+`OperationDefinition.apply(input, doc, ids)` requires one to be threaded
+through to handlers. That distinction matters: IDs a handler mints during
+preview are exactly the IDs apply commits, because apply commits the
+stored candidate rather than re-folding the batch. That is what makes the
+honesty guarantee structural.
+
+### Tests
+
+`src/lib/workbench/domain/batchEvaluation.test.ts`, one or more cases per
+AC. Every test builds its own registry via `createOperationRegistry()`
+(never the shared singleton, which would make tests order-dependent);
+fakes record calls in their own closures rather than in a shared map keyed
+by kind name. Notable cases: deep before/after comparison across valid,
+unknown-kind, validator-rejecting, throwing-handler and impure-handler
+batches; a novel kind registered inside the test whose name appears
+nowhere in `batchEvaluation.ts`; two independently bad operations both
+reported; a second operation that reads what the first produced.
 
 ## Design References
 

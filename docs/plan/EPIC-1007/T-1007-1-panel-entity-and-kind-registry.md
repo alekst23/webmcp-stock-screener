@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1007 (Panel System)
 **Design**: docs/design/panel-system/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1007-4, T-1007-7
 
@@ -94,3 +94,60 @@ container.
 Grid geometry (T-1007-2), link groups (T-1007-3), workspace mutation and
 revisions (T-1007-4), tool schemas (T-1007-5), and any real panel body
 (sibling epics).
+
+## Solution Approach
+
+Two new files under `src/lib/panels/`, both pure and side-effect-free
+beyond module-level registration:
+
+- `domain/panel.ts` — the `Panel` entity and `PanelSourceRef` shape (a
+  panel's source is an opaque `{ type, ref }` pair; T-1007-7 owns
+  validating it). `makePanel` is a plain constructor with defaults for
+  `hidden`, `collapsed`, `source`, `renderer` — it does not mint IDs or
+  validate `kind`/`config` against a registry; that is the use case
+  layer's (T-1007-4) job, consistent with domain never importing
+  `registry/`.
+- `registry/panelKindRegistry.ts` — `PanelKindDefinition`,
+  `ConfigValidation`/`ConfigError`, `PanelKindConflictError`,
+  `UnknownPanelKindError`, and a `PanelRegistry` interface backed by a
+  `Map<string, PanelKindDefinition>` closed over inside
+  `createPanelRegistry()`. The module-global `panelKindRegistry` is one
+  such instance; `registerPanelKind`/`getPanelKind`/`listPanelKinds` are
+  thin wrappers over it, per technical.md's symbol table. Generic
+  variance: registry storage and signatures use
+  `PanelKindDefinition<Record<string, unknown>>`; `register` accepts
+  `PanelKindDefinition<never>` so a caller with a narrower `TConfig` can
+  pass its definition without a cast (a function whose parameter type is
+  narrower is assignable to a wider parameter position through
+  contravariance-safe `never`).
+- `registry/defaultPanelKinds.ts` — `registerDefaultPanelKinds(registry)`
+  registers the eight kinds from the tool spec with real `defaultSize`,
+  `minSize` (defaulting to `{ colSpan: 2, rowSpan: 2 }` unless the kind's
+  natural minimum is smaller, e.g. `filter_builder` and `alerts` at
+  `{ colSpan: 1, rowSpan: 1 }`), the technical.md link-channel matrix
+  reproduced exactly, and `bindingTypes` drawn from which T-1007-7 source
+  types make sense for that kind (`chart`/`similar_opportunities` accept
+  `screener_results`, `watchlist`, `symbol_list`, `panel_reference`;
+  `results_table` accepts `screener_results`, `watchlist`,
+  `panel_reference`; `watchlist` kind accepts `watchlist`, `symbol_list`;
+  `study_library`/`symbol_details`/`alerts` accept `symbol_list`,
+  `panel_reference`; `filter_builder` is not data-bound — `[]`).
+  `defaultRenderer` is `'table'` for `results_table`, `'chart_grid'` for
+  `chart`/`similar_opportunities`, and `null` for the rest (not yet
+  rendering bound data). `component()` returns a placeholder marker
+  object; `validateConfig` provisionally accepts any object matching the
+  schema's declared top-level property names.
+- Config schemas are minimal-but-real JSON Schema objects (`type: object`,
+  `properties`, no `required` beyond what's obviously fixed) — enough for
+  catalog discovery and `create_panel`'s generated schema (T-1007-5) to
+  merge, not a full validation contract.
+
+Kept out: no reference to `GridRect`'s consumers, no reference to
+`bindPanelSource`/`setPanelRenderer` semantics (T-1007-4), no Svelte
+import anywhere in `domain/` or `registry/`.
+
+Isolation for AC8/AC16 extensibility: `createPanelRegistry()` allocates a
+fresh `Map`; the exported `panelKindRegistry` singleton and
+`registerDefaultPanelKinds` are never called from within
+`createPanelRegistry()` itself — only from a composition root (future
+ticket) and from tests that explicitly want the seeded defaults.
