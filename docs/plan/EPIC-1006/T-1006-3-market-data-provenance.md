@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1006 (Workspace, Revisions & the Common Tool Contract)
 **Design**: docs/design/workspace-revisions/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1006-8
 
