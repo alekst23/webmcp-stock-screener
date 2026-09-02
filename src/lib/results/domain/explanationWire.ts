@@ -46,14 +46,15 @@ function toWireFilterNodeExplanation(node: FilterNodeExplanation): Record<string
 			occurred_bars_ago: node.occurredBarsAgo
 		});
 	}
-	return {
+	return withoutUndefined({
 		node_id: node.nodeId,
 		kind: node.kind,
 		op: node.op,
 		enabled: node.enabled,
 		outcome: toWireOutcome(node.outcome),
-		children: node.children.map(toWireFilterNodeExplanation)
-	};
+		children: node.children.map(toWireFilterNodeExplanation),
+		truncated_child_count: node.truncatedChildCount
+	});
 }
 
 function toWireRankingFieldContribution(field: RankingFieldContribution): Record<string, unknown> {
@@ -68,11 +69,12 @@ function toWireRankingFieldContribution(field: RankingFieldContribution): Record
 }
 
 function toWireRankingExplanation(ranking: RankingExplanation): Record<string, unknown> {
-	return {
+	return withoutUndefined({
 		fields: ranking.fields.map(toWireRankingFieldContribution),
 		normalization: ranking.normalization,
-		composite_score: ranking.compositeScore
-	};
+		composite_score: ranking.compositeScore,
+		truncated_field_count: ranking.truncatedFieldCount
+	});
 }
 
 export function toWireResultExplanation(explanation: ResultExplanation): Record<string, unknown> {

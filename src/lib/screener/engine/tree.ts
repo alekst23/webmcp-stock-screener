@@ -66,7 +66,14 @@ async function walk(
 			passed: result.passed,
 			value: result.value,
 			unit: result.unit,
-			detail: result.detail
+			detail: result.detail,
+			// Restores what conditionEvaluation.shared.ts's ConditionEvalOutcome
+			// already computes: without this, a genuine indeterminate ("input
+			// missing", unavailableOutcome()'s value: null) is indistinguishable
+			// from a genuine, available fail that also reports value: null (e.g.
+			// evaluatePattern's "pattern not detected") -- explain_result (T-1010-5,
+			// AC6) needs this distinction and cannot recover it from `value` alone.
+			dataUnavailable: result.dataUnavailable
 		};
 		if (result.dataUnavailable) {
 			unavailableNodeIds.push(node.nodeId);

@@ -4,8 +4,9 @@
 // PinnedRunStore spy that makes the "no silent rerun" guarantee testable
 // rather than merely structural.
 
+import { emptyFilterTree } from '../screener/definition';
 import { keepAllRuns, type PinnedRunStore, type RunNotAvailable } from '../screener/ports';
-import type { ScreenerMatch, ScreenerRun } from '../screener/run';
+import type { RejectedCandidate, ScreenerMatch, ScreenerRun } from '../screener/run';
 import { createPinnedRunStore } from '../screener/runStore';
 import { makeProvenance, type MarketDataProvenance } from '../workbench/domain/provenance';
 
@@ -36,9 +37,21 @@ export function testMatch(rank: number, overrides: Partial<ScreenerMatch> = {}):
 	};
 }
 
+// A run-evaluated-but-not-returned instrument (screener/run.ts's
+// RejectedCandidate) -- either a genuine filter-tree failure or a matched
+// instrument truncated by the ranking limit (see `rankingValues`, absent
+// for the former).
+export function testRejectedCandidate(
+	instrumentId: string,
+	overrides: Partial<RejectedCandidate> = {}
+): RejectedCandidate {
+	return { instrumentId, nodeEvaluations: {}, ...overrides };
+}
+
 // Builds a plausible, already-complete run with `matchCount` matches ranked
-// 1..matchCount. Every field a ResultsReader test needs is populated with a
-// sane default so a test only overrides what it's actually exercising.
+// 1..matchCount. Every field a ResultsReader/explain_result test needs is
+// populated with a sane default so a test only overrides what it's actually
+// exercising.
 export function testRun(
 	runId: string,
 	matchCount: number,
@@ -58,6 +71,9 @@ export function testRun(
 		normalization: 'percentile_rank',
 		warnings: [],
 		provenance: testProvenance(),
+		rejectedEvaluations: {},
+		filterTree: emptyFilterTree('filter_1'),
+		rankingSpec: null,
 		createdAt: '2026-09-02T14:30:05.000Z',
 		...overrides,
 		matches

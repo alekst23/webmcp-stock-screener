@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ScreenerDefinition } from '../../screener/definition';
+import { emptyFilterTree, type ScreenerDefinition } from '../../screener/definition';
 import type { RunRetentionPolicy } from '../../screener/ports';
 import type { ScreenerEvaluationPort } from '../../screener/ports';
 import {
@@ -136,6 +136,9 @@ function completeRunFor(
 		warnings: opts.warnings ?? [],
 		provenance: fixtureProvenance(),
 		matches,
+		rejectedEvaluations: {},
+		filterTree: emptyFilterTree('filter_root'),
+		rankingSpec: null,
 		createdAt: '2026-09-02T14:30:05.000Z'
 	});
 }

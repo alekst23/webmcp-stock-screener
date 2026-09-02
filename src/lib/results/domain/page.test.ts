@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeProvenance, type MarketDataProvenance } from '../../workbench/domain/provenance';
+import { emptyFilterTree } from '../../screener/definition';
 import type { ScreenerMatch, ScreenerRun } from '../../screener/run';
 import {
 	buildResultsPage,
@@ -64,6 +65,9 @@ function testRun(
 		normalization: 'percentile_rank',
 		warnings: [],
 		provenance: testProvenance(),
+		rejectedEvaluations: {},
+		filterTree: emptyFilterTree('filter_1'),
+		rankingSpec: null,
 		createdAt: '2026-09-02T14:30:05.000Z',
 		...overrides,
 		matches: overrides.matches ?? defaultMatches

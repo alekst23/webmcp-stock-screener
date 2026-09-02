@@ -31,6 +31,13 @@ export interface RankingExplanation {
 	fields: RankingFieldContribution[];
 	normalization: RankingNormalization;
 	compositeScore: number;
+	// Present (T-1010-5, AC11) when a response-size bound cut `fields` short.
+	// `compositeScore` always stays the true, untruncated total -- only the
+	// per-field itemization is capped -- which is why applying this bound
+	// must happen after, and independently of, makeResultExplanation's
+	// contribution-sum invariant check (explanationBound.ts never re-invokes
+	// it). Absent (never present-but-zero) when nothing was truncated.
+	truncatedFieldCount?: number;
 }
 
 function percentileRank(values: readonly number[], value: number): number {
