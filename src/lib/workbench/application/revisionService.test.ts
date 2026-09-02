@@ -194,4 +194,37 @@ describe('createRevisionService', () => {
 		const envelope = applyDraft();
 		expect(envelope.undoToken).toBeNull();
 	});
+
+	it('propagates a failed storage write instead of returning a success envelope', () => {
+		const storage = memoryStorage();
+		const failingRepository = createLocalWorkspaceRepository(storage);
+		failingRepository.put(emptyWorkspace('workspace_1', 'Test', '2026-01-01T00:00:00.000Z'));
+		const failingService = createRevisionService({
+			repository: {
+				...failingRepository,
+				put: () => {
+					throw new Error('quota exceeded');
+				}
+			},
+			clock: fixedClock('2026-01-02T00:00:00.000Z'),
+			ids: createIdSequencer(),
+			idempotency: createIdempotencyCache()
+		});
+		// A commit whose write never lands must throw, not return an envelope
+		// claiming the mutation succeeded -- the envelope is the sole contract
+		// callers trust (AC2/AC3).
+		expect(() =>
+			failingService.commit({
+				workspaceId: 'workspace_1',
+				context: { expectedRevision: 1, actor: 'agent' },
+				operationKind: 'test.op',
+				requestInput: { n: 1 },
+				mutate: (doc) => ({
+					document: { ...doc, activeSymbol: 'AAPL' },
+					affectedIds: ['workspace_1'],
+					diffSummary: 'Set active symbol to AAPL.'
+				})
+			})
+		).toThrow('quota exceeded');
+	});
 });

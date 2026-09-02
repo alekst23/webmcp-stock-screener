@@ -37,19 +37,21 @@ describe('buildWorkbenchTools', () => {
 		const repository = createLocalWorkspaceRepository(memoryStorage());
 		const clock = fixedClock('2026-01-01T00:00:00.000Z');
 		const ids = createIdSequencer();
+		const idempotency = createIdempotencyCache();
 		deps = {
 			repository,
 			revisions: createRevisionService({
 				repository,
 				clock,
 				ids,
-				idempotency: createIdempotencyCache()
+				idempotency
 			}),
 			history: createChangeHistory(),
 			registry: createOperationRegistry(),
 			provenance: { current: () => FIXED_PROVENANCE },
 			clock,
-			ids
+			ids,
+			idempotency
 		};
 	});
 
@@ -145,6 +147,37 @@ describe('buildWorkbenchTools', () => {
 			hasUnsavedChanges: boolean;
 		};
 		expect(state.hasUnsavedChanges).toBe(false);
+	});
+
+	it('save_workspace replays a repeated idempotency_key instead of minting a new change', async () => {
+		// Regression: save_workspace used to mint a fresh change_id on every
+		// call regardless of idempotency_key, so a retried request never got
+		// back "the same response as though the first had arrived late" (spec).
+		const created = jsonOf(await tool('create_workspace').execute({ name: 'My Workspace' })) as {
+			affected_ids: string[];
+		};
+		const id = created.affected_ids[0]!;
+		const args = { workspace_id: id, name: 'Baseline', idempotency_key: 'save-1' };
+		const first = jsonOf(await tool('save_workspace').execute(args)) as { change_id: string };
+		const second = jsonOf(await tool('save_workspace').execute(args)) as { change_id: string };
+		expect(second.change_id).toBe(first.change_id);
+	});
+
+	it('save_workspace appears in get_change_history', async () => {
+		// Regression: save_workspace bypassed recordCommit entirely, so a save
+		// was invisible to get_change_history despite returning a full
+		// mutation envelope with its own change_id (AC6).
+		const created = jsonOf(await tool('create_workspace').execute({ name: 'My Workspace' })) as {
+			affected_ids: string[];
+		};
+		const id = created.affected_ids[0]!;
+		const saved = jsonOf(
+			await tool('save_workspace').execute({ workspace_id: id, name: 'Baseline' })
+		) as { change_id: string };
+		const history = jsonOf(await tool('get_change_history').execute({ workspace_id: id })) as {
+			changeId: string;
+		}[];
+		expect(history.map((r) => r.changeId)).toContain(saved.change_id);
 	});
 
 	it('save_workspace rejects a mismatched expected_revision as a structured error', async () => {

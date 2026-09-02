@@ -75,6 +75,25 @@ export class UndoTokenError extends Error {
 	}
 }
 
+// Raised when the underlying storage write itself fails (e.g. localStorage
+// quota exceeded) -- distinct from every other error here, which rejects a
+// mutation before touching storage. A caller must never report a mutation
+// envelope as successful when this fires: the requested change did not
+// actually persist.
+export class StorageWriteError extends Error {
+	constructor(message: string, options?: { cause?: unknown }) {
+		super(message, options);
+		this.name = 'StorageWriteError';
+	}
+
+	toWireError(): WireError {
+		return {
+			error: 'storage_write_failed',
+			message: this.message
+		};
+	}
+}
+
 export class OperationValidationError extends Error {
 	readonly issues: string[];
 

@@ -60,6 +60,17 @@ export function createChangeHistory(): ChangeHistory {
 	return {
 		append(record: ChangeRecord): void {
 			const records = byWorkspace.get(record.workspaceId) ?? [];
+			// undo_change only ever targets the newest record for a workspace
+			// (see undoChange's newest-check below), so a record stops being
+			// genuinely undoable the moment a later one lands. Reflecting that
+			// here -- not just at undo-time -- is what lets prune() actually
+			// find eviction candidates; leaving every record 'available'
+			// forever was silently defeating MAX_RECORDS_PER_WORKSPACE.
+			for (const existing of records) {
+				if (existing.undoState === 'available') {
+					existing.undoState = 'superseded';
+				}
+			}
 			records.push(record);
 			byWorkspace.set(record.workspaceId, records);
 			prune(record.workspaceId);

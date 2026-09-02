@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { StorageWriteError } from '../domain/errors';
 import { emptyWorkspace, type WorkspaceDocument } from '../domain/workspace';
 import { memoryStorage } from '../testSupport';
 import { createLocalWorkspaceRepository } from './workspaceRepository';
@@ -136,7 +137,7 @@ describe('createLocalWorkspaceRepository', () => {
 		expect(repo.listRevisions('workspace_1')).toEqual([]);
 	});
 
-	it('does not corrupt previously stored data when a write fails', () => {
+	it('raises StorageWriteError and does not corrupt previously stored data when a write fails', () => {
 		const storage = memoryStorage();
 		const repo = createLocalWorkspaceRepository(storage);
 		repo.put(doc('workspace_1', 1));
@@ -147,7 +148,9 @@ describe('createLocalWorkspaceRepository', () => {
 			}
 		};
 		const failingRepo = createLocalWorkspaceRepository(failingStorage);
-		expect(() => failingRepo.put(doc('workspace_1', 2))).not.toThrow();
+		// A failed write must surface, not be swallowed -- a caller that reports
+		// success on a write that never landed is lying about persistence.
+		expect(() => failingRepo.put(doc('workspace_1', 2))).toThrow(StorageWriteError);
 		expect(repo.get('workspace_1')?.revision).toBe(1);
 	});
 

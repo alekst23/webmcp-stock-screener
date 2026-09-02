@@ -42,6 +42,9 @@ underneath me, retry without duplicating work, and reverse a mistake.
 | 6 | T-1006-6 | Change history, undo tokens and revision restore | T-1006-5 | Done |
 | 7 | T-1006-7 | Extensible operation registry with preview and apply | T-1006-5 | Done |
 | 8 | T-1006-8 | Workspace and context tool surface | T-1006-3, T-1006-6, T-1006-7 | Done |
+| 9 | T-1006-9 | Wire-case the three read-only tools | T-1006-8 | Open |
+| 10 | T-1006-10 | Type `OperationRegistry.register`'s errors | T-1006-7 | Open |
+| 11 | T-1006-11 | Boundary logging, cross-tab write race, and re-serialization cost | T-1006-4, T-1006-5 | Open |
 
 ## Dependency Graph
 

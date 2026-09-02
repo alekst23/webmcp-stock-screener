@@ -281,11 +281,12 @@ export interface IdempotencyCache {
 export function createIdempotencyCache(options?: { maxEntries?: number; ttlMs?: number }): IdempotencyCache;
 ```
 
-`commit` is the single write path for the whole program. It checks
-`expectedRevision`, replays on a repeated `idempotencyKey`, appends the
-warning when `expectedRevision` is absent, increments the revision, records
-history, mints the undo token, and returns the envelope. Nothing else in
-the codebase increments a revision.
+`commit` is the single write path for the whole program. It replays on a
+repeated `idempotencyKey` first (a genuine replay must return the original
+envelope regardless of how far the revision has since moved), then checks
+`expectedRevision`, appends the warning when `expectedRevision` is absent,
+increments the revision, records history, mints the undo token, and returns
+the envelope. Nothing else in the codebase increments a revision.
 
 Defaults: idempotency cache holds 200 entries with a 1-hour TTL.
 
@@ -426,3 +427,10 @@ Nothing here imports from `src/lib/webmcp/tools.ts` or
 `src/lib/workspace/store.ts` except the `ToolSpec` / `ToolResult` types.
 Storage keys do not overlap. The current UI is untouched. EPIC-1015 removes
 the old surface once the new one is complete.
+
+The seven tools built here are gated behind `WORKBENCH_TOOLS_ENABLED` (a
+`const` in `src/lib/workbench/tools/registerWorkbenchTools.ts`, currently
+`false`) and `registerWorkbenchTools()` is not called from app startup by
+this epic -- flipping the flag (or making it a real runtime toggle) once the
+sibling epics that register their own operations against T-1006-7's registry
+are ready is the activation mechanism EPIC-1015 needs.

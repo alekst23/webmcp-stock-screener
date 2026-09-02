@@ -10,6 +10,7 @@ import {
 	IdempotencyConflictError,
 	OperationValidationError,
 	RevisionConflictError,
+	StorageWriteError,
 	UndoTokenError
 } from '../domain/errors';
 import type { IdSequencer } from '../domain/ids';
@@ -18,6 +19,8 @@ import type { ProvenanceSource, WorkspaceRepository } from '../domain/ports';
 import { emptyWorkspace } from '../domain/workspace';
 import { recordCommit, restoreRevision, undoChange } from '../application/changeHistory';
 import type { ChangeHistory } from '../application/changeHistory';
+import { fingerprintRequest } from '../application/idempotency';
+import type { IdempotencyCache } from '../application/idempotency';
 import type { OperationRegistry } from '../application/operationRegistry';
 import type { RevisionService } from '../application/revisionService';
 import type { Clock } from '../domain/ports';
@@ -30,6 +33,11 @@ export interface WorkbenchDeps {
 	provenance: ProvenanceSource;
 	clock: Clock;
 	ids: IdSequencer;
+	// save_workspace attaches a name without bumping the revision (Open
+	// Question 5), so it can't route through RevisionService.commit's own
+	// idempotency check like every other mutating tool -- it replays keys
+	// against this cache directly instead.
+	idempotency: IdempotencyCache;
 }
 
 // Static for now (Open Question 7): no permission model exists yet, and
@@ -51,7 +59,8 @@ function toErrorResult(err: unknown): ToolResult {
 		err instanceof RevisionConflictError ||
 		err instanceof IdempotencyConflictError ||
 		err instanceof UndoTokenError ||
-		err instanceof OperationValidationError
+		err instanceof OperationValidationError ||
+		err instanceof StorageWriteError
 	) {
 		return fail(err.message, err.toWireError());
 	}
@@ -164,27 +173,56 @@ function saveWorkspace(deps: WorkbenchDeps) {
 		}
 		// Naming attaches to the current revision rather than opening a second
 		// numbering scheme (epic Open Question 5) -- no revision bump, so this
-		// bypasses RevisionService.commit entirely and updates the existing
-		// snapshot's name directly. Re-saving the same name to the same
-		// revision is naturally idempotent in effect, so idempotency_key is
-		// accepted but not separately deduped here.
-		deps.repository.putRevision({
+		// bypasses RevisionService.commit's own idempotency/history plumbing
+		// and updates the existing snapshot's name directly. It still honors
+		// idempotency_key (via the shared cache) and still appends to change
+		// history, so a replayed save and a listed save behave like every
+		// other enveloped tool despite not bumping the revision.
+		const fingerprint = fingerprintRequest('workbench.save_workspace', {
 			workspaceId: id,
-			revision: doc.revision,
 			name: input.name,
-			savedAt: deps.clock.now(),
-			document: doc
+			expectedRevision: input.expected_revision ?? null
 		});
-		return ok(
-			toWireEnvelope({
+		try {
+			if (input.idempotency_key) {
+				const cached = deps.idempotency.lookup(input.idempotency_key, fingerprint);
+				if (cached) {
+					return ok(toWireEnvelope(cached));
+				}
+			}
+			deps.repository.putRevision({
+				workspaceId: id,
+				revision: doc.revision,
+				name: input.name,
+				savedAt: deps.clock.now(),
+				document: doc
+			});
+			const envelope = {
 				changeId: deps.ids.next('change'),
 				newRevision: doc.revision,
 				affectedIds: [id],
 				diffSummary: `Saved workspace as "${input.name}".`,
 				warnings: [],
 				undoToken: null
-			})
-		);
+			};
+			if (input.idempotency_key) {
+				deps.idempotency.remember(input.idempotency_key, fingerprint, envelope);
+			}
+			deps.history.append({
+				changeId: envelope.changeId,
+				workspaceId: id,
+				revision: envelope.newRevision,
+				at: deps.clock.now(),
+				actor: 'agent',
+				diffSummary: envelope.diffSummary,
+				affectedIds: envelope.affectedIds,
+				undoToken: null,
+				undoState: 'none'
+			});
+			return ok(toWireEnvelope(envelope));
+		} catch (err) {
+			return toErrorResult(err);
+		}
 	};
 }
 

@@ -38,19 +38,25 @@ export function createDefaultWorkbenchDeps(): WorkbenchDeps {
 	const repository = createLocalWorkspaceRepository();
 	const clock = { now: () => new Date().toISOString() };
 	const ids = createIdSequencer();
+	// One instance shared with revisions below: save_workspace replays
+	// idempotency_key against the same cache mutating tools use, so a
+	// caller can't tell save's bypass of RevisionService.commit apart from
+	// any other tool's idempotency behavior.
+	const idempotency = createIdempotencyCache();
 	return {
 		repository,
 		revisions: createRevisionService({
 			repository,
 			clock,
 			ids,
-			idempotency: createIdempotencyCache()
+			idempotency
 		}),
 		history: createChangeHistory(),
 		registry: operationRegistry,
 		provenance: { current: () => FIXED_PROVENANCE },
 		clock,
-		ids
+		ids,
+		idempotency
 	};
 }
 

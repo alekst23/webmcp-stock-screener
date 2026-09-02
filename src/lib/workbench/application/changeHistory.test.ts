@@ -83,6 +83,31 @@ describe('createChangeHistory', () => {
 		expect(history.list('workspace_1', { before: 4 }).map((r) => r.revision)).toEqual([3, 2, 1]);
 	});
 
+	it('enforces the per-workspace cap even when every record has an undo token', () => {
+		// Regression: prune() only evicts records whose undoState isn't
+		// 'available', but nothing used to transition an older record away
+		// from 'available' once a newer one landed, so a workspace where every
+		// change is undoable (the common case) grew without bound.
+		for (let revision = 1; revision <= 205; revision++) {
+			history.append({
+				changeId: `change_${revision}`,
+				workspaceId: 'workspace_1',
+				revision,
+				at: 't',
+				actor: 'agent',
+				diffSummary: 'x',
+				affectedIds: [],
+				undoToken: `undo_${revision}`,
+				undoState: 'available'
+			});
+		}
+		const records = history.list('workspace_1');
+		expect(records.length).toBeLessThanOrEqual(200);
+		// The newest record stays genuinely undoable; only it should read 'available'.
+		expect(records[0]?.undoState).toBe('available');
+		expect(records.slice(1).every((r) => r.undoState === 'superseded')).toBe(true);
+	});
+
 	it('finds a record by its undo token and marks it redeemed', () => {
 		history.append({
 			changeId: 'change_1',

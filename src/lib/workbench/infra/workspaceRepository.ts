@@ -4,6 +4,7 @@
 // precedent of a second store under its own keys so neither disturbs the
 // shipping app's data.
 import { normalizeWorkspace, type WorkspaceDocument } from '../domain/workspace';
+import { StorageWriteError } from '../domain/errors';
 import type { ResourceId } from '../domain/ids';
 import type { Revision } from '../domain/workspace';
 import type { SavedRevision, WorkspaceRepository, WorkspaceSummary } from '../domain/ports';
@@ -29,12 +30,16 @@ function readJson<T>(storage: Storage | undefined, key: string, fallback: T): T 
 	}
 }
 
+// A failed write (e.g. quota) leaves the previously stored value in place
+// rather than corrupting the index (T-1006-4 AC9) -- but it must not be
+// mistaken for success. `put`/`putRevision` propagate this to the caller
+// (RevisionService.commit), which must not report a mutation envelope as
+// successful when the write behind it never actually landed.
 function writeJson(storage: Storage | undefined, key: string, value: unknown): void {
 	try {
 		storage?.setItem(key, JSON.stringify(value));
-	} catch {
-		// A failed write (e.g. quota) leaves the previously stored value in
-		// place rather than corrupting the index (T-1006-4 AC9).
+	} catch (err) {
+		throw new StorageWriteError(`Failed to write "${key}" to storage.`, { cause: err });
 	}
 }
 
@@ -121,7 +126,9 @@ export function createLocalWorkspaceRepository(storage?: Storage): WorkspaceRepo
 			try {
 				backing?.setItem(ACTIVE_KEY, id);
 			} catch {
-				// Same fail-gracefully contract as writeJson.
+				// Deliberately still fail-quiet, unlike writeJson: this is a UI
+				// convenience pointer, not the mutation envelope's own success
+				// claim, and the workspace it points at was already committed.
 			}
 		},
 
