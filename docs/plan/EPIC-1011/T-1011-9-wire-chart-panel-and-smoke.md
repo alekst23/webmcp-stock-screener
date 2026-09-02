@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1011-4, T-1011-5, T-1011-6, T-1011-7, T-1011-8
 **Blocks**: —
 
@@ -75,9 +75,11 @@ chart/tools/registerChartTools.ts      composition root, feature-flagged
 
 ### Rendering reads state, never guesses it
 
-`ChartPanel.svelte` takes `{ document, panelId, data, comparisons }`. Config,
-studies and annotations come from `readChartState(document, panelId)` and
-`readChartAnnotationsView(document, panelId)` — the latter because staleness
+`ChartPanel.svelte` takes `{ workspace, panelId, data, comparisons }` — the
+document prop is named `workspace` rather than `document` so it cannot shadow
+the global inside the component. Config, studies and annotations come from
+`readChartState(workspace, panelId)` and
+`readChartAnnotationsView(workspace, panelId)` — the latter because staleness
 is computed in exactly one place and the panel must not compute a second
 answer. Bars, studies' calculated outputs and provenance come from a
 `ChartDataResult`, which is what `get_chart_data` already returns: the panel
@@ -128,9 +130,30 @@ never re-mints a live `study_N`, `annotation_N` or `setup_N`.
 
 `chartRendererTypeDefinition` (T-1011-4) is the base; `composeRendererWithStudies`
 (T-1011-5) folds the study-editing half into it. `registerChartPanelContract`
-is the single call site: it registers the chart source type and the *composed*
+is the single call site: it registers the chart source type and the _composed_
 renderer against a structurally-declared `PanelContractRegistry`. Nothing is
 imported from EPIC-1007.
+
+Composing the two halves as shipped surfaced a defect neither ticket could
+see alone: the view half rejects any config key it does not own, so the
+composed renderer rejected its own `defaultConfig()` over the `studies` key
+its sibling contributes. Composition is where that is knowable, so
+`buildChartRendererDefinition` shows each half only the keys it owns rather
+than teaching either half about the other.
+
+### Two seams fixed in passing
+
+Two contracts disagreed with themselves and would have failed the first real
+caller; both are fixed here rather than left for the epic to close over.
+
+- `chart.edit_studies` advertised the snake_case `EDIT_CHART_STUDIES_SCHEMA`
+  but validated camelCase only, so `panel_id` — the key its own schema
+  requires — was rejected. The operation now parses through
+  `fromWireEditChartStudiesInput`, which accepts either casing, so existing
+  camelCase callers are unaffected.
+- `timeAxisTickIndices` rounded several ticks onto the same bar whenever a
+  window held fewer bars than ticks, stacking two date labels on one bar and
+  crashing a keyed render. It now de-duplicates.
 
 ### AC9/AC10 — manual browser verification is deferred
 
@@ -152,6 +175,20 @@ and assert the instrument, both studies and both annotations are in the DOM,
 then undo every mutation with its own returned undo token and assert the
 prior state is restored (AC10). Manual browser verification is deferred to
 the ticket that first mounts a chart panel in a route.
+
+Undo in EPIC-1006 is one step deep by design — a token is redeemable only
+while its change is the newest, and rolling further back is what
+`restore_workspace_revision` is for. AC10's pass therefore undoes each
+mutation while it is still the newest change and re-applies it to reach the
+next, rather than unwinding six changes at the end, which the platform
+refuses with `UndoTokenError('superseded')`.
+
+Rendering a Svelte component under Vitest needed one config change:
+`vite.config.ts` now asks for the `browser` resolve condition under the test
+mode, because Vitest otherwise loads Svelte's server build, where `mount()`
+throws. Every route in this app already disables SSR, so the browser build is
+the only one that ever runs in production; `vite dev` and `vite build`
+resolve exactly as before.
 
 ## Design References
 
