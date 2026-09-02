@@ -140,6 +140,18 @@ function runIdOf(panel: Panel): string | null {
 	return typeof runId === 'string' ? runId : null;
 }
 
+// Exposed so resultsTablePanelKind.ts (T-1010-7) can validate a panel's
+// kind-level config through the exact same parse+validate+normalize rules
+// as the table renderer's own contract, rather than duplicating them --
+// this panel kind's default renderer is always 'table', so the two schemas
+// are the same schema by construction.
+export function validateResultsTableWireConfig(
+	deps: ResultsTableContractDeps,
+	input: unknown
+): ConfigValidation<Record<string, unknown>> {
+	return validateConfig(deps, input);
+}
+
 export function createResultsTableRendererTypeDefinition(
 	deps: ResultsTableContractDeps
 ): RendererTypeDefinition {
