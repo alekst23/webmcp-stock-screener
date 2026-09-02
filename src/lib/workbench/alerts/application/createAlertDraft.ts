@@ -73,6 +73,9 @@ function applyCreateAlertDraft(
 		source: input.source,
 		previewable: input.previewable,
 		previewProblems: input.previewProblems,
+		// A freshly created draft has never had an activation request.
+		pendingActivation: null,
+		activationHistory: [],
 		createdAt: now,
 		updatedAt: now
 	});

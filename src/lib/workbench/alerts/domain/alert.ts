@@ -12,6 +12,11 @@ import { normalizeCondition, type Condition } from '../../../screener/conditions
 import type { FilterNode, UniverseSpec } from '../../../screener/definition';
 import { normalizeUniverse } from '../../../screener/definition';
 import { readScreener } from '../../../screener/state';
+import {
+	ACTIVATION_EVENT_KINDS,
+	type AlertActivationEvent,
+	type AlertActivationRequest
+} from './alertActivation';
 import { ALERT_STATES, INITIAL_ALERT_STATE, type AlertState } from './alertStateMachine';
 
 export const ALERT_EXTENSION_KEY = 'alerts';
@@ -47,6 +52,17 @@ export interface AlertRecord {
 	// preview can never disagree with the mark stored on the draft.
 	previewable: boolean;
 	previewProblems: string[];
+	// null except while in the 'pending_activation' state (T-1014-9). Cleared
+	// by a confirm, a decline, or an edit that invalidates it -- never read by
+	// anything that decides whether to arm the alert; that decision is made
+	// exclusively by the human-only confirm function.
+	pendingActivation: AlertActivationRequest | null;
+	// Append-only record of every activation-related event this alert has
+	// seen (requested/confirmed/declined/invalidated/expired/disarmed),
+	// oldest first. This is what AC3 and AC4 mean by "the alert's history" --
+	// distinct from the workspace-wide ChangeHistory ledger, and readable
+	// without it.
+	activationHistory: AlertActivationEvent[];
 	createdAt: string;
 	updatedAt: string;
 }
@@ -107,6 +123,49 @@ function normalizeState(value: unknown): AlertState {
 		: INITIAL_ALERT_STATE;
 }
 
+// Never throws: a corrupt or foreign persisted request normalizes to null
+// (i.e. "no pending request") rather than breaking the whole alert record.
+function normalizePendingActivation(value: unknown): AlertActivationRequest | null {
+	if (!isRecord(value)) {
+		return null;
+	}
+	const { requestedAt, expiresAt } = value;
+	if (typeof requestedAt !== 'string' || typeof expiresAt !== 'string') {
+		return null;
+	}
+	return { requestedAt, expiresAt };
+}
+
+function normalizeActivationEvent(value: unknown): AlertActivationEvent | null {
+	if (!isRecord(value)) {
+		return null;
+	}
+	const { kind, at, actor } = value;
+	if (
+		typeof kind !== 'string' ||
+		!(ACTIVATION_EVENT_KINDS as readonly string[]).includes(kind) ||
+		typeof at !== 'string' ||
+		(actor !== 'human' && actor !== 'agent')
+	) {
+		return null;
+	}
+	return { kind: kind as AlertActivationEvent['kind'], at, actor };
+}
+
+function normalizeActivationHistory(value: unknown): AlertActivationEvent[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	const out: AlertActivationEvent[] = [];
+	for (const item of value) {
+		const event = normalizeActivationEvent(item);
+		if (event) {
+			out.push(event);
+		}
+	}
+	return out;
+}
+
 export function normalizeAlert(value: unknown): AlertRecord | null {
 	if (!isRecord(value) || typeof value.alertId !== 'string' || value.alertId.length === 0) {
 		return null;
@@ -121,6 +180,8 @@ export function normalizeAlert(value: unknown): AlertRecord | null {
 		previewProblems: Array.isArray(value.previewProblems)
 			? value.previewProblems.filter((p): p is string => typeof p === 'string')
 			: [],
+		pendingActivation: normalizePendingActivation(value.pendingActivation),
+		activationHistory: normalizeActivationHistory(value.activationHistory),
 		createdAt: typeof value.createdAt === 'string' ? value.createdAt : '',
 		updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : ''
 	};
@@ -200,10 +261,25 @@ export function toWireAlert(alert: AlertRecord): Record<string, unknown> {
 		alert_id: alert.alertId,
 		name: alert.name,
 		state: alert.state,
-		armed: false,
+		// The only place this is computed from the real state (T-1014-9): a
+		// draft, pending-activation or disarmed alert is always `armed: false`,
+		// and 'armed' is the one state that only the human-only confirm
+		// function (never a ToolSpec) can ever have written here.
+		armed: alert.state === 'armed',
 		source: toWireSource(alert.source),
 		previewable: alert.previewable,
 		preview_problems: alert.previewProblems,
+		pending_activation: alert.pendingActivation
+			? {
+					requested_at: alert.pendingActivation.requestedAt,
+					expires_at: alert.pendingActivation.expiresAt
+				}
+			: null,
+		activation_history: alert.activationHistory.map((event) => ({
+			kind: event.kind,
+			at: event.at,
+			actor: event.actor
+		})),
 		created_at: alert.createdAt,
 		updated_at: alert.updatedAt
 	};

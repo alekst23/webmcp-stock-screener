@@ -43,6 +43,8 @@ function baseAlert(overrides: Partial<AlertRecord> = {}): AlertRecord {
 		source: { kind: 'conditions', conditions: [RANGE_CONDITION] },
 		previewable: true,
 		previewProblems: [],
+		pendingActivation: null,
+		activationHistory: [],
 		createdAt: NOW,
 		updatedAt: NOW,
 		...overrides
@@ -108,13 +110,80 @@ describe('alert storage', () => {
 		expect(normalizeAlert({ alertId: 'a', state: 'not-a-real-state' })?.state).toBe('draft');
 		expect(normalizeAlert({ alertId: 'a' })?.state).toBe('draft');
 	});
+
+	it('defaults pendingActivation to null and activationHistory to [] when absent', () => {
+		const normalized = normalizeAlert({ alertId: 'a', state: 'draft' });
+		expect(normalized?.pendingActivation).toBeNull();
+		expect(normalized?.activationHistory).toEqual([]);
+	});
+
+	it('round-trips a pending activation request and an activation history', () => {
+		const raw = {
+			alertId: 'a',
+			state: 'pending_activation',
+			pendingActivation: { requestedAt: NOW, expiresAt: '2026-09-02T00:15:00.000Z' },
+			activationHistory: [{ kind: 'requested', at: NOW, actor: 'agent' }]
+		};
+		const normalized = normalizeAlert(raw);
+		expect(normalized?.pendingActivation).toEqual({
+			requestedAt: NOW,
+			expiresAt: '2026-09-02T00:15:00.000Z'
+		});
+		expect(normalized?.activationHistory).toEqual([
+			{ kind: 'requested', at: NOW, actor: 'agent' }
+		]);
+	});
+
+	it('drops a malformed pending activation request and history entry rather than throwing', () => {
+		const normalized = normalizeAlert({
+			alertId: 'a',
+			pendingActivation: { requestedAt: 4 },
+			activationHistory: [
+				{ kind: 'not-a-real-kind', at: NOW, actor: 'agent' },
+				{ kind: 'requested', at: NOW, actor: 'bogus' },
+				'not even an object',
+				{ kind: 'requested', at: NOW, actor: 'agent' }
+			]
+		});
+		expect(normalized?.pendingActivation).toBeNull();
+		expect(normalized?.activationHistory).toEqual([
+			{ kind: 'requested', at: NOW, actor: 'agent' }
+		]);
+	});
 });
 
 describe('toWireAlert', () => {
-	it('always reports armed: false and echoes the draft state', () => {
+	it('echoes the draft state and reports armed: false for it', () => {
 		const wire = toWireAlert(baseAlert());
 		expect(wire.state).toBe('draft');
 		expect(wire.armed).toBe(false);
+	});
+
+	it('reports armed: true only for an alert actually in the armed state', () => {
+		const wire = toWireAlert(baseAlert({ state: 'armed' }));
+		expect(wire.state).toBe('armed');
+		expect(wire.armed).toBe(true);
+	});
+
+	it('serializes a pending activation request and the activation history', () => {
+		const wire = toWireAlert(
+			baseAlert({
+				state: 'pending_activation',
+				pendingActivation: { requestedAt: NOW, expiresAt: '2026-09-02T00:15:00.000Z' },
+				activationHistory: [{ kind: 'requested', at: NOW, actor: 'agent' }]
+			})
+		);
+		expect(wire.pending_activation).toEqual({
+			requested_at: NOW,
+			expires_at: '2026-09-02T00:15:00.000Z'
+		});
+		expect(wire.activation_history).toEqual([{ kind: 'requested', at: NOW, actor: 'agent' }]);
+	});
+
+	it('serializes pending_activation: null and an empty activation_history for a fresh draft', () => {
+		const wire = toWireAlert(baseAlert());
+		expect(wire.pending_activation).toBeNull();
+		expect(wire.activation_history).toEqual([]);
 	});
 
 	it('serializes a conditions source with its typed conditions', () => {

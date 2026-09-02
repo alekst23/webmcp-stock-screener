@@ -1,15 +1,18 @@
-// The `alerts.edit_conditions` operation (T-1014-8, AC9). Renames and/or
-// replaces an alert draft's source. Only ever operates on -- and only ever
-// produces -- a draft: editing a non-draft alert is refused rather than
-// silently changing its state, and a successful edit always writes back
-// `state: 'draft'`, hard-coded, never derived from the existing record or
-// from wire input.
+// The `alerts.edit_conditions` operation (T-1014-8 AC9, extended by
+// T-1014-9 AC6). Renames and/or replaces an alert draft's source. A
+// successful edit always writes back `state: 'draft'`, hard-coded, never
+// derived from the existing record or from wire input -- so this tool can
+// never leave (or put) an alert in any state other than 'draft'.
 //
-// Nothing here is reachable from another state today (this ticket produces
-// only drafts), so the guard is currently dead code in the sense that no
-// call site can trigger it -- but it is the guard T-1014-9 extends when a
-// pending-activation or armed alert exists to refuse editing against, rather
-// than a check that ticket has to invent from scratch.
+// Two states may be edited: 'draft' (the ordinary case) and
+// 'pending_activation'. Editing a pending-activation alert is what AC6
+// calls invalidating the request -- the underlying draft changes, so
+// whatever the researcher would be confirming is no longer what they
+// reviewed. This function drops the pending request and appends an
+// 'invalidated' event to the alert's activation history; arming afterward
+// requires calling enable_alert again and a fresh confirmation. 'armed' and
+// 'disarmed' remain refused: an armed alert must be disabled first, and
+// this ticket has no requirement to make a disarmed alert editable.
 import type { CatalogRegistry } from '../../../catalog/registry';
 import { readScreener } from '../../../screener/state';
 import type { IdSequencer } from '../../domain/ids';
@@ -23,7 +26,8 @@ import {
 	type AlertConditionSource,
 	type AlertRecord
 } from '../domain/alert';
-import { isDraft } from '../domain/alertStateMachine';
+import { appendActivationEvent } from '../domain/alertActivation';
+import { isDraft, isPendingActivation } from '../domain/alertStateMachine';
 import {
 	alertSourceIssues,
 	computeAlertPreviewability,
@@ -49,8 +53,11 @@ function findEditableAlert(alertId: unknown, doc: WorkspaceDocument): AlertRecor
 	if (!alert) {
 		return `alert_id: "${alertId}" is not an alert in this workspace.`;
 	}
-	if (!isDraft(alert.state)) {
-		return `alert "${alertId}" is in state "${alert.state}", not draft; only a draft can be edited.`;
+	if (!isDraft(alert.state) && !isPendingActivation(alert.state)) {
+		return (
+			`alert "${alertId}" is in state "${alert.state}"; only a draft or a pending activation ` +
+			'request can be edited.'
+		);
 	}
 	return alert;
 }
@@ -90,20 +97,38 @@ function applyEditAlertDraft(
 			`applyEditAlertDraft: alert "${input.alertId}" vanished between validate and apply.`
 		);
 	}
+	// AC6: editing a pending-activation alert invalidates its request. This is
+	// the only place that decides invalidation, and it is a fact about the
+	// existing record's state -- never about wire input.
+	const wasPending = isPendingActivation(existing.state);
+	const activationHistory = wasPending
+		? appendActivationEvent(existing.activationHistory, {
+				kind: 'invalidated',
+				at: now,
+				actor: 'agent'
+			})
+		: existing.activationHistory;
 	const nextDoc = writeAlert(doc, {
 		...existing,
 		name: input.name,
 		source: input.source,
 		previewable: input.previewable,
 		previewProblems: input.previewProblems,
-		// Hard-coded: an edit can only ever keep an alert in draft (AC9).
+		// Hard-coded: an edit can only ever leave an alert in draft (AC9),
+		// clearing any pending activation request along with it (AC6).
 		state: 'draft',
+		pendingActivation: null,
+		activationHistory,
 		updatedAt: now
 	});
+	const diffSummary = wasPending
+		? `Edited alert draft ${input.alertId} ("${input.name}"); its pending activation request was ` +
+			'invalidated and must be requested and confirmed again to arm it.'
+		: `Edited alert draft ${input.alertId} ("${input.name}"), still not armed.`;
 	return {
 		document: nextDoc,
 		affectedIds: [input.alertId],
-		diffSummary: `Edited alert draft ${input.alertId} ("${input.name}"), still not armed.`,
+		diffSummary,
 		inverse: {
 			document: doc,
 			affectedIds: [input.alertId],

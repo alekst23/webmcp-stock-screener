@@ -69,11 +69,18 @@ describe('alert safety: armed is unreachable from this ticket', () => {
 	});
 
 	it('the state machine module exports nothing that can perform a transition', () => {
+		// T-1014-9 adds isPendingActivation/isArmed/isDisarmed alongside
+		// isDraft -- all four are predicates over an already-known state, none
+		// of them takes a target state or performs a write. See
+		// alertStateMachine.test.ts for the dedicated pin on this property.
 		expect(Object.keys(alertStateMachine).sort()).toEqual([
 			'ALERT_STATES',
 			'ALERT_STATE_TRANSITIONS',
 			'INITIAL_ALERT_STATE',
-			'isDraft'
+			'isArmed',
+			'isDisarmed',
+			'isDraft',
+			'isPendingActivation'
 		]);
 	});
 
