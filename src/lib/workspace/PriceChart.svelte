@@ -25,6 +25,13 @@
 		variant?: 'mini' | 'detail';
 	} = $props();
 
+	// Unique per instance, not per variant: twelve mini-charts across three
+	// panels would otherwise share one gradient id, and the first per-panel
+	// fill override would repaint all of them with whichever gradient the
+	// document happened to define first.
+	const uid = $props.id();
+	const gradientId = $derived(`price-chart-fill-${variant}-${uid}`);
+
 	const geometry = $derived(computeChartGeometry(bars, width, height));
 	const anchorXPos = $derived(geometry.x(anchorIndex));
 	const yTickCount = $derived(variant === 'mini' ? 2 : 5);
@@ -66,7 +73,7 @@
 		onpointerleave={handlePointerLeave}
 	>
 		<defs>
-			<linearGradient id="price-chart-fill-{variant}" x1="0" y1="0" x2="0" y2="1">
+			<linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
 				<stop offset="0%" class="fill-from" stop-opacity="0.3" />
 				<stop offset="100%" class="fill-to" stop-opacity="0" />
 			</linearGradient>
@@ -80,7 +87,7 @@
 			{/if}
 		{/each}
 		{#if bars.length > 0}
-			<path d={geometry.areaPath} class="area" fill="url(#price-chart-fill-{variant})" />
+			<path d={geometry.areaPath} class="area" fill="url(#{gradientId})" />
 			<path d={geometry.linePath} class="line" />
 			<line x1={anchorXPos} y1="0" x2={anchorXPos} y2={height} class="anchor" />
 		{/if}
