@@ -8,8 +8,8 @@
 // cleared before every test: otherwise the second test in this file would
 // find the first test's already-seeded workspace still active and never
 // exercise seedDefaultWorkspace's justCreated path at all.
-import { beforeEach, describe, expect, it } from 'vitest';
-import { createDefaultPanelShellRuntime } from './registerPanelTools';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDefaultPanelShellRuntime, registerPanelTools } from './registerPanelTools';
 import { readPanelState, bindPanelSource } from '../application';
 import { defaultWireResultsTableConfig } from '../../results/application/tableConfigWire';
 import { getResultsPanelRuntimeDeps } from '../../results/panel/resultsPanelContext';
@@ -99,5 +99,29 @@ describe('createDefaultPanelShellRuntime', () => {
 			result.ok,
 			`expected the renderer's validateSelection to recognize a real result id from the same store, got ${JSON.stringify(result)}`
 		).toBe(true);
+	});
+});
+
+// T-1010-8 AC1/AC8: registerPanelTools() (not just the sync runtime builder
+// above) registers the two Results tools this epic adds directly, alongside
+// the fourteen existing panel tools -- neither surface crowds out the other,
+// and the table-renderer contract stays reachable only through
+// configure_panel_view/set_panel_selection, never as its own listed tool.
+describe('registerPanelTools', () => {
+	it('registers get_screener_results and explain_result alongside the fourteen existing panel tools', async () => {
+		const registerTool = vi.fn();
+		vi.stubGlobal('document', { modelContext: { registerTool } });
+		try {
+			await registerPanelTools();
+			const names = registerTool.mock.calls.map(([tool]) => tool.name as string);
+			expect(names).toHaveLength(16);
+			expect(names).toContain('get_screener_results');
+			expect(names).toContain('explain_result');
+			expect(names).not.toContain('configure_results_table');
+			expect(names).not.toContain('select_result');
+			expect(names).not.toContain('table');
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 });

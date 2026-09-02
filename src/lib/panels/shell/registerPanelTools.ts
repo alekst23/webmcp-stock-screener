@@ -9,8 +9,10 @@
 import { ensureModelContext } from '../../webmcp/bridge';
 import { builtinCatalogRegistry } from '../../catalog/registry';
 import { createPinnedRunStore } from '../../screener/runStore';
+import type { PinnedRunStore } from '../../screener/ports';
 import { registerResultsTableRendererContract } from '../../results/tools/tableRendererContract';
 import { registerResultsTablePanelKind } from '../../results/registry/resultsTablePanelKind';
+import { buildResultsTools } from '../../results/tools/resultsTools';
 import { createChangeHistory } from '../../workbench/application/changeHistory';
 import { createIdempotencyCache } from '../../workbench/application/idempotency';
 import { createRevisionService } from '../../workbench/application/revisionService';
@@ -40,6 +42,12 @@ import {
 export interface PanelShellRuntime {
 	deps: PanelToolDeps;
 	observer: PanelWorkspaceObserver;
+	// The exact PinnedRunStore instance the table renderer contract and the
+	// results_table panel kind already close over (T-1010-7) -- exposed here
+	// too so registerPanelTools() below can build the two results tools
+	// (T-1010-8) against the same store, rather than a second one that would
+	// silently disagree with what the panel itself renders.
+	runs: PinnedRunStore;
 }
 
 // Fresh registry instances every call -- never the module-global defaults --
@@ -105,19 +113,26 @@ export function createDefaultPanelShellRuntime(): PanelShellRuntime {
 
 	seedDefaultWorkspace(deps, init.justCreated);
 
-	return { deps, observer: createPanelWorkspaceObserver() };
+	return { deps, observer: createPanelWorkspaceObserver(), runs };
 }
 
-// Registers the fourteen tools -- each wrapped so a successful call notifies
-// the shell's observer, which is how PanelContainer re-renders without a
-// reload after any agent-driven mutation (AC5). Returns the runtime so the
-// caller (the /workbench route) can hand the same deps/observer to
-// PanelContainer.
+// Registers the fourteen panel tools plus the two Results tools this epic
+// registers directly (T-1010-8: get_screener_results, explain_result) --
+// each wrapped so a successful call notifies the shell's observer, which is
+// how PanelContainer re-renders without a reload after any agent-driven
+// mutation (AC5). Wrapping the two read-only Results tools the same way is
+// harmless: notifying after a read that changed nothing just re-renders
+// already-current state. Returns the runtime so the caller (the /workbench
+// route) can hand the same deps/observer to PanelContainer.
 export async function registerPanelTools(
 	runtime: PanelShellRuntime = createDefaultPanelShellRuntime()
 ): Promise<PanelShellRuntime> {
 	const mc = ensureModelContext();
-	const tools = wrapToolsWithNotify(buildPanelTools(runtime.deps), runtime.observer);
+	const allTools = [
+		...buildPanelTools(runtime.deps),
+		...buildResultsTools({ ...runtime.deps, runs: runtime.runs })
+	];
+	const tools = wrapToolsWithNotify(allTools, runtime.observer);
 	for (const spec of tools) {
 		await mc.registerTool({
 			name: spec.name,
