@@ -407,7 +407,7 @@ export function normalizeCapturedSetup(value: unknown): CapturedChartSetup | nul
 	if (validateSetupWindow(value.window, 'window').length > 0 || !isRecord(value.provenance)) {
 		return null;
 	}
-	const studies = normalizeStudies(value.studies).map(capturedStudy);
+	const studies = normalizeStudies(renamedIdField(value.studies, 'studyId')).map(capturedStudy);
 	return {
 		setupId: value.setupId,
 		capturedAt: value.capturedAt,
@@ -425,7 +425,7 @@ export function normalizeCapturedSetup(value: unknown): CapturedChartSetup | nul
 		normalization: normalizeNormalization(value.normalization),
 		studies,
 		comparisons: normalizeComparisons(value.comparisons),
-		annotations: normalizeAnnotations(normalizedAnnotationSource(value.annotations)).map(
+		annotations: normalizeAnnotations(renamedIdField(value.annotations, 'annotationId')).map(
 			capturedAnnotation
 		),
 		// Passed through as stored rather than re-validated field by field:
@@ -435,17 +435,16 @@ export function normalizeCapturedSetup(value: unknown): CapturedChartSetup | nul
 	};
 }
 
-// Captured annotations key their ID as `annotationId`; the annotation
-// normalizer expects the chart's `id`. Mapping here keeps both wire shapes
-// stable rather than compromising one for the other.
-function normalizedAnnotationSource(value: unknown): unknown {
+// A captured study and annotation key their ID as `studyId` / `annotationId`,
+// while the chart-state normalizers they are restored through expect `id`.
+// Bridging here keeps both wire shapes stable rather than compromising one of
+// them for the other's convenience.
+function renamedIdField(value: unknown, from: string): unknown {
 	if (!Array.isArray(value)) {
 		return [];
 	}
 	return value.map((entry) =>
-		isRecord(entry) && typeof entry.annotationId === 'string'
-			? { ...entry, id: entry.annotationId }
-			: entry
+		isRecord(entry) && typeof entry[from] === 'string' ? { ...entry, id: entry[from] } : entry
 	);
 }
 
