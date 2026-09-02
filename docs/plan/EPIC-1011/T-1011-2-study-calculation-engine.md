@@ -50,6 +50,107 @@ changed underneath a saved setup.
 9. Nothing in this ticket performs I/O or imports from an
    infrastructure, tool, or component module.
 
+## Solution Approach
+
+### Shape
+
+Two new domain files, pure and DOM-free:
+
+- `src/lib/workbench/chart/domain/studyEngine.ts` — the public surface:
+  `STUDY_ENGINE_VERSION`, the input/output types, parameter resolution
+  against the catalog, the calculator lookup keyed by catalog item ID,
+  and warning derivation.
+- `src/lib/workbench/chart/domain/studyEngine/calculators.ts` — the seven
+  pure array-in/array-out calculators, split out so neither file grows
+  past the size limit.
+
+Tests sit alongside as `*.test.ts`.
+
+### Entry point
+
+```ts
+computeStudy(
+  bars: readonly OhlcvBar[],
+  catalogItemId: string,
+  params?: StudyParamInput,
+  options?: { registry?: CatalogRegistry }
+): StudyComputation
+```
+
+`OhlcvBar` is a minimal structural type declared locally
+(`{ time; open; high; low; close; volume }`) rather than imported from
+T-1011-1, so this ticket has no sibling dependency; a later ticket adapts
+its `StudyInstance` bars onto it.
+
+`StudyComputation` carries `catalogItemId`, the fully resolved `params`,
+`outputs` (a record keyed by the catalog's declared output names, each an
+array of `number | null` with exactly `bars.length` entries),
+`warmupBars`, `warnings`, and `engineVersion`.
+
+Two non-throwing companions so the tool layer can validate without a
+try/catch: `validateStudyParams(catalogItemId, params)` returning issue
+strings for an `OperationDefinition.validate`, and `isStudySupported(id)`.
+
+### Parameter resolution
+
+Defaults, valid ranges, and enum members all come from
+`resolveStudy(id)` in `src/lib/catalog/registry.ts`. Nothing about a
+study's parameter metadata is duplicated here. An unknown parameter name,
+a wrong value type, a non-finite number, or a value outside the catalog's
+declared `range` raises `StudyParameterError` naming the parameter, the
+offending value and the permitted range; no clamping, no partial result.
+An unknown or non-study catalog ID raises `UnknownStudyError`.
+Malformed bars (a non-finite value in a field the selected study reads)
+raise `StudyInputError` naming the bar index and the field.
+
+### Warm-up and alignment
+
+Every output series is allocated at `bars.length` and pre-filled with
+`null`. A calculator only ever writes at indices where its definition is
+satisfied, so warm-up bars keep the explicit `null` — never a zero, a
+back-filled first value, or a shortened array. Per-study minimums:
+SMA/EMA/Bollinger `length`, ATR/RSI `length + 1` (both need a previous
+close), MACD `slow + signal - 1`, VWAP 1.
+
+Too few bars is a **warning, not an error**: the outputs come back
+all-null and `warnings` states the study, the bars required and the bars
+supplied. A partially defined multi-output study (MACD with enough bars
+for the line but not the signal) gets a warning naming the outputs that
+are entirely absent.
+
+### Arithmetic
+
+Standard published definitions, with the choices that vary between
+implementations pinned here because the version constant covers them:
+EMA seeded with the SMA of the first `length` closes and smoothed at
+`2 / (length + 1)`; ATR and RSI use Wilder's smoothing seeded on the mean
+of the first `length` true ranges / changes; Bollinger uses the
+population standard deviation over the same window as its middle band;
+MACD's signal is an EMA over the defined portion of the MACD line; VWAP
+uses the typical price `(high + low + close) / 3` and resets on the
+anchor boundary (`session` = calendar day, `week` = ISO week, `month` =
+calendar month) rather than accumulating across the series.
+
+### Version constant
+
+`STUDY_ENGINE_VERSION` is the value T-1011-3 puts in
+`MarketDataProvenance.calcEngineVersion`. Bump rule, documented at the
+constant: MAJOR when any calculator's output for a fixed input and fixed
+parameters would change (arithmetic, seeding, warm-up length, anchor
+boundaries, default resolution); MINOR when a study or output is added
+without moving any existing number; PATCH for changes that touch no
+number at all (messages, warnings, types).
+
+### Testing
+
+Reference values are computed independently from the published
+definitions — by hand for the cases that are hand-checkable (SMA,
+Bollinger's variance, VWAP resets) and via an independent throwaway
+script for the recursive ones (EMA, RSI, ATR, MACD) — then checked in as
+literals with a stated tolerance. Each calculator is also asserted for
+exact `null` warm-up placement, index alignment, and repeat-call
+determinism.
+
 ## Design References
 
 - `docs/design/chart-tools/spec.md` — "Manage studies" and "Read a
