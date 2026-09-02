@@ -11,7 +11,7 @@
 // member (screener/ports.ts), so nothing reachable from this file can
 // produce a fresher run than the one already pinned under runId (AC4, AC5).
 
-import type { ResourceId } from '../../domain/ids';
+import { createIdSequencer, type ResourceId } from '../../domain/ids';
 import type { PinnedRunStore, RunNotAvailable } from '../../../screener/ports';
 import {
 	decodeCursor,
@@ -65,7 +65,13 @@ function isRunNotAvailable<T>(value: T | RunNotAvailable): value is RunNotAvaila
 	return typeof value === 'object' && value !== null && 'available' in value;
 }
 
-const defaultExportIdGenerator = createExportIdGenerator();
+// A module-scoped sequencer, not the workspace's shared one -- export_results
+// is read-only with respect to workspace state (AC10) and has no persisted
+// high-water mark to resume from, so each process gets its own 'export'
+// sequence. What matters for the cross-epic concern this replaced a
+// workaround for is that ids are minted via the canonical IdSequencer/
+// mintId mechanism and kind registry, not a private string format.
+const defaultExportIdGenerator = createExportIdGenerator(createIdSequencer());
 
 export function exportResults(
 	store: PinnedRunStore,

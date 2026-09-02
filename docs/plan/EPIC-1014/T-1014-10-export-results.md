@@ -180,21 +180,26 @@ fabricated or re-derived spec. Full reproducibility of AC1's "the universe" need
 `ScreenerRun` to pin the `UniverseSpec` itself, mirroring how it already pins
 `filterTree`/`rankingSpec`; flagged here for the epic owner.
 
-### Known cross-epic gap: stable export ID
+### Resolved cross-epic gap: stable export ID
 
-`workbench/domain/ids.ts`'s `ResourceKind` enum (EPIC-1006, already merged) lists
-`'workspace' | 'panel' | 'screener' | 'run' | 'result' | 'change' | 'undo' | 'link' |
-'filter' | 'study' | 'annotation' | 'setup' | 'watchlist' | 'alert' | 'preview' |
-'column' | 'rule'` -- evidently pre-provisioned for several not-yet-built EPIC-1014
-tools (`watchlist`, `alert`, `setup`, `study`), but it has no `'export'` member, and
-`IdSequencer.next()` is typed to that closed union, so `deps.ids.next('export')` does
-not compile. Rather than extend that shared, already-merged enum unilaterally, this
-ticket mints a self-contained export id (`domain/exportId.ts`, format `export_<n>`,
-matching `mintId`'s grammar cosmetically but not registered in `RESOURCE_KINDS`).
-AC8 ("a stable export ID") is satisfied; the id is just not currently parseable by
-`ids.ts`'s own `parseId`/`isResourceId`. Flagged here for the epic owner -- adding
-`'export'` to `ResourceKind` is a one-line, low-risk change but is a cross-epic file
-this ticket does not self-approve touching.
+Originally flagged here as a cross-epic gap: `workbench/domain/ids.ts`'s
+`ResourceKind` enum (EPIC-1006, already merged) had no `'export'` member, so
+`domain/exportId.ts` minted a self-contained id (format `export_<n>`, matching
+`mintId`'s grammar cosmetically but not registered in `RESOURCE_KINDS`) rather
+than self-approving an edit to that shared, already-merged enum.
+
+During Wave 2, T-1014-6 independently needed the same kind of extension (a
+`'backtest'` member) and the epic orchestrator approved it as the correct
+pattern -- `ResourceKind` is exactly the shared mechanism EPIC-1006 built so
+every owning epic mints through one canonical scheme instead of forking it
+(the project has prior history with `provenance.ts` forking into two
+contracts; this enum exists specifically to avoid repeating that). Per the
+orchestrator's follow-up instruction, this ticket's workaround was replaced
+with the same direct extension: `'export'` is now a `ResourceKind`, and
+`domain/exportId.ts::createExportIdGenerator` mints through
+`IdSequencer.next('export')` instead of a private counter. Export ids are
+now parseable by `ids.ts`'s own `parseId`/`isResourceId`, satisfying AC8
+through the canonical mechanism rather than a cosmetic imitation of it.
 
 ### Testing
 

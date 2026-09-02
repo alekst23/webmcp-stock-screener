@@ -1,28 +1,21 @@
-// A self-contained stable-ID generator for exports (T-1014-10, AC8).
+// A stable-ID generator for exports (T-1014-10, AC8).
 //
-// workbench/domain/ids.ts's ResourceKind (EPIC-1006, already merged) has no
-// 'export' member, and IdSequencer.next() is typed to that closed union --
-// `deps.ids.next('export')` does not compile. Extending that shared,
-// already-merged enum is a cross-epic decision this ticket does not
-// self-approve (see the ticket doc's Solution Approach). This module mints
-// an export id that matches ids.ts's `mintId` grammar cosmetically
-// (`export_<n>`) without registering a new kind in the shared registry --
-// the id is stable and unique, just not parseable by ids.ts's own
-// parseId/isResourceId today.
+// 'export' is now a registered ResourceKind in workbench/domain/ids.ts
+// (EPIC-1006's shared, canonical stable-ID registry), so this generator
+// mints through that registry's own IdSequencer rather than keeping a
+// private counter -- export ids share the same never-reused-sequence
+// mechanism as every other resource kind and are recognized by ids.ts's
+// own parseId/isResourceId, instead of only cosmetically resembling its
+// grammar. See docs/plan/EPIC-1014/T-1014-10-export-results.md's Solution
+// Approach for why this ticket originally avoided extending that enum, and
+// the epic's cross-epic review note for why the extension was approved.
 //
-// Domain layer: no I/O, no dependency on the shared ids.ts registry.
+// Domain layer: no I/O; depends only on the shared ids.ts contract.
 
-import type { ResourceId } from '../../domain/ids';
+import { type IdSequencer, type ResourceId } from '../../domain/ids';
 
 export type ExportIdGenerator = () => ResourceId;
 
-// `seed` lets a test (or a future persisted high-water mark) continue a
-// sequence rather than always restarting at 1, mirroring
-// createIdSequencer's own `seed` parameter.
-export function createExportIdGenerator(seed = 0): ExportIdGenerator {
-	let sequence = seed;
-	return (): ResourceId => {
-		sequence += 1;
-		return `export_${sequence}`;
-	};
+export function createExportIdGenerator(ids: IdSequencer): ExportIdGenerator {
+	return (): ResourceId => ids.next('export');
 }
