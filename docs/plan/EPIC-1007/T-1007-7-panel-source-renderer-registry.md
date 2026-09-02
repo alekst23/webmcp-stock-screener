@@ -128,3 +128,84 @@ groups (T-1007-3), workspace mutation and revisions (T-1007-4), tool
 schemas (T-1007-5), and the real table/chart/heatmap renderer contracts
 (EPIC-1010, EPIC-1011, EPIC-1012 respectively) — this ticket builds the
 registry mechanism and placeholder contracts, not the real ones.
+
+## Solution Approach
+
+Two new files under `src/lib/panels/registry/`, mirroring T-1007-1's
+structure but with independent storage (two `Map`s closed over inside
+`createSourceRendererRegistry()` — one for source types, one for renderer
+types) — never merged into `panelKindRegistry`'s map, per the technical
+design's explicit "deliberately separate" note.
+
+- `registry/sourceRendererRegistry.ts` — `SourceTypeDefinition`,
+  `RendererTypeDefinition`, `ConfigError`/`ConfigValidation` reused from
+  `panelKindRegistry.ts` (imported, not redefined, since AC7 asks for the
+  identical error shape) rather than duplicated. Four typed error
+  classes (`SourceTypeConflictError`, `RendererTypeConflictError`,
+  `UnknownSourceTypeError`, `UnknownRendererTypeError`) mirror
+  `PanelKindConflictError`/`UnknownPanelKindError`'s shape:
+  `readonly name`/`readonly sourceType`/`readonly renderer` plus, for the
+  "unknown" pair, `readonly registeredTypes: string[]`.
+  - `validateSource` looks up every registered source type, filters to
+    those whose `isCompatible({ panelKind, renderer })` is true, and
+    either validates the input against the named type (when `source` is
+    a `{ type, ref }` shape naming one of them and compatible) or returns
+    `{ ok: false, errors, acceptedSourceTypes }` where
+    `acceptedSourceTypes` is that compatible-name list — computed the
+    same way on both the "wrong type" and "unknown type" failure paths
+    so the AC6 error always lists real accepted types, not just a static
+    per-source list.
+  - `validateRendererConfig` is a thin `requireRendererType(renderer)
+    .validateConfig(input)` — AC7 wants exactly the kind registry's
+    validator shape, so no new error type is needed here beyond
+    `UnknownRendererTypeError` when the renderer name itself is
+    unregistered.
+  - `migrateConfig({ from, to, config })`: resolves `to`'s
+    `RendererTypeDefinition` (throws `UnknownRendererTypeError` if
+    unregistered), then calls a small private helper
+    `recognizedFieldNames(configSchema)` that reads
+    `(configSchema as { properties?: object }).properties &&
+    Object.keys(properties)` — schema-driven, not hardcoded per renderer,
+    because a renderer's config contract is *defined* by its schema and a
+    second hardcoded field list would drift from it. Fields in `config`
+    whose key is in that set carry over; the rest are collected into
+    `dropped`. `from` is accepted but unused beyond documenting intent
+    (the migration only needs the *old* config values and the *new*
+    schema) — kept in the signature because T-1007-4's call site has it
+    on hand and it reads clearly at the call site.
+  - `renderersAcceptingSource(sourceType)` scans registered renderer
+    types for `acceptedSourceTypes.includes(sourceType)`.
+- `registry/defaultSourceRendererTypes.ts` —
+  `registerDefaultSourceRendererTypes(registry)` registers:
+  - Sources: `screener_results` (`{ run_id: string }`), `watchlist`
+    (`{ watchlist_id: string }`), `symbol_list` (`{ symbols: string[] }`),
+    `panel_reference` (`{ panel_id: string }`). Each `isCompatible`
+    checks the renderer accepts that source type (via a closure over the
+    registry's own `getRendererType`, using `renderer === null` as
+    "compatible if any registered renderer would accept it" — a source
+    can be bound before a renderer is chosen) — implemented by checking
+    `renderer === null || requireRendererType(renderer)
+    .acceptedSourceTypes.includes(name)`, so isCompatible does not need
+    to know about specific panel kinds; `panelKind` is accepted in the
+    signature for forward compatibility (a future kind-specific
+    restriction) but unused by the four shipped types, matching the
+    ticket's "provisional... obviously replaceable" instruction.
+  - Renderers: `table` (`acceptedSourceTypes: ['screener_results',
+    'watchlist', 'symbol_list']`), `chart_grid` (all four source types;
+    config schema covers `rows`, `columns`, `itemCount`, `page`,
+    `pageSize`, `sharedStudies: string[]`, `chartSettings: object` per
+    T-1007-4 AC6/T-1007-5 AC6), `heatmap` (`screener_results`,
+    `watchlist`, `symbol_list`), `scatter_plot` (`screener_results`,
+    `symbol_list`). Each `validateConfig` provisionally checks the input
+    is an object and every present key is a declared schema property
+    (same provisional strategy as T-1007-1's kind validators).
+
+Extensibility test (AC16 epic-level evidence) lives in
+`sourceRendererRegistry.test.ts`: constructs an isolated registry via
+`createSourceRendererRegistry()`, registers a fictional
+`'fringe_signal'` source type and `'sparkbars'` renderer type defined
+entirely in the test file, and exercises lookup, list, `validateSource`,
+`validateRendererConfig`, `migrateConfig`, and
+`renderersAcceptingSource` against them — proving no file in this ticket
+needs to change for a sibling epic to plug in. A twin test in
+`panelKindRegistry.test.ts` does the same for a fictional panel kind.
