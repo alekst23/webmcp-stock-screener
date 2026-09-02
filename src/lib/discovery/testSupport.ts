@@ -112,7 +112,7 @@ export function createFakeInstrumentDirectory(
 				asOf: options.asOf ?? '2026-09-01T00:00:00Z',
 				sourceId: options.sourceId ?? 'src.instruments.fake',
 				sourceLabel: options.sourceLabel ?? 'Test instrument directory',
-				delivery: 'static',
+				liveness: 'static',
 				timezone: 'UTC'
 			}),
 			warnings
