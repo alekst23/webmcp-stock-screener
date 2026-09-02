@@ -4,8 +4,9 @@ Contracts introduced by EPIC-1008. Two of them are consumed outside this
 epic and should be treated as published:
 
 - **The catalog registry query surface** — EPIC-1009 (`edit_filter_tree`)
-  validates conditions against it; EPIC-1011 (`edit_chart_studies`)
-  resolves study IDs through it.
+  validates conditions against it; EPIC-1011's chart-renderer contract,
+  reached through EPIC-1007's `configure_panel_view` (retired
+  `edit_chart_studies`'s standalone form), resolves study IDs through it.
 - **`InstrumentDirectory`** — the integration seam the separate
   reference/fundamental-data workstream implements against.
 
@@ -236,7 +237,7 @@ agent
   └─────────────> catalog registry (in-app, static)
                      ▲                    ▲
                      │                    │
-       EPIC-1009 edit_filter_tree   EPIC-1011 edit_chart_studies
+       EPIC-1009 edit_filter_tree   EPIC-1011 configure_panel_view
        (isOperatorValidForField)    (resolveStudy)
 ```
 

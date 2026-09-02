@@ -3,8 +3,9 @@
 This document fixes the shapes EPIC-1009 owns and the two contracts other
 epics consume: the **screener definition** (edited by the five mutation
 tools) and the **pinned run** (produced by `run_screener`, consumed by
-EPIC-1010's `get_screener_results`, `select_result`, and
-`explain_result`).
+EPIC-1010's `get_screener_results`, EPIC-1007's `set_panel_selection`
+(retired `select_result`'s standalone form; selection now runs through
+the generic panel tool), and `explain_result`).
 
 Every mutation tool here accepts `expected_revision` and
 `idempotency_key` and returns EPIC-1006's mutation envelope
