@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1014 (High-Value Follow-Up Tools)
 **Design**: docs/design/screener-followup-tools/spec.md
-**Status**: Open
+**Status**: Done
 **Depends on**: — (consumes EPIC-1008's market-data ports and EPIC-1009's
 screener definition)
 **Blocks**: T-1014-6
