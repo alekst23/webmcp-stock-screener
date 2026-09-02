@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1009 (Screener Core)
 **Design**: docs/design/screener-core/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1009-2, T-1009-5, T-1009-6
 **Blocks**: T-1009-10
 
@@ -72,3 +72,62 @@ of interpreting an empty result as a market fact.
 
 Executing the screener (T-1009-9), and the evaluation engine itself
 (T-1009-7).
+
+## Solution Approach
+
+### Modules
+
+- `src/lib/screener/screenerValidation.ts` (domain) -- the public entry
+  point, `validateScreenerDefinition(screener, options?)`. Walks the filter
+  tree once: delegates per-condition catalog checks to
+  `conditionValidation.ts`'s `validateCondition` (AC2), adds a
+  data-availability pass over every catalog ID a condition reads (AC3,
+  `unavailable` blocks, `partial` is advisory), skips disabled subtrees
+  entirely while still recording their node IDs (AC7), and assembles the
+  cost estimate (AC5) and empty-universe check (AC6). Exports
+  `ScreenerValidationOptions` (`registry?`, `marketData?`, `costBudget?`)
+  and the documented defaults `DEFAULT_COST_BUDGET_INSTRUMENT_DAYS`
+  (5,000,000 instrument-days -- spec.md Open Question 2),
+  `DEFAULT_LOOKBACK_DAYS` (252, one trading year) and
+  `DEFAULT_ASSUMED_UNIVERSE_SIZE` (8,000, used only for the cost estimate
+  when the universe can't be resolved).
+- `src/lib/screener/screenerValidation.contradictions.ts` (domain) -- split
+  out to stay under the 400-line file limit. Exports
+  `detectGroupContradictions(siblings)`: reduces range and numeric-scalar
+  (`op.greater_than`/`op.less_than`/`op.equals`) conditions on the same
+  field to a numeric bound and flags disjoint pairs (AC4). Not a theorem
+  prover by design -- only direct enabled condition-node siblings of one
+  enabled `and` group are compared; `ScreenerValidationReport
+  .detectionExhaustive` is always `false`.
+- `src/lib/webmcp/screener/validateScreener.ts` (API layer) -- the
+  `validate_screener` tool. Resolves the workspace/screener from
+  `WorkbenchDeps.repository`, calls `validateScreenerDefinition`, and
+  serializes the report to snake_case wire keys. No `mutate()` callback, no
+  `RevisionService`, no `expected_revision`/`idempotency_key` input (AC8).
+  Exports `createValidateScreenerTool(deps, options?)` where `options` is
+  `{ registry?, marketData?, costBudget? }`.
+
+### Test plan
+
+- `screenerValidation.test.ts` (14 tests) exercises
+  `validateScreenerDefinition` directly against the real built-in catalog
+  (`field.price.close`, `field.volume`, `field.market_cap`) plus one fixture
+  registry override for a `partial`-availability field (the seeded inventory
+  has no such item). Covers: AC1 clean pass with revision reported, AC2
+  delegation (out-of-range parameter), AC3 both arms (blocking
+  `unavailable`, advisory `partial`), AC4 both tractable contradiction
+  shapes (disjoint ranges, mutually exclusive scalar bounds), AC5 (advisory
+  over-budget warning plus the documented default budget), AC6 both arms
+  (blocking empty universe with injected market data, "never claims zero"
+  without it), AC7 (disabled leaf, disabled group skipping its whole
+  subtree), AC9 (three independent problems in one response), and AC8's
+  no-mutation guarantee at the domain level (screener object byte-for-byte
+  unchanged).
+- `validateScreener.test.ts` (7 tests) exercises the tool through an
+  in-memory `WorkspaceRepository` (`createLocalWorkspaceRepository(
+  memoryStorage())`, the pattern `setScreenerRanking.test.ts` uses): a clean
+  pass reporting the screener ID/revision, snake_case wire shape, unknown/
+  missing `screener_id` and no-active-workspace rejections, and AC8 at the
+  tool level (workspace revision and screener revision unchanged
+  before/after, stored document deep-equal, and no change-history entry
+  appended).

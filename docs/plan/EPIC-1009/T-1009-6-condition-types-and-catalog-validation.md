@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1009 (Screener Core)
 **Design**: docs/design/screener-core/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1009-4
 **Blocks**: T-1009-7, T-1009-8
 
@@ -95,3 +95,79 @@ loop.
 Evaluating a condition against real data (T-1009-7), whole-screener
 problem reporting such as contradictions and cost (T-1009-8), and
 registration (T-1009-10).
+
+## Solution Approach
+
+### Modules
+
+- `src/lib/screener/conditionValidation.shared.ts` (new) — the
+  `ConditionValidationContext`/`ResolvedContext` types and the helpers every
+  per-variant validator shares: `problem`, `unknownItemProblem`,
+  `withinRange`, `describeRange`, `findDisallowedConditionFields`,
+  `validateOperatorForField`, `checkTypedValue`, `validateCatalogParams`,
+  `extraFieldProblems`. Exists so `conditionValidation.ts` and
+  `conditionValidation.catalog.ts` can both depend on it without depending
+  on each other (avoids a circular import between the two variant-bearing
+  files).
+- `src/lib/screener/conditionValidation.ts` (new) — the exported entry
+  point `validateCondition(condition, context?)`, its `Record`-keyed
+  dispatch table, and the four structurally simpler variants: scalar,
+  range, series_comparison, temporal (the only recursive variant).
+- `src/lib/screener/conditionValidation.catalog.ts` (new) — the four
+  variants whose rules lean hardest on catalog lookups: event_relative,
+  pattern, relative, study_output, plus the `STUDY_OUTPUT_PREDICATES`
+  closed union (no such enumeration exists elsewhere in the codebase, so
+  this validator defines its own contract for AC8's "predicate is a member
+  of a closed union").
+- `src/lib/webmcp/screener/editFilterTree.ts` (modified) — `add` and
+  `update` now reject before any write: `parseConditionInput` first checks
+  the raw payload's keys against `CONDITION_FIELD_ALLOWLIST` via
+  `findDisallowedConditionFields` (AC11, before `normalizeCondition` would
+  otherwise silently drop a stray `expression`/`sql`/`js` key), then
+  normalizes, then runs `validateCondition` against an injected
+  `CatalogRegistry` (default `builtinCatalogRegistry`) and the screener's
+  `UniverseSpec` (AC5). Every rejection reuses the existing
+  `FilterTreeOpFailure` → `OperationValidationError` path — no second error
+  shape. `createEditFilterTreeTool` gained a second, defaulted `registry`
+  parameter; `WorkbenchDeps` is untouched.
+
+### Exported entry point
+
+```ts
+function validateCondition(
+	condition: Condition,
+	context?: { registry?: CatalogRegistry; universe?: UniverseSpec; nodeId?: ResourceId }
+): ValidationProblem[];
+```
+
+Empty array means valid. `context.registry` defaults to
+`builtinCatalogRegistry`; `context.universe` is consulted by
+`event_relative`'s availability check; `context.nodeId` populates
+`ValidationProblem.nodeIds` (absent on a not-yet-written `add`, since no
+node id exists yet).
+
+### Test plan
+
+- `conditionValidation.test.ts` — scalar, range, series_comparison,
+  temporal, dispatch/injected-registry behavior, and the AC11 raw-field
+  rejection (`expression`, `sql` keys on an otherwise valid condition).
+- `conditionValidation.catalog.test.ts` — event_relative, pattern,
+  relative, study_output. Uses `builtinCatalogRegistry` wherever the real
+  seeded inventory (`src/lib/catalog/items.ts`) covers the scenario, and a
+  small fixture `CatalogRegistry` (mirroring `registry.ts`'s real query
+  semantics, the same pattern `universeValidation.test.ts` already uses)
+  only where the seeded inventory cannot express the scenario — e.g. every
+  seeded pattern and earnings-adjacent field is deliberately unavailable,
+  so an *accepted* pattern/event_relative case needs a fixture item with
+  `availability.status: 'available'`; a *required* catalog parameter needs
+  a fixture study, since no seeded study declares one.
+- `editFilterTree.test.ts` — existing fixtures switched from placeholder
+  IDs (`'price'`, `'gt'`) to real catalog IDs (`field.price.close`,
+  `op.greater_than`) now that add/update validate against the catalog; new
+  tests cover AC9 (unknown field, out-of-range value) and AC11 (raw
+  `expression` key) at the tool layer, each asserting the tree and the
+  workspace revision are both unchanged.
+- Per-type coverage (AC13): each of the eight types gets at least one
+  accepted and one rejected case; unknown-catalog-item, out-of-range
+  parameter, and raw-expression-payload are each covered by at least one
+  test across the suite.

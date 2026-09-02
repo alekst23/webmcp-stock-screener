@@ -38,16 +38,16 @@ numbers neither of us can reproduce.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1009-1 | Screener definition model and typed filter tree | — | Open |
-| 2 | T-1009-2 | Screener execution contracts and run provenance | — | Open |
-| 3 | T-1009-3 | `create_screener` and `set_screener_universe` tools | T-1009-1 | Open |
-| 4 | T-1009-4 | `edit_filter_tree` structural operations | T-1009-1 | Open |
-| 5 | T-1009-5 | `set_screener_ranking` tool | T-1009-1 | Open |
-| 6 | T-1009-6 | Eight condition types with catalog validation | T-1009-4 | Open |
-| 7 | T-1009-7 | Filter-tree evaluation engine | T-1009-2, T-1009-6 | Open |
-| 8 | T-1009-8 | `validate_screener` tool | T-1009-2, T-1009-5, T-1009-6 | Open |
-| 9 | T-1009-9 | `run_screener` with pinned run store | T-1009-7 | Open |
-| 10 | T-1009-10 | Wire the six screener tools into the new WebMCP surface | T-1009-3, T-1009-8, T-1009-9 | Open |
+| 1 | T-1009-1 | Screener definition model and typed filter tree | — | Done |
+| 2 | T-1009-2 | Screener execution contracts and run provenance | — | Done |
+| 3 | T-1009-3 | `create_screener` and `set_screener_universe` tools | T-1009-1 | Done |
+| 4 | T-1009-4 | `edit_filter_tree` structural operations | T-1009-1 | Done |
+| 5 | T-1009-5 | `set_screener_ranking` tool | T-1009-1 | Done |
+| 6 | T-1009-6 | Eight condition types with catalog validation | T-1009-4 | Done |
+| 7 | T-1009-7 | Filter-tree evaluation engine | T-1009-2, T-1009-6 | Done |
+| 8 | T-1009-8 | `validate_screener` tool | T-1009-2, T-1009-5, T-1009-6 | Done |
+| 9 | T-1009-9 | `run_screener` with pinned run store | T-1009-7 | Done |
+| 10 | T-1009-10 | Wire the six screener tools into the new WebMCP surface | T-1009-3, T-1009-8, T-1009-9 | Done |
 
 ## Dependency Graph
 

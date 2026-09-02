@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1009 (Screener Core)
 **Design**: docs/design/screener-core/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1009-7, T-1009-8
 
@@ -77,3 +77,54 @@ surface all agree on the same contract without importing each other.
 
 The evaluation implementation (T-1009-7), the validation tool
 (T-1009-8), HTTP routes, and result paging (EPIC-1010).
+
+## Solution Approach
+
+**Binding architecture note**: this epic is implemented entirely in
+browser-side TypeScript under `src/lib/screener/`, not in
+`backend/`. Where this ticket's Description and Design References say
+"backend" and cite `backend/domain/contracts/engine.py`, read that as the
+Protocol-in-domain / adapter-in-infra *pattern*, not the location. AC1 and
+AC2's "screener definition" and "condition types" are already satisfied by
+T-1009-1 (`src/lib/screener/definition.ts`, `src/lib/screener/conditions.ts`)
+— this ticket consumes those, adding only the strict parse AC2 calls for and
+the run/validation/port contracts.
+
+### Modules
+
+**`src/lib/screener/ports.ts`** (types only, domain layer, new file)
+
+- `ScreenerEvaluationPort` — `{ validate(definition): Promise<ScreenerValidationReport>; execute(input: { definition, runId }): Promise<ScreenerRunOutcome> }`. T-1009-7 implements it; nothing here performs I/O.
+- `ScreenerMarketData` — the narrow port the (future) engine needs: resolve a universe to instruments, fetch a field value per instrument, fetch a series, detect a pattern, evaluate a study output, and report the `MarketDataProvenance` covering the read. Mirrors the shape of `src/lib/discovery/ports.ts`'s `InstrumentDirectory` (a port only, honest-unavailability default lives in the T-1009-7 adapter, not here — mirroring `src/lib/discovery/unavailableDirectory.ts`).
+- `PinnedRunStore` — `{ getRun(runId): ScreenerRun | RunNotAvailable; getMatches(runId, offset, limit): ScreenerMatch[] | RunNotAvailable }`. No execute/rerun method exists on this interface — that structural absence is EPIC-1010's "no silent rerun" guarantee. `RunNotAvailable = { available: false; runId; reason: 'unknown' | 'evicted'; message }` distinguishes "gone" from "matched nothing" (an empty `ScreenerRun.matches` array). Retention is pluginable via `RunRetentionPolicy.shouldEvict(run, now, index)`, with an exported `keepAllRuns` policy implementing the working assumption (spec.md Open Question 1) that eviction is an explicit, off-by-default decision. T-1009-9 implements the store.
+
+**`src/lib/screener/validation.ts`** (new file, imports `definition.ts`/`conditions.ts` types + `ResourceId`)
+
+- `ProblemSeverity`, `ValidationProblem`, `PROBLEM_CODES` (one const per code this epic emits: invalid parameter, unknown catalog item, unavailable data, contradiction, expensive query, empty universe, unknown condition type).
+- `CostEstimate`, `ScreenerValidationReport` (carries `detectionExhaustive: false` literal, documented as deliberate).
+- `parseScreenerForExecution(value: unknown): { ok: true; screener: ScreenerDefinition } | { ok: false; problems: ValidationProblem[] }` — a strict sibling to T-1009-1's lenient `normalizeScreener`: walks the filter tree and rejects (rather than silently drops, per AC2) any condition node whose `type` is not one of the eight known variants, reporting `PROBLEM_CODES.unknownConditionType` with the offending `nodeId`. Does not modify `normalizeScreener`.
+
+**`src/lib/screener/run.ts`** (new file, the cross-epic contract; imports `ResourceId` from `workbench/domain/ids`, `Revision` from `workbench/domain/workspace`, `MarketDataProvenance`/`toWireProvenance` from `workbench/domain/provenance`, `ValidationProblem` from `./validation`)
+
+- `FilterNodeEvaluation`, `ScreenerWarning`, `ScreenerMatch`, `ScreenerRun`, `ScreenerRunRefusal`, `ScreenerRunOutcome` — exact shapes per the ticket brief above, each with a WHY comment.
+- `makeScreenerRun(input): ScreenerRun` — enforces `truncated === returnedCount < matchedCount`, `returnedCount === matches.length`, ranks contiguous from 1 over `matches` in array order, and a runtime provenance-presence guard (checks `liveness`/`sourceId`/`engineVersion` are set) so a run built from an untyped/deserialized object with absent provenance throws rather than silently constructing (AC5). Throws `Error` with a descriptive message on any invariant violation — callers (T-1009-7) are expected to construct from validated data, so this is a programming-error guard, not a user-facing validation path (that's `validation.ts`).
+- `toWireScreenerRun`/`toWireScreenerMatch` — snake_case serializers delegating to `toWireProvenance` for the `provenance` field.
+
+### Test plan (`*.test.ts` alongside each module)
+
+- `conditions.ts` is already tested by T-1009-1; `validation.test.ts` covers only this ticket's new surface:
+  - `parseScreenerForExecution` accepts a screener carrying each of the eight condition variants (one test per variant, parameterized or individual).
+  - rejects a definition with an unrecognized condition `type`, reporting `PROBLEM_CODES.unknownConditionType` and the node ID.
+  - rejects/passes nested groups and disabled nodes correctly (disabled nodes are not walked for AC2 purposes, matching spec.md's "disabled nodes produce no problems").
+- `run.test.ts`:
+  - `makeScreenerRun` builds a valid run from well-formed input.
+  - throws when `truncated`/`returnedCount`/`matches.length` are inconsistent.
+  - throws when ranks are not contiguous from 1.
+  - throws when provenance is `null`/`undefined`/a partial object cast through `unknown` (AC5, AC8 "refusal to construct a run with incomplete provenance").
+  - `toWireScreenerRun`/`toWireScreenerMatch` produce snake_case keys and delegate provenance serialization to `toWireProvenance`.
+  - `ScreenerRunRefusal` / `ScreenerRunOutcome` typecheck as a discriminated union on `status`.
+- `ports.ts` holds only types (no logic), so per the ticket brief it gets no dedicated test file; its shapes are exercised indirectly wherever `run.ts`/`validation.ts` tests construct values matching them.
+
+### Out of scope for this ticket (unchanged from ticket doc)
+
+No adapter implementing `ScreenerEvaluationPort`/`ScreenerMarketData`/`PinnedRunStore`, no data source, no HTTP routes. Those are T-1009-7/8/9.
