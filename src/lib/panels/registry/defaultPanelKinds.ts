@@ -199,18 +199,18 @@ function toDefinition(spec: KindSpec): PanelKindDefinition<Record<string, unknow
 	};
 }
 
-// Skips any kind a caller already registered (e.g. a sibling epic's real
-// definition, registered into the same registry before this call) rather
-// than registering unconditionally: `register` throws on a duplicate name,
-// and every owning epic's own comment above already promises "replaces its
-// kind's definition by re-registering it, no edit to this file required" --
-// this is what makes that promise true instead of aspirational. Starting
+// Registers every kind as a placeholder (PanelRegistry.register's
+// `{ placeholder: true }` option), which is what makes every owning epic's
+// own comment above ("replaces its kind's definition by re-registering it,
+// no edit to this file required") actually true regardless of whether this
+// function or the sibling epic's real registerPanelKind() call runs first:
+// a placeholder never conflicts with, and steps aside for, a real
+// registration on either side of it in call order -- see
+// PanelRegistry.register's own comment for the full truth table. Starting
 // from an empty registry (every call site before T-1010-7) is unaffected:
 // nothing is ever already present, so every kind is still registered.
 export function registerDefaultPanelKinds(registry: PanelRegistry): void {
 	for (const spec of KIND_SPECS) {
-		if (!registry.has(spec.kind)) {
-			registry.register(toDefinition(spec));
-		}
+		registry.register(toDefinition(spec), { placeholder: true });
 	}
 }

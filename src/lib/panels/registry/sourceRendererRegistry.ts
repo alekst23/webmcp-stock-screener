@@ -130,9 +130,16 @@ export interface RendererMigration {
 	dropped: string[];
 }
 
+// See panelKindRegistry.ts's identically-shaped RegisterOptions/register()
+// comment for the full truth table this option drives -- both registries
+// implement the same order-independent placeholder/real precedence rule.
+export interface RegisterOptions {
+	placeholder?: boolean;
+}
+
 export interface SourceRendererRegistry {
-	registerSourceType(definition: SourceTypeDefinition): void;
-	registerRendererType(definition: RendererTypeDefinition): void;
+	registerSourceType(definition: SourceTypeDefinition, options?: RegisterOptions): void;
+	registerRendererType(definition: RendererTypeDefinition, options?: RegisterOptions): void;
 	getSourceType(name: string): SourceTypeDefinition | undefined;
 	requireSourceType(name: string): SourceTypeDefinition;
 	getRendererType(name: string): RendererTypeDefinition | undefined;
@@ -179,6 +186,39 @@ function recognizedFieldNames(configSchema: object): Set<string> {
 export function createSourceRendererRegistry(): SourceRendererRegistry {
 	const sourceTypes = new Map<string, SourceTypeDefinition>();
 	const rendererTypes = new Map<string, RendererTypeDefinition>();
+	// Names currently holding a placeholder registration -- see
+	// panelKindRegistry.ts's identical convention for why this can't be
+	// recovered from the stored definition itself.
+	const placeholderSourceTypes = new Set<string>();
+	const placeholderRendererTypes = new Set<string>();
+
+	// Shared by registerSourceType/registerRendererType below -- the same
+	// order-independent precedence rule (real always wins, two reals still
+	// conflict, a placeholder never conflicts) applies identically to both
+	// maps, so the truth table logic itself is written once.
+	function upsert<T>(
+		map: Map<string, T>,
+		placeholders: Set<string>,
+		name: string,
+		definition: T,
+		incomingIsPlaceholder: boolean,
+		onConflict: () => never
+	): void {
+		if (map.has(name)) {
+			if (incomingIsPlaceholder) {
+				return;
+			}
+			if (!placeholders.has(name)) {
+				onConflict();
+			}
+		}
+		map.set(name, definition);
+		if (incomingIsPlaceholder) {
+			placeholders.add(name);
+		} else {
+			placeholders.delete(name);
+		}
+	}
 
 	function requireSourceType(name: string): SourceTypeDefinition {
 		const found = sourceTypes.get(name);
@@ -203,17 +243,29 @@ export function createSourceRendererRegistry(): SourceRendererRegistry {
 	}
 
 	return {
-		registerSourceType(definition: SourceTypeDefinition): void {
-			if (sourceTypes.has(definition.name)) {
-				throw new SourceTypeConflictError(definition.name);
-			}
-			sourceTypes.set(definition.name, definition);
+		registerSourceType(definition: SourceTypeDefinition, options?: RegisterOptions): void {
+			upsert(
+				sourceTypes,
+				placeholderSourceTypes,
+				definition.name,
+				definition,
+				options?.placeholder ?? false,
+				() => {
+					throw new SourceTypeConflictError(definition.name);
+				}
+			);
 		},
-		registerRendererType(definition: RendererTypeDefinition): void {
-			if (rendererTypes.has(definition.name)) {
-				throw new RendererTypeConflictError(definition.name);
-			}
-			rendererTypes.set(definition.name, definition);
+		registerRendererType(definition: RendererTypeDefinition, options?: RegisterOptions): void {
+			upsert(
+				rendererTypes,
+				placeholderRendererTypes,
+				definition.name,
+				definition,
+				options?.placeholder ?? false,
+				() => {
+					throw new RendererTypeConflictError(definition.name);
+				}
+			);
 		},
 		getSourceType(name: string): SourceTypeDefinition | undefined {
 			return sourceTypes.get(name);

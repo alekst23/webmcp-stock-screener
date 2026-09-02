@@ -111,6 +111,53 @@ describe('PanelRegistry: registration', () => {
 		).toBe('chart');
 	});
 
+	// Three sibling epics (results, chart, similarity) each register a real
+	// kind into the same registry a default-seeding call also touches, and
+	// nothing coordinates which of the two runs first at any given
+	// composition root -- so "the real one wins" must hold regardless of
+	// call order, not just in whichever order today's one composition root
+	// happens to use.
+	it('lets a placeholder registered first be overwritten by a later real registration', () => {
+		const registry = createPanelRegistry();
+		registry.register(makeMinimalKind('chart'), { placeholder: true });
+
+		expect(
+			() => registry.register(makeMinimalKind('chart')),
+			'a real registration must overwrite an existing placeholder, not conflict with it'
+		).not.toThrow();
+
+		expect(registry.get('chart')?.defaultTitle, 'expected the real definition to be stored').toBe(
+			'chart'
+		);
+	});
+
+	it('skips a later placeholder registration once a real one is already present', () => {
+		const registry = createPanelRegistry();
+		registry.register(makeMinimalKind('chart'));
+		const placeholderAttempt = { ...makeMinimalKind('chart'), defaultTitle: 'placeholder chart' };
+
+		expect(
+			() => registry.register(placeholderAttempt, { placeholder: true }),
+			'a placeholder registration must never conflict with an existing real one'
+		).not.toThrow();
+
+		expect(
+			registry.get('chart')?.defaultTitle,
+			'the real definition must survive a later placeholder registration attempt'
+		).toBe('chart');
+	});
+
+	it('still rejects two real registrations of the same kind, in either order relative to a placeholder', () => {
+		const registry = createPanelRegistry();
+		registry.register(makeMinimalKind('chart'), { placeholder: true });
+		registry.register(makeMinimalKind('chart'));
+
+		expect(
+			() => registry.register(makeMinimalKind('chart')),
+			'a second real registration is a genuine duplicate and must still conflict'
+		).toThrow(PanelKindConflictError);
+	});
+
 	it('lists every registered kind with its schema and link channels', () => {
 		const registry = createPanelRegistry();
 		registry.register(makeFringeSignalKind());
