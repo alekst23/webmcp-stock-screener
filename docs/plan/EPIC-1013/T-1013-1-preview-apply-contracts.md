@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1013 (Safety layer (preview & apply))
 **Design**: docs/design/safety-preview-apply/
-**Status**: Open
+**Status**: Done
 **Depends on**: — (consumes EPIC-1006's registry and envelope types)
 **Blocks**: T-1013-2, T-1013-3, T-1013-4
 
@@ -70,3 +70,107 @@ ticket.
 ## Out of Scope
 
 Evaluation, diffing, storage, and tool registration.
+
+## Implementation Plan
+
+Two new pure-data modules in the domain layer, each with a sibling test
+file. No existing source file is touched.
+
+### `src/lib/workbench/domain/preview.ts`
+
+Pure types plus a handful of total, side-effect-free helpers. Type-only
+imports: `ResourceId` from `./ids`, `Revision` and `WorkspaceDocument`
+from `./workspace`. Nothing from `infra/`, `src/lib/webmcp/`,
+`src/lib/workspace/` or `src/lib/surface/` (AC8).
+
+- `ProposedOperation` — `{ kind: string; input: unknown }`. `kind` is a
+  registry key typed as a bare `string`, deliberately not a union, so a
+  kind registered by a later epic needs no edit here (AC2). `input` is
+  `unknown` because only the kind's registered validator knows its shape.
+- `ChangeBatch = ProposedOperation[]` — a plain array, so ordering is the
+  array's own ordering and is structurally significant (AC1). No set, no
+  keyed map: two batches with the same operations in different orders are
+  different batches, and the fold in T-1013-2 evaluates left to right.
+- `OperationFailure` — `{ index; kind; reason }` (AC4). `index` is the
+  operation's position in the batch, which is how a caller points at the
+  offending operation without needing the operation to carry an ID.
+- `OperationWarning` — `{ index; kind; message }`. A separate interface
+  from `OperationFailure`, not a severity flag on one type, so
+  applicability can never be computed from a mis-set enum (AC5).
+- `OperationOutcome` — `{ index; kind; describe; failures; warnings }`,
+  the per-operation slice of the result (AC3). Holds its own failures and
+  warnings so a caller can render per-operation detail without filtering
+  the batch-level lists by index.
+- Diff types (AC6, and T-1013-3 AC10): `DiffChangeType`
+  (`'added' | 'removed' | 'updated'`), `FieldChange`
+  (`{ field; before; after }`), `DiffEntry`
+  (`{ change; entityType; id; fields }`) and `WorkspaceDiff = DiffEntry[]`.
+  `entityType` is a free string, not a union, so entity kinds contributed
+  by sibling epics (panel, link, workspace, or an `extensions` key) need
+  no edit here. `fields` is `[]` for added/removed and lists only the
+  fields that actually changed for `updated`.
+- `PreviewResult` — `{ previewId; baseRevision; diff; affectedIds;
+  summary; warnings; failures; outcomes; applicable }` (AC3, AC5).
+- `PreviewRecord` — `{ previewId; baseRevision; candidate; result }`,
+  where `candidate` is a `WorkspaceDocument`. This is the value T-1013-4's
+  store persists; it lives here because apply commits the state preview
+  already computed rather than recomputing it, which is what makes the
+  honesty guarantee structural (technical.md, "one evaluation path").
+- Helpers, all pure and total: `isApplicable(failures)` (empty failures ⇒
+  applicable, so warnings alone never block — AC5),
+  `collectAffectedIds(diff)` (deduped, first-appearance order, per
+  technical.md's "Diff shape"), and `buildPreviewResult(input)` deriving
+  `affectedIds` and `applicable` from the diff and failures rather than
+  letting a caller pass an inconsistent pair.
+- `toWirePreviewResult(result)` → `WirePreviewResult`, the sole
+  snake_case emitter here, mirroring `toWireEnvelope` in `mutation.ts`:
+  `preview_id`, `base_revision`, `diff`, `affected_ids`, `diff_summary`,
+  `warnings`, `failures`, `per_operation`, `applicable`. Nested failures,
+  warnings, outcomes and diff entries serialize to snake_case too
+  (`entity_type`, `change`, `fields`, `describe`), because the tool layer
+  in T-1013-6 hands this straight to a caller.
+
+### `src/lib/workbench/domain/previewErrors.ts`
+
+- `SafetyErrorReason` union of the seven cases in AC7, plus
+  `SAFETY_ERROR_REASONS` as a `readonly` array so the set is enumerable
+  by a caller and by tests.
+- `class SafetyError extends Error` with `readonly reason` and a private
+  `details` record, kept under 120 lines by pushing every case-specific
+  field into `details` instead of into named class properties. Its
+  `toWireError(): WireError` returns `{ error: reason, message,
+  ...details }` — `error` is the reason itself, so a caller can branch on
+  the wire payload exactly as it branches on `instanceof` + `.reason`.
+  `WireError` is imported type-only from `./errors` so the shape matches
+  EPIC-1006's convention.
+- Static named constructors carrying the case-specific fields:
+  `unknownPreview`, `expiredPreview`, `staleRevision` (message names both
+  revisions; wire fields `previewed_revision` / `current_revision`),
+  `preconditionMismatch`, `alreadyApplied`, `notApplicable` (carries the
+  `OperationFailure[]`), `invalidInput`. Factories rather than a wide
+  constructor so an impossible pairing (e.g. an `expired_preview` with
+  revision fields) cannot be constructed.
+
+### Tests
+
+`preview.test.ts` covers: batch ordering being significant and preserved;
+`kind` accepting a key the module never mentions; a `PreviewResult`
+carrying every AC3 field; a batch holding several failures at distinct
+indices; warnings-only staying applicable while any failure is not;
+`DiffEntry` shapes for added/removed/updated with `updated` listing only
+changed fields; `collectAffectedIds` deduping in first-appearance order;
+and the exact snake_case wire mapping including nested entries.
+
+`previewErrors.test.ts` covers: each reason distinguishable via
+`instanceof SafetyError` + `.reason` and via `toWireError().error`;
+`SAFETY_ERROR_REASONS` containing exactly the seven reasons and every
+factory being represented in it; `staleRevision` naming both revisions in
+its message and its wire fields; `notApplicable` carrying its failures;
+and `SafetyError` being a real `Error` (has a stack, is catchable).
+
+Every assertion gets a message as `expect`'s second argument.
+
+### Verification
+
+`npx prettier --write "src/lib/workbench/**/*.ts"`, then `npm test` and
+`npm run typecheck` must both be clean.
