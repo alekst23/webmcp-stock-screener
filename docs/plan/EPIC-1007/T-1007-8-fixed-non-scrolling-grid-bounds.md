@@ -2,12 +2,12 @@
 
 **Epic**: EPIC-1007 (Panel System)
 **Design**: docs/design/panel-system/
-**Status**: In Progress — geometry (AC1, AC2, AC5) delivered here,
-alongside T-1007-2, in `src/lib/panels/domain/layout.ts`. AC3 (surfacing
-`findFreeRect`'s null as a failed `create_panel` mutation) is T-1007-4's
-job, which consumes this module's `findFreeRect`/`applyLayout`. AC4
-(viewport-filling CSS rendering) is NOT delivered by this work — it is
-owned by T-1007-6, which renders the grid container.
+**Status**: Done — geometry (AC1, AC2, AC5) delivered alongside T-1007-2
+in `src/lib/panels/domain/layout.ts`. AC3 (surfacing `findFreeRect`'s null
+as a failed `create_panel` mutation) was T-1007-4's job. AC4
+(viewport-filling CSS rendering) was delivered by T-1007-6 in
+`src/lib/panels/shell/gridStyle.ts` — see this doc's Solution Approach
+addendum below.
 **Depends on**: —
 **Blocks**: T-1007-4, T-1007-6
 
