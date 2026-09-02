@@ -2,7 +2,10 @@
 
 **Epic**: EPIC-1007 (Panel System)
 **Design**: docs/design/panel-system/
-**Status**: Open
+**Status**: In Progress — geometry (AC1, AC2, AC3, AC5) delivered here,
+alongside T-1007-2, in `src/lib/panels/domain/layout.ts`. AC4
+(viewport-filling CSS rendering) is NOT delivered by this work — it is
+owned by T-1007-6, which renders the grid container.
 **Depends on**: —
 **Blocks**: T-1007-4, T-1007-6
 
@@ -87,3 +90,42 @@ without bound.
 Drag-to-resize, responsive breakpoints below whatever minimum viewport
 size the app already supports, and any change to the 6/4 constants
 themselves once set here.
+
+AC4 (the rendered container filling 100% of the viewport, CSS-only) is
+explicitly NOT delivered here — it belongs to T-1007-6, which owns
+`src/lib/panels`' rendering/composition layer. This ticket is geometry
+only: correcting T-1007-2's row bound.
+
+## Solution Approach
+
+This ticket is delivered as a correction folded into T-1007-2's module
+(`src/lib/panels/domain/layout.ts`), per the Technical Considerations
+note — not a parallel grid implementation. `GRID_ROWS = 4` already lives
+in the seeded `src/lib/panels/domain/grid.ts` (not modified here); this
+ticket's job is making sure every geometry function in `layout.ts`
+treats the row bound exactly like the column bound:
+
+- **AC1**: `validatePlacement`'s `out_of_bounds` check tests
+  `row + rowSpan > GRID_ROWS` the same way it tests
+  `col + colSpan > GRID_COLUMNS`, and the violation's `message` states
+  the row bound (`gridRows` is on the violation shape alongside
+  `gridColumns`).
+- **AC2**: `findFreeRect`'s row-major scan is bounded to
+  `row <= GRID_ROWS - size.rowSpan`; when no candidate rect fits (either
+  because the grid is full or because `size.rowSpan > GRID_ROWS`), it
+  returns `null` — a normal return, never a thrown exception. Tested
+  explicitly: a 6x4 grid fully occupied returns `null` rather than a
+  rect that overflows row 4.
+- **AC3**: out of scope for this agent — `create_panel`'s use case
+  (T-1007-4, Wave 2) is the caller that turns `findFreeRect`'s `null`
+  into a failed-mutation envelope. This ticket only guarantees the
+  geometry primitive it depends on behaves correctly (AC2).
+- **AC5**: `splitRect` and `fullGridRect` (backing `maximize_panel`) are
+  both written directly against `GRID_ROWS = 4` / `GRID_COLUMNS = 6` —
+  there is no separate "12-column" code path anywhere to have missed.
+  Tests exercise `splitRect`'s minimum-size rejection and
+  `fullGridRect`'s shape against the 6x4 bounds.
+
+No new files beyond what T-1007-2 already introduces
+(`layout.ts`, `layout.test.ts`) — this ticket does not own a separate
+module.
