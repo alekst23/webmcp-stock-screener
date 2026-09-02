@@ -66,6 +66,64 @@ next ceiling is predicted before it is hit.
 8. Results are recorded somewhere durable enough to serve as a regression
    baseline, including the headroom figure that re-triggers the DuckDB work.
 
+## Solution Approach
+
+**How absolute RSS is obtained.** App Runner exposes request-level metrics
+only, not per-task memory, so the number has to come from inside the process.
+`resource.getrusage(RUSAGE_SELF).ru_maxrss` is a high-water mark that never
+decreases within a process, so reading it at a checkpoint always reports the
+true peak up to that point — the same instrument `measure_panel_memory.py`
+already uses. The defect this ticket exists to correct is not in that
+function; it is in `measure_universe_scale.py`'s `measure()`, which takes a
+`baseline = peak_rss_bytes()` *after* the panel bytes are already on disk and
+the pandas/pyarrow/boto3 stack is already imported, then reports
+`peak_rss_bytes() - baseline` at every later stage. Because `ru_maxrss` is
+monotonic, that subtraction produces a delta from an arbitrary already-late
+starting point, not the absolute number the container's cgroup enforces —
+exactly the mistake the blocker table records against the earlier 688 MB
+figure. New script, `backend/scripts/measure_container_memory.py`, reports
+every stage as the raw, un-subtracted reading (AC7): interpreter start,
+after third-party libraries import, after this project's own modules import,
+after the real panel's bytes are fetched from S3, after they are parsed,
+before search, and at peak during search. Each number already includes every
+prior stage's cost, matching how the blocker table's own breakdown reads.
+
+**Where it runs.** Built and run as the exact deployed image
+(`backend/Dockerfile`, `docker build backend`), not a bare `uv run` on this
+host — the container runtime, its base image, and its process tree are part
+of what the 2 GB ceiling has to hold, and a host-Python run would omit them.
+The container is given real, read-only AWS credentials (`aws configure
+export-credentials --profile alekst23`) so `infra/object_store.py`'s
+existing S3 client fetches the real deployed object
+(`s3://webmcp-panel-prod-490284589142/panel.parquet`, verified
+`ContentLength` 81,254,506 bytes) exactly as the running App Runner service
+does — same code path, same bytes, no synthetic panel, no mock fallback.
+`docker run --memory=2g --cpus=1` mirrors the App Runner instance
+configuration (2048 MiB / 1024 CPU units) so a genuine breach would surface
+as an OOM kill under the same ceiling the service runs under, not just as a
+number compared against 2 GB after the fact.
+
+**The two patterns.** AC5 requires quantifying growth from a trivial pattern,
+not just asserting the realistic one is bigger, so both run against the
+identical panel and identical pipeline up to "before search", differing only
+in the setup passed to `find_instances`:
+
+- *simple* — one step, zero studies: `close > sma(close, 50)`. As trivial as
+  a valid setup gets.
+- *complex* — 3 steps referencing 4 studies, a plausible research pattern
+  (volume-spike anchor → uptrend confirmation → breakout), matching the
+  epic's "3-step/4-study" reference figure:
+  - studies: `rel_volume = volume / sma(volume, 20)`,
+    `trend200 = close - sma(close, 200)`,
+    `momentum12 = close - ema(close, 12)`, `vol_atr = atr(14)`
+  - step 1: `rel_volume > 3` (narrow anchor)
+  - step 2, within (1, 10): `trend200 > 0 and momentum12 > 0`
+  - step 3, within (1, 15): `close > highest(high, 20) and vol_atr > 0`
+
+Each pattern runs in its own fresh container invocation (`ru_maxrss` cannot
+fall back down within one process, so measuring both in one run would let
+the first pattern's peak contaminate the second's).
+
 ## Design References
 
 - `docs/plan/project.md` — the blocker table's stage-by-stage 723 MB
