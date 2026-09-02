@@ -173,6 +173,25 @@ export function applyLayoutBatch(
 	return result.rects;
 }
 
+// A panel's config is one shared object, but it only ever holds fields
+// from ONE contract at a time in practice: the kind's own (freshly
+// created) or the active renderer's (after a renderer-specific
+// mutation) -- kind and renderer schemas are disjoint field sets (e.g.
+// chart's {symbol,timeframe,studies} vs. chart_grid's
+// {rows,columns,...}). configureChartGrid/configurePanelView merge new
+// fields onto whatever of the CURRENT config the active renderer's own
+// contract already recognizes, via a self-migration, rather than the raw
+// stored config -- otherwise a leftover kind-level field (or a prior
+// renderer's field survived from before a switch) would fail validation
+// against a schema it was never meant to satisfy.
+export function recognizedRendererConfig(
+	sourceRenderer: SourceRendererRegistry,
+	renderer: string,
+	config: Record<string, unknown>
+): Record<string, unknown> {
+	return sourceRenderer.migrateConfig({ from: renderer, to: renderer, config }).config;
+}
+
 export function resolveAutoRect(size: GridSize, occupied: OccupiedRect[]): OccupiedRect['rect'] {
 	const rect = findFreeRect(size, occupied);
 	if (rect === null) {

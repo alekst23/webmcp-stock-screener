@@ -4,7 +4,12 @@
 // collapsed are plain chrome the container itself owns.
 import type { MutationContext, MutationEnvelope } from '../../workbench/domain/mutation';
 import { PanelOperationError } from './errors';
-import { commitPanelChange, findPanel, type PanelUseCaseDeps } from './support';
+import {
+	commitPanelChange,
+	findPanel,
+	recognizedRendererConfig,
+	type PanelUseCaseDeps
+} from './support';
 
 export interface ConfigurePanelViewRequest {
 	context: MutationContext;
@@ -29,7 +34,8 @@ function resolveConfig(
 			`Panel "${panel.title}" has no active renderer to validate configuration against.`
 		);
 	}
-	const candidate = { ...panel.config, ...requested };
+	const base = recognizedRendererConfig(deps.sourceRenderer, panel.renderer, panel.config);
+	const candidate = { ...base, ...requested };
 	const validation = deps.sourceRenderer.validateRendererConfig(panel.renderer, candidate);
 	if (!validation.ok) {
 		throw new PanelOperationError(

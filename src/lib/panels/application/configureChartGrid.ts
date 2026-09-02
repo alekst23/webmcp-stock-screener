@@ -3,7 +3,12 @@
 // that renderer's own contract -- not the panel kind's.
 import type { MutationContext, MutationEnvelope } from '../../workbench/domain/mutation';
 import { PanelOperationError } from './errors';
-import { commitPanelChange, findPanel, type PanelUseCaseDeps } from './support';
+import {
+	commitPanelChange,
+	findPanel,
+	recognizedRendererConfig,
+	type PanelUseCaseDeps
+} from './support';
 
 const CHART_GRID_RENDERER = 'chart_grid';
 
@@ -44,7 +49,8 @@ export function configureChartGrid(
 				);
 			}
 
-			const candidate = { ...panel.config, ...requestedFields(request) };
+			const base = recognizedRendererConfig(deps.sourceRenderer, CHART_GRID_RENDERER, panel.config);
+			const candidate = { ...base, ...requestedFields(request) };
 			const validation = deps.sourceRenderer.validateRendererConfig(CHART_GRID_RENDERER, candidate);
 			if (!validation.ok) {
 				throw new PanelOperationError(
