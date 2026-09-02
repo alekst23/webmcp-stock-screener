@@ -6,8 +6,10 @@ epic and should be treated as published:
 - **The catalog registry query surface** — EPIC-1009 (`edit_filter_tree`)
   validates conditions against it; EPIC-1011 (`edit_chart_studies`)
   resolves study IDs through it.
-- **`InstrumentDirectory`** — the integration seam the separate
-  reference/fundamental-data workstream implements against.
+- **`InstrumentDirectory`** — the integration seam a future
+  reference/fundamental-data source implements against. Nothing supplies
+  that data today and nobody owns sourcing it; the port and its honest
+  no-source default are the deliverable.
 
 Everything here lives in **new files**. `src/lib/webmcp/tools.ts`,
 `src/lib/webmcp/types.ts`, `src/lib/webmcp/register.ts`, and
@@ -20,7 +22,8 @@ Everything here lives in **new files**. `src/lib/webmcp/tools.ts`,
 | `src/lib/surface/provenance.ts` | domain | `DiscoveryEnvelope`, `Provenance`, engine version (T-1008-1) |
 | `src/lib/surface/ids.ts` | domain | stable-ID construction and validation (T-1008-1) |
 | `src/lib/catalog/types.ts` | domain | catalog item type model (T-1008-2) |
-| `src/lib/catalog/registry.ts` | domain | seeded inventory + query surface (T-1008-2) |
+| `src/lib/catalog/items.ts` | domain | seeded inventory, data only (T-1008-2) |
+| `src/lib/catalog/registry.ts` | domain | query surface over the inventory (T-1008-2) |
 | `src/lib/discovery/ports.ts` | domain | `InstrumentDirectory` and its record types (T-1008-3) |
 | `src/lib/discovery/unavailableDirectory.ts` | infra | default adapter when nothing is configured (T-1008-3) |
 | `src/lib/webmcp/discovery/*.ts` | api | the three tool specs (T-1008-4/5/6) |
@@ -99,11 +102,11 @@ names.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | `'available' \| 'partial' \| 'unavailable'` | |
+| `status` | `'available' \| 'partial' \| 'unavailable'` | can an agent actually use this item today? |
 | `reason` | `string \| undefined` | required when not `available` |
-| `requiresReferenceData` | `boolean` | true when the live-data workstream must supply it |
+| `requiresReferenceData` | `boolean` | true when the item needs reference data this project has no source for |
 | `intervalIds` | `string[]` | intervals the item is available over |
-| `earliest` / `latest` | `string \| undefined` | ISO dates; unknown until the live-data workstream lands |
+| `earliest` / `latest` | `string \| undefined` | ISO dates; unknown until a real data source lands |
 
 Discriminated members:
 
@@ -138,19 +141,40 @@ enumValues?, required }`.
 | `searchCatalogItems` | `(query: CatalogQuery) => CatalogMatch[]` | ranked search across label, ID, aliases, tags |
 | `isOperatorValidForField` | `(operatorId: string, fieldId: string) => OperatorFieldCheck` | **EPIC-1009's validation hook** — reports valid/invalid with a reason |
 | `resolveStudy` | `(studyId: string) => StudyItem \| undefined` | **EPIC-1011's resolution hook** |
+| `clampCatalogLimit` | `(limit?: number) => { limit, clamped }` | bounds a page to `MAX_CATALOG_RESULTS` (50), default 20 |
+| `suggestCatalogIds` | `(unknownId: string, max?) => string[]` | nearest real IDs for a miss; `describe_catalog_item`'s self-correction hint |
 
 `CatalogQuery`: `{ text?, kinds?, includeUnavailable?, limit? }`.
 `CatalogMatch`: `{ item: CatalogItem, score: number, matchedOn: 'id' |
-'label' | 'alias' | 'tag' | 'description' }`.
+'label' | 'alias' | 'tag' | 'description' | 'enumeration' }`. `'enumeration'`
+is what an empty-text kind-restricted listing reports: nothing was matched
+against, so attributing the hit to a field that played no part would be a
+small lie an agent would try to reason from.
+
+Ranking is a fixed ladder (exact ID 100, exact label 90, exact alias 80,
+then prefix, then substring, then tag, then description), ties broken on ID.
+Deliberately predictable rather than tuned: an agent that cannot anticipate
+the ordering re-queries instead of trusting it.
+
+**What `availability` means.** It answers "can an agent use this today?",
+and the `reason` says which kind of no it is — no data source, no engine
+support, or no consuming tool yet. An agent that cannot tell "unsupported"
+from "not wired up" retries forever. Concretely: daily OHLCV fields,
+`interval.1d`, and the studies the expression engine really implements
+(`sma`, `ema`, `atr`) are available; RSI/MACD/Bollinger are declared but
+unavailable pending engine support; VWAP and the intraday intervals are
+unavailable for want of intraday data; sector/industry/index/exchange/
+country/market-cap/fundamentals fields and the index universes are
+unavailable with `requiresReferenceData: true`.
 
 Returned collections are `readonly`; the inventory is frozen at module
 load. Registry **data** and registry **query logic** are separate modules so
-the live-data workstream can later contribute availability records without
+a real data source can later contribute availability records without
 touching the query surface.
 
 ### `InstrumentDirectory` (`src/lib/discovery/ports.ts`, T-1008-3)
 
-**The integration seam for the reference/fundamental-data workstream.**
+**The integration seam for a future reference/fundamental-data source.**
 
 ```
 searchInstruments(query: InstrumentQuery)
@@ -177,7 +201,11 @@ getInstrument(instrumentId: string)
 | `listedFrom` / `listedTo` | `string \| undefined` | ISO dates |
 
 `InstrumentQuery`: `{ text, assetTypes?, exchangeIds?, countryCodes?,
-includeDelisted?, limit? }` — `limit` bounded by a documented maximum.
+includeDelisted?, limit? }` — `limit` bounded by `MAX_INSTRUMENT_RESULTS`
+(50), defaulting to `DEFAULT_INSTRUMENT_RESULTS` (10). `ports.ts` exports
+`clampInstrumentLimit(limit)`, returning `{ limit, clamped }`, so adapters
+and the tool layer clamp against the same number and both can warn when
+they clamped rather than truncating silently.
 `InstrumentMatch`: `{ instrument: Instrument, score: number, matchedOn:
 'symbol' | 'name' | 'alias' | 'isin' | 'figi' }`.
 
@@ -202,17 +230,24 @@ outcome, never a throw and never a fabricated record.
    results.
 8. Adapters live in infra. The port must stay free of I/O imports.
 
-The workstream may implement this over HTTP against the existing FastAPI
-backend; if so, the response body is the `DiscoveryEnvelope` shape above
-verbatim, so the choice does not reopen the port.
+An implementer may choose HTTP against the existing FastAPI backend; if so,
+the response body is the `DiscoveryEnvelope` shape above verbatim, so the
+choice does not reopen the port.
 
 ### `unavailableInstrumentDirectory` (`src/lib/discovery/unavailableDirectory.ts`, T-1008-3)
 
-Default when nothing is configured. Both methods resolve to a well-formed
-envelope with an empty payload, `sourceId: 'src.instruments.unconfigured'`,
-`delivery: 'static'`, and a warning naming the reference-data dependency.
-It never throws and never invents instruments. This is the deliberate
-alternative to a mock instrument dataset.
+Default when nothing is configured — which is every deployment today.
+`createUnavailableInstrumentDirectory()` is a factory, not a module-level
+singleton, so composition decides which adapter is in use. Both methods
+resolve to a well-formed envelope with an empty payload (`[]` and `null`
+respectively), `sourceId: 'src.instruments.unconfigured'`, `delivery:
+'static'`, and a warning stating that no reference-data source is
+configured. It never throws and never invents instruments. This is the
+deliberate alternative to a mock instrument dataset.
+
+A configurable test double, `createFakeInstrumentDirectory` in
+`src/lib/discovery/testSupport.ts`, is what other tickets' tests drive.
+It lives beside the tests, never in the shipped default path.
 
 ### `buildDiscoveryTools` (`src/lib/webmcp/discovery/group.ts`, T-1008-7)
 
@@ -220,8 +255,36 @@ alternative to a mock instrument dataset.
 ToolSpec[]` — returns the three specs, in the existing `ToolSpec` shape
 `register.ts` already consumes. Dependencies are parameters, not
 module-level singletons, so a real directory replaces the default without
-editing consumers. All three tools are always `available`: discovery
-precedes state.
+editing consumers. `registry` defaults to `builtinCatalogRegistry`. All
+three tools are always `available`: discovery precedes state.
+`DISCOVERY_TOOL_NAMES` is exported alongside it so a composition root — and
+the collision test against the existing 11-tool surface — can name the set
+without instantiating it.
+
+Whether the group is registered on the live page is the new surface's
+composition root's decision. This epic wires nothing into the running app:
+`register.ts`, `session.ts`, `tools.ts` and `+page.svelte` are untouched, so
+the current tool count and activity log are identical whether or not the
+group is composed in, and `main` stays deployable.
+
+### Result shaping (`src/lib/webmcp/discovery/results.ts`)
+
+`ok` / `fail` mirror `webmcp/tools.ts`'s shapes rather than importing them:
+this epic ships the replacement surface alongside the one EPIC-1015 retires
+and must not touch it, and a two-line JSON wrapper is a cheaper duplication
+than a coupling between the two. Also here: `catalogProvenance()` (source
+`src.catalog.builtin`, `delivery: 'static'`, no currency or reporting period
+because a catalog entry has no monetary content) and the argument readers
+each tool uses to re-check its inputs — a bridge is not obliged to enforce a
+declared `inputSchema`, so the handlers validate rather than trust it.
+
+Each tool's result carries an `outcome` discriminant so the difference an
+agent most needs is machine-readable rather than buried in prose:
+`search_instruments` reports `matches` / `no_matches` / `source_unavailable`,
+and `search_catalog` reports `matches` / `no_matches` / `enumeration`. An
+unknown ID passed to `describe_catalog_item` is an error result carrying the
+ID and the nearest real IDs — the same one-turn self-correction the existing
+surface gives on a bad expression — not an empty success.
 
 ## Data flow
 

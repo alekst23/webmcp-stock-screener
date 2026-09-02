@@ -2,9 +2,51 @@
 
 **Epic**: EPIC-1008 (Discovery & Catalog)
 **Design**: docs/design/discovery-and-catalog/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1008-1
 **Blocks**: T-1008-5, T-1008-6
+
+## Solution Approach
+
+Three new domain modules, with data and query logic deliberately separated
+so a real data source can later contribute availability records without
+touching how the catalog is searched.
+
+- `src/lib/catalog/types.ts` — the item model. `CatalogItem` is a
+  discriminated union on `kind`, so an entry missing its kind's required
+  fields does not compile (AC12). `DataAvailability` is likewise a union:
+  `status: 'partial' | 'unavailable'` **requires** a `reason`, making
+  "unavailable, no explanation" unrepresentable.
+- `src/lib/catalog/items.ts` — the seeded inventory: 5 intervals, 17
+  fields, 12 operators spanning all eight condition families, 7 studies, 3
+  indicators, 3 patterns, 4 universes, 3 templates.
+- `src/lib/catalog/registry.ts` — `getCatalogItem`, `listCatalogItems`,
+  `searchCatalogItems`, `isOperatorValidForField`, `resolveStudy`, plus
+  `clampCatalogLimit` and `suggestCatalogIds` (T-1008-6's self-correction
+  hint). The inventory is `Object.freeze`d at module load, so a caller
+  cannot corrupt an item two sibling epics also hold.
+
+**What `availability` means.** It answers "can an agent use this today?",
+and the `reason` says which kind of no it is: no data source, no engine
+support, or no consuming tool yet. An agent that cannot tell "unsupported"
+from "not wired up" retries forever. So: daily OHLCV fields, `interval.1d`
+and the studies the expression engine really implements (`sma`, `ema`,
+`atr`) are available; RSI/MACD/Bollinger are declared but unavailable
+pending engine support; VWAP and intraday intervals are unavailable for
+want of intraday data; the reference-data fields and index universes are
+unavailable with `requiresReferenceData: true`. Nothing claims data it does
+not have.
+
+Ranking is a fixed ladder (exact ID, exact label, exact alias, prefix,
+substring, tag, description) with ties broken on ID — predictable rather
+than tuned, because an agent that cannot anticipate ordering re-queries
+instead of trusting it. An empty text query is enumeration, reported as
+`matchedOn: 'enumeration'` rather than attributed to a field that played no
+part.
+
+Tests: `registry.test.ts`. Mutation-checked — dropping `Object.freeze`,
+removing the `includeUnavailable` filter, and making the operand-type check
+always pass each turn their tests red.
 
 ## Description
 
@@ -50,8 +92,8 @@ instead of hard-coded string lists scattered across tools.
    a template item declares what it applies to.
 7. A data availability record states whether the item is available,
    partially available, or unavailable; the reason when it is not fully
-   available; and explicitly whether it depends on reference data supplied
-   by the separate live-data workstream.
+   available; and explicitly whether it depends on reference data this
+   project has no source for.
 8. Items that depend on reference data not yet supplied (sector, industry,
    index, country, exchange, fundamentals, and earnings-calendar fields and
    universes) are present in the registry and marked unavailable with a
@@ -105,9 +147,9 @@ instead of hard-coded string lists scattered across tools.
   the Open Questions in `docs/design/discovery-and-catalog/spec.md` for the
   assumption this ticket implements; if implementation reveals the split is
   not carrying its weight, record that rather than silently merging them.
-- Registry data and registry query logic should be separable, so the
-  live-data workstream can later contribute or override availability records
-  without touching the query surface.
+- Registry data and registry query logic should be separable, so a real
+  data source can later contribute or override availability records without
+  touching the query surface.
 
 ## Out of Scope
 
@@ -115,6 +157,6 @@ instead of hard-coded string lists scattered across tools.
   `create_custom_study`).
 - Actually evaluating a study or operator — the registry declares what
   exists and what it takes, not how it computes.
-- Sourcing real availability windows from the live-data workstream; this
-  ticket declares the availability shape and seeds honest placeholders that
-  say "unavailable, pending reference data".
+- Sourcing real availability windows — nothing supplies them and nobody
+  owns doing so; this ticket declares the availability shape and seeds
+  honest placeholders that say "unavailable, no reference-data source".

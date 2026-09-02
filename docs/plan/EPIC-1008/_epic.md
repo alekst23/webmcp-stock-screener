@@ -1,5 +1,6 @@
 # EPIC-1008: Discovery & Catalog
 
+**Status**: Done (7/8 tickets; T-1008-8 is a non-blocking follow-up filed at epic review)
 **Depends on**: —
 **Blocks**: EPIC-1009 (filter tree validates against the catalog registry),
 EPIC-1011 (chart studies resolve through the catalog registry)
@@ -40,13 +41,14 @@ available yet".
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1008-1 | Discovery result envelope, provenance, and stable-ID scheme | — | Open |
-| 2 | T-1008-2 | Catalog registry: typed item model and seeded inventory | T-1008-1 | Open |
-| 3 | T-1008-3 | Instrument directory port and reference-data seam | T-1008-1 | Open |
-| 4 | T-1008-4 | `search_instruments` tool | T-1008-1, T-1008-3 | Open |
-| 5 | T-1008-5 | `search_catalog` tool | T-1008-2 | Open |
-| 6 | T-1008-6 | `describe_catalog_item` tool | T-1008-2 | Open |
-| 7 | T-1008-7 | Register the discovery tool group on the new surface | T-1008-4, T-1008-5, T-1008-6 | Open |
+| 1 | T-1008-1 | Discovery result envelope, provenance, and stable-ID scheme | — | Done |
+| 2 | T-1008-2 | Catalog registry: typed item model and seeded inventory | T-1008-1 | Done |
+| 3 | T-1008-3 | Instrument directory port and reference-data seam | T-1008-1 | Done |
+| 4 | T-1008-4 | `search_instruments` tool | T-1008-1, T-1008-3 | Done |
+| 5 | T-1008-5 | `search_catalog` tool | T-1008-2 | Done |
+| 6 | T-1008-6 | `describe_catalog_item` tool | T-1008-2 | Done |
+| 7 | T-1008-7 | Register the discovery tool group on the new surface | T-1008-4, T-1008-5, T-1008-6 | Done |
+| 8 | T-1008-8 | Make instrument-search unavailability detection structural, not string-matched | T-1008-3, T-1008-4 | Open |
 
 ## Dependency Graph
 
@@ -85,10 +87,10 @@ T-1008-1 ──┬──> T-1008-2 ──┬──> T-1008-5 ──┐
    live/delayed status, timezone, and — where the payload is
    monetary/price/fundamental — currency, price-adjustment policy, and
    fundamentals reporting period, plus the calculation-engine version.
-5. When a catalog item or instrument search depends on reference data that
-   the separate live-data workstream has not yet supplied, the tool returns
-   a well-formed result that explicitly reports the data as unavailable and
-   why — it does not fail, and it does not present placeholder data as real.
+5. When a catalog item or instrument search depends on reference data this
+   project has no source for, the tool returns a well-formed result that
+   explicitly reports the data as unavailable and why — it does not fail,
+   and it does not present placeholder data as real.
 6. Requesting an unknown catalog item ID or an unknown instrument ID returns
    an explicit not-found result naming the ID, not an empty success.
 7. The catalog registry is exported as a typed, read-only inventory that

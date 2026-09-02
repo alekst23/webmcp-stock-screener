@@ -2,9 +2,38 @@
 
 **Epic**: EPIC-1008 (Discovery & Catalog)
 **Design**: docs/design/discovery-and-catalog/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1008-2
 **Blocks**: T-1008-7
+
+## Solution Approach
+
+`src/lib/webmcp/discovery/describeCatalogItem.ts` —
+`createDescribeCatalogItemTool(registry)`. The result is a **projection** of
+the registry item, derived field by field rather than re-declared as a
+second type, so the two cannot drift.
+
+- `detail` carries only the fields that exist for the item's kind (a
+  field's nullability and reporting basis, an operator's arity/operand
+  types/condition family, an interval's bar duration, a universe's
+  membership source, a template's target). A single flat shape padded with
+  nulls would make an agent work out which nulls are meaningful.
+- Parameters report value type, unit, default, range or enum values, and
+  whether they are required; outputs report type, unit and range.
+- An unavailable item is described **in full**, with its availability
+  status and reason — that is a real answer, not a lookup failure, and the
+  reason distinguishes missing data from missing engine support.
+- An unknown ID is an error result naming the ID and listing the nearest
+  real catalog IDs from `suggestCatalogIds`, mirroring the existing
+  surface's `ExpressionError`/`FUNCTION_CATALOG` precedent so a near miss
+  is correctable in one turn rather than a retry loop. Suggestion scoring
+  is a fixed ladder (exact, tail match, containment, alias, shared prefix)
+  — cheap and deterministic, because a predictable suggestion beats a
+  marginally better unpredictable one.
+
+Tests: `describeCatalogItem.test.ts`, covering one item of every kind.
+Mutation-checked — emptying the suggestion list turns the near-miss test
+red.
 
 ## Description
 

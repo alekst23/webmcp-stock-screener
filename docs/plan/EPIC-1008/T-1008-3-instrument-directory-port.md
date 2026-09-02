@@ -2,9 +2,36 @@
 
 **Epic**: EPIC-1008 (Discovery & Catalog)
 **Design**: docs/design/discovery-and-catalog/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1008-1
 **Blocks**: T-1008-4
+
+## Solution Approach
+
+- `src/lib/discovery/ports.ts` (domain) — `Instrument`, `AssetType`,
+  `ListingStatus`, `InstrumentMatch`, `InstrumentQuery`, and the
+  `InstrumentDirectory` interface. Also `MAX_INSTRUMENT_RESULTS` (50),
+  `DEFAULT_INSTRUMENT_RESULTS` (10) and `clampInstrumentLimit`, so the
+  adapter and the tool layer clamp against one number rather than two that
+  can drift. No I/O imports and no import of any adapter.
+- `src/lib/discovery/unavailableDirectory.ts` (infra) —
+  `createUnavailableInstrumentDirectory()`. A factory, not a singleton, so
+  composition chooses the adapter (AC8). `searchInstruments` resolves `[]`
+  and `getInstrument` resolves `null`, both inside a full envelope whose
+  `sourceId` is `src.instruments.unconfigured`, `delivery` is `static`, and
+  whose warning states plainly that no reference-data source is configured
+  and that instrument-scoped work cannot proceed.
+- `src/lib/discovery/testSupport.ts` — `createFakeInstrumentDirectory` and
+  `fakeInstrument`, the configurable double AC10 asks for. It lives with
+  the tests, deliberately not in the shipped path: a mock directory would
+  put invented listings in front of an agent that cannot tell them from
+  real ones.
+
+The shipped default returns nothing rather than fixtures because the honest
+failure mode ("no data, here is why") is the one an agent can act on. Both
+the empty-result path and the clamping path were mutation-checked: dropping
+the unavailability warning and removing the upper clamp each turn their
+tests red.
 
 ## Description
 
@@ -56,8 +83,8 @@ drop into the discovery tools without either side changing.
    without editing consuming code.
 9. The port, its record shapes, and the expectations placed on an
    implementer are documented in the feature's technical design as the
-   program-to-workstream contract, including how the implementer is expected
-   to populate every provenance field.
+   contract a future reference-data source implements against, including
+   how that implementer is expected to populate every provenance field.
 10. A test double implementing the port with configurable results is
     available for other tickets' tests, and the port's own tests cover: a
     matching search, a no-match search, a not-found fetch, and the default
@@ -98,6 +125,6 @@ drop into the discovery tools without either side changing.
 
 - Implementing a real reference-data source, ingestion, or backfill.
 - Sector, industry, index, fundamentals, and earnings-calendar data —
-  T-1008-2 declares those as catalog fields; supplying them is the other
-  workstream's job.
+  T-1008-2 declares those as catalog fields; supplying them is unowned and
+  out of this epic entirely.
 - The `search_instruments` tool itself (T-1008-4).

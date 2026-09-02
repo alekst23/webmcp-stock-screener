@@ -2,9 +2,36 @@
 
 **Epic**: EPIC-1008 (Discovery & Catalog)
 **Design**: docs/design/discovery-and-catalog/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1008-2, T-1008-3
+
+## Solution Approach
+
+Two new domain modules under `src/lib/surface/` — named for the whole new
+tool surface, not for discovery, because sibling epics need the same
+envelope.
+
+- `provenance.ts` — `ENGINE_VERSION` (the single declared value, AC8),
+  `DeliveryStatus`, `PriceAdjustment`, `ReportingPeriod`, `Provenance`,
+  `DiscoveryEnvelope<T>`, and the `makeProvenance` / `envelope`
+  constructors. `Provenance` is a **discriminated union on `delivery`**, so
+  `delayed` without a `delaySeconds` does not compile (AC3) and the
+  always-required fields are structurally unskippable (AC5).
+  `makeProvenance` drops `undefined` optionals rather than writing them, so
+  an omitted currency is genuinely absent rather than an explicit
+  `undefined` a consumer could misread (AC4).
+- `ids.ts` — `makeInstrumentId` / `isInstrumentId` (`inst:<MIC>:<SYMBOL>`)
+  and `makeCatalogItemId` / `isCatalogItemId` (`<prefix>.<path>`), plus the
+  exported `CATALOG_ID_PREFIXES`. The catalog kind→prefix table lives here
+  rather than in `src/lib/catalog/` so `surface/` stays free of a catalog
+  dependency and sibling epics can validate IDs without importing the
+  registry.
+
+Tests: `provenance.test.ts`, `ids.test.ts`. Each was mutation-checked —
+disabling the undefined-stripping, loosening the instrument-ID pattern to
+accept a bare ticker, and dropping the delay magnitude each turn the
+corresponding tests red.
 
 ## Description
 

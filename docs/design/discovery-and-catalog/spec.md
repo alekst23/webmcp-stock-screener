@@ -44,9 +44,9 @@ Questions below and implemented as stated.
    ranges, defaults, outputs, and data availability.
 4. **Provenance on every result**: every discovery result states when it is
    as of, where it came from, and under what conditions it holds.
-5. **Honest unavailability**: anything depending on reference data the
-   separate live-data workstream has not yet supplied is reported as
-   unavailable with a reason, never omitted and never faked.
+5. **Honest unavailability**: anything depending on reference data this
+   project has no source for is reported as unavailable with a reason,
+   never omitted and never faked.
 
 ## Behavioral Specifications
 
@@ -142,9 +142,10 @@ Questions below and implemented as stated.
    application uses when the provider supplies no stable identifier of its
    own.
 3. **Availability windows.** The earliest/latest data bounds per catalog
-   item can only come from the live-data workstream. *Assumption
-   implemented:* the shape is declared now and populated as unknown, so the
-   contract does not change when the real bounds arrive.
+   item can only come from a real data source, and this project has none
+   for reference data. *Assumption implemented:* the shape is declared now
+   and populated as unknown, so the contract does not change when real
+   bounds arrive.
 4. **Catalog versioning.** The tool spec requires a calculation-engine
    version on results but says nothing about versioning the catalog itself
    as items are added. *Assumption implemented:* the engine version covers
