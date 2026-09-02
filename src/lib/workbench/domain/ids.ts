@@ -9,6 +9,7 @@ export type ResourceKind =
 	| 'panel'
 	| 'screener'
 	| 'run'
+	| 'result'
 	| 'change'
 	| 'undo'
 	| 'link'
@@ -25,6 +26,7 @@ const RESOURCE_KINDS: ReadonlySet<string> = new Set<ResourceKind>([
 	'panel',
 	'screener',
 	'run',
+	'result',
 	'change',
 	'undo',
 	'link',
