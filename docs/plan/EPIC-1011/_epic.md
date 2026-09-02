@@ -45,15 +45,15 @@ fully specified setup back and forth without describing it in prose.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-1011-1 | Chart domain model, stable IDs, and captured-setup contract | — | Open |
-| 2 | T-1011-2 | Study calculation engine with declared engine version | — | Open |
-| 3 | T-1011-3 | Chart series port and market-data provenance envelope | — | Open |
-| 4 | T-1011-4 | Chart source and view contract (symbol, timeframe, range, display settings) | T-1011-1, T-1011-3 | Open |
-| 5 | T-1011-5 | Chart studies contract (add/update/reorder/toggle/remove) | T-1011-1, T-1011-2 | Open |
-| 6 | T-1011-6 | `get_chart_data` bounded read | T-1011-1, T-1011-2, T-1011-3 | Open |
-| 7 | T-1011-7 | `add_chart_annotation` tool | T-1011-1 | Open |
-| 8 | T-1011-8 | `capture_chart_setup` tool | T-1011-4, T-1011-5, T-1011-7 | Open |
-| 9 | T-1011-9 | Chart panel rendering, tool registration, and smoke | T-1011-4, T-1011-5, T-1011-6, T-1011-7, T-1011-8 | Open |
+| 1 | T-1011-1 | Chart domain model, stable IDs, and captured-setup contract | — | Done |
+| 2 | T-1011-2 | Study calculation engine with declared engine version | — | Done |
+| 3 | T-1011-3 | Chart series port and market-data provenance envelope | — | Done |
+| 4 | T-1011-4 | Chart source and view contract (symbol, timeframe, range, display settings) | T-1011-1, T-1011-3 | Done |
+| 5 | T-1011-5 | Chart studies contract (add/update/reorder/toggle/remove) | T-1011-1, T-1011-2 | Done |
+| 6 | T-1011-6 | `get_chart_data` bounded read | T-1011-1, T-1011-2, T-1011-3 | Done |
+| 7 | T-1011-7 | `add_chart_annotation` tool | T-1011-1 | Done |
+| 8 | T-1011-8 | `capture_chart_setup` tool | T-1011-4, T-1011-5, T-1011-7 | Done |
+| 9 | T-1011-9 | Chart panel rendering, tool registration, and smoke | T-1011-4, T-1011-5, T-1011-6, T-1011-7, T-1011-8 | Done |
 
 ## Dependency Graph
 

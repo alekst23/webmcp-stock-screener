@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1011-1, T-1011-3
 **Blocks**: T-1011-8, T-1011-9
 
@@ -73,6 +73,78 @@ EPIC-1007's `bind_panel_source` (instrument, range, comparisons) or
 11. The tool's own description and input schema state that the
     instrument must be an ID and that adjustment policy affects every
     downstream price.
+
+## Solution Approach
+
+Two halves, two entry points, one implementation of the rules.
+
+**Mutation half — EPIC-1006 operations.** No standalone WebMCP tool is
+registered. `src/lib/workbench/chart/application/chartSource.ts` and
+`chartView.ts` each export an `OperationDefinition` factory plus a
+`register*` call site:
+
+| Kind | Module | Owns |
+|------|--------|------|
+| `chart.bind_source` | `chartSource.ts` | instrument, timeframe, range, comparisons |
+| `chart.configure_view` | `chartView.ts` | candle type, scale, session, price adjustment |
+
+Registering there is what supplies `expected_revision`, `idempotency_key`,
+the mutation envelope, atomic apply and the undo token (AC5–AC8) — none of
+that is reimplemented here. `applyOperations` derives the combined inverse
+from the pre-mutation document, so each `apply` returns a `MutationDraft`
+with a non-null `inverse` and undo falls out.
+
+**Validation half — the EPIC-1007 registry contract.**
+`chart/tools/chartRendererContract.ts` exports plain-value
+`SourceTypeDefinition` and `RendererTypeDefinition` payloads plus
+`registerChartRendererContract(registry)`. EPIC-1007's registry is not on
+`main`, so the definition interfaces are declared structurally in that file
+and nothing is imported from EPIC-1007. `CHART_RENDERER_NAME` (`chart_grid`)
+and `CHART_SOURCE_TYPE` (`instrument`) are exported constants so a rename is
+one line. The registry validates but never applies, so its `validateReference`
+and `validateConfig` delegate to the *same* exported validators the
+operations' `validate()` calls — one rule set, two entry points.
+
+**Where the rules live.** Field-level shape validation is already in the
+domain: `applyChartConfigPatch` (which validates before it patches) and
+`invalidatesChartData`. This ticket adds only what the domain cannot know:
+
+- Panel existence and kind (AC9's unknown panel ID) — needs the document.
+- Bare-ticker rejection (AC2) — a `string` where an `InstrumentRef` belongs
+  gets its own message directing the caller to resolve the ticker first,
+  rather than the generic "expected an object".
+- Unknown instrument and "range with no available data" (AC9) — neither is
+  knowable from the document, and `validate()` is synchronous so the async
+  `ChartSeriesPort` cannot answer it. An injected synchronous
+  `InstrumentAvailability` oracle (`isKnownInstrument`, `dataWindow`) answers
+  both. When no oracle is injected the two checks are skipped: an unwired
+  chart must not reject every instrument as unknown.
+- Relative-range resolution, so `{kind:'relative'}` can be compared against a
+  coverage window. `resolveChartRange(range, now)` is exported for T-1011-6.
+
+**Comparisons (AC4).** `bind_source` takes `addComparisons` (normalization
+optional) and `removeComparisons` (instrument IDs), applied through the
+domain's `addComparison`/`removeComparison`. An omitted normalization gets
+`DEFAULT_NORMALIZATION` and the draft's warnings say so, as the spec's
+"Comparison" scenario requires.
+
+**Cache invalidation (AC10).** There is no bar cache to evict yet, so the
+observable contract is the report: when `invalidatesChartData(changes)` is
+true the draft carries an explicit warning naming the fields that forced it,
+and `describeChartDataInvalidation(changes)` is exported so T-1011-6 and
+T-1011-9 use the same sentence.
+
+**One finding worth passing on.** `applyOperations` merges per-operation
+drafts and keeps only `diffSummary`; a draft's `warnings` do not reach the
+envelope through that path. Every notice this ticket must deliver — the
+default normalization it applied, the caches it invalidated — is therefore
+written into the diff summary as well as into `warnings`. T-1011-9 should
+either keep doing that or take it up with EPIC-1006.
+
+**Schemas (AC11).** Both `inputSchema`s and the renderer `configSchema` are
+hand-written JSON Schema objects whose descriptions state that the instrument
+is an ID (never a ticker) and that the adjustment policy changes every
+downstream price, study value and read.
 
 ## Design References
 

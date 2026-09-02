@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1011 (Chart Tools)
 **Design**: docs/design/chart-tools/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1011-1
 **Blocks**: T-1011-8, T-1011-9
 
@@ -51,6 +51,71 @@ from a paragraph of dates and prices.
    and prices.
 9. An optional label or note on any annotation kind is returned verbatim
    in subsequent reads of the chart's state.
+
+## Solution Approach
+
+Two new files, no domain changes — `chart/domain/annotations.ts` already
+supplies `createAnnotation`, `validateAnnotationAnchors`, `isAnnotationStale`,
+`staleAnnotationIds`, `annotationTimes` and `annotationPrices` for all five
+kinds, and `chart/domain/chartState.ts` owns the annotation list and the
+`ChartPriceAdjustment` vocabulary.
+
+### `chart/application/chartAnnotations.ts`
+
+The use-case layer. It contributes the three things the domain deliberately
+does not know about:
+
+1. **Range resolution.** A chart's configured range is either an explicit
+   `{start, end}` or a relative token (`6mo`, `ytd`, `max`, …). Deciding
+   whether an anchor falls inside a _relative_ range needs a "now", which
+   makes it a use case rather than a pure domain function — so
+   `resolveChartRange(range, now)` and `describeChartRange(range, now)` live
+   here and take the injected `Clock`'s time. `max` resolves to `null`,
+   meaning unbounded, and is the one range nothing can fall outside of.
+   The rejection message names the resolved range, satisfying AC4.
+2. **Anchor-shape triage.** The domain validates anchors _of a known kind_;
+   it cannot report "you sent a price for a date range" because its anchor
+   type is a discriminated union that already carries `kind`. So this layer
+   compares the caller's anchor keys against the keys the kind requires and,
+   on a mismatch, reports what was missing and what was foreign alongside the
+   domain's own sentence describing what the kind expects. That sentence is
+   obtained by asking `validateAnnotationAnchors(kind, undefined)` rather than
+   copied, so the wording has exactly one definition (AC3).
+3. **The `chart.add_annotation` operation.** `createAddChartAnnotationOperation`
+   returns an EPIC-1006 `OperationDefinition`. Registering it there is what
+   supplies `expected_revision`, `idempotency_key`, the mutation envelope and
+   the undo token — none of that is reimplemented. `apply` mints the ID from
+   the `IdSequencer` (`annotation_N`, AC2), appends to the panel's chart state
+   through `writeChartState`, and returns an `inverse` draft whose document is
+   the same state with that annotation removed, so the undo token removes
+   exactly the drawing that was added (AC7).
+
+Staleness (AC6) is surfaced by `readChartAnnotationsView(doc, panelId)`, which
+returns each annotation with a `stale` flag computed against the chart's
+_current_ `priceAdjustment`, plus the list of stale IDs. Annotations stamp the
+policy in force at creation; a later policy change therefore flips the flag
+without touching the stored anchors. `apply` also lifts stale IDs into the
+draft's `warnings`, so the mutation envelope itself reports that earlier
+drawings no longer mean what they did.
+
+### `chart/tools/addChartAnnotation.ts`
+
+`buildAddChartAnnotationTool(deps)` returns the single `add_chart_annotation`
+`ToolSpec`. The handler resolves the workspace, then commits through
+`applyOperations` so the registered operation — not a parallel code path — is
+what actually runs. Typed EPIC-1006 errors map to `fail(...)` with their wire
+form. The factory registers the operation into the injected registry only if
+it is absent, so the tool is usable standalone while T-1011-9 remains free to
+register it explicitly at the composition root.
+
+The success payload carries the wire envelope, the created annotation verbatim
+(including an optional `label`, AC9), the chart's current price-adjustment
+policy, and the panel's full annotation list with per-annotation `stale` flags
+— which is the read path AC6 and AC9 are observed through.
+
+Anchors are stored in data coordinates only (ISO times and prices); nothing in
+either module knows about pixels, so a visible-range change cannot move an
+annotation (AC8).
 
 ## Design References
 

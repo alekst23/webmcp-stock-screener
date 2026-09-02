@@ -79,6 +79,30 @@ const addPanelOp: OperationDefinition<AddPanelInput> = {
 	}
 };
 
+interface WarningInput {
+	note: string;
+}
+
+// Applies cleanly but has something the caller needs to be told about -- the
+// case a study whose warm-up exceeds the visible range produces.
+const warningOp: OperationDefinition<WarningInput> = {
+	kind: 'test.warns',
+	inputSchema: {},
+	validate: () => [],
+	describe: () => 'Did something worth warning about.',
+	apply: (input, doc) => ({
+		document: { ...doc },
+		affectedIds: [doc.id],
+		diffSummary: 'Did something worth warning about.',
+		warnings: [input.note],
+		inverse: {
+			document: { ...doc },
+			affectedIds: [doc.id],
+			diffSummary: 'Undid it.'
+		}
+	})
+};
+
 interface RenamePanelInput {
 	panelId: string;
 	title: string;
@@ -234,6 +258,20 @@ describe('applyOperations', () => {
 		expect(() => applyOperations([], { expectedRevision: 1, actor: 'agent' }, deps())).toThrow(
 			OperationValidationError
 		);
+	});
+
+	it("carries every operation's warnings through to the envelope", () => {
+		registry.register(warningOp);
+		const envelope = applyOperations(
+			[
+				{ kind: 'test.warns', input: { note: 'first' } },
+				{ kind: 'test.warns', input: { note: 'second' } }
+			],
+			{ expectedRevision: 1, actor: 'agent' },
+			deps()
+		);
+		expect(envelope.warnings).toContain('first');
+		expect(envelope.warnings).toContain('second');
 	});
 
 	it('applies a collection as exactly one revision, one change id and one undo token', () => {

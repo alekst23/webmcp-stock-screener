@@ -19,42 +19,53 @@ see the spec's Open Questions.
 ## Cross-epic contract: `CapturedChartSetup`
 
 **This is the interface between EPIC-1011 and EPIC-1012.**
-`capture_chart_setup` writes it; `find_similar_setups`,
-`explain_similarity`, and `compare_setups` read it. It must be
-self-contained: a consumer never reads the live chart, and reconfiguring
-or removing the source panel does not invalidate a captured record.
-Changing this shape after T-1011-8 lands is a coordinated change across
-both epics.
+`capture_chart_setup` writes it; EPIC-1012's `find_similar_setups`,
+`explain_similarity` and `compare_setups` read it, and they are its only
+consumers. It must be self-contained: a consumer never reads the live
+chart, and reconfiguring or removing the source panel does not invalidate
+a captured record.
+
+**Changing this shape is a coordinated cross-epic change.** Both sides
+land together, and a record already persisted in a workspace must keep
+normalizing — a captured setup outlives the chart it came from, so an
+unannounced field rename silently breaks records that already exist.
+
+Defined in `src/lib/workbench/chart/domain/capturedSetup.ts`, which is
+the whole contract: the record type, `buildCapturedSetup` (the only
+constructor), `toWireCapturedSetup` (the only snake_case serializer),
+`normalizeCapturedSetup` (normalize-on-read), `CaptureSetupError`, and
+the setup store described below. Field names in the tables are the wire
+names; the TypeScript identifiers are the `camelCase` equivalents.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `setup_id` | stable ID, `setup_`-prefixed | addresses the record; the only thing EPIC-1012 needs to run |
 | `captured_at` | ISO timestamp | when the capture was taken |
-| `workspace_revision` | number | revision the capture was taken at |
-| `source_panel_id` | stable ID | chart panel it came from; informational, not a live reference |
-| `name` | string, optional | caller-supplied |
-| `notes` | string, optional | caller-supplied |
+| `workspace_revision` | number | the revision whose state was frozen. The capture itself commits at `revision + 1`, and its own existence is the only difference between the two |
+| `source_panel_id` | stable ID | chart panel it came from; informational, not a live reference — the panel may be gone |
+| `name` | string, optional | caller-supplied; absent rather than null when not given |
+| `notes` | string, optional | caller-supplied; absent rather than null when not given |
 | `instrument` | `InstrumentRef` | instrument ID, symbol, exchange, asset type — never a bare ticker as identifier |
 | `window` | `SetupWindow` | the historical window captured |
-| `candle_type` | enum | candlestick, ohlc bar, line, area, heikin-ashi, hollow candle |
-| `scale` | enum | linear, logarithmic |
-| `price_adjustment` | enum | `adjusted`, `split_adjusted`, `unadjusted` |
-| `normalization` | `Normalization` | how the series is made comparable; explicit, never defaulted at search time |
+| `candle_type` | enum | `candlestick`, `ohlc_bar`, `line`, `area`, `heikin_ashi`, `hollow_candle` |
+| `scale` | enum | `linear`, `logarithmic` |
+| `price_adjustment` | enum | the **chart's** policy: `adjusted`, `split_adjusted`, `unadjusted`. Distinct from `provenance.price_adjustment`, which is the basis the source actually applied; both are recorded because the chart's vocabulary is wider than provenance's |
+| `normalization` | `Normalization` | how the series is made comparable; explicit, never defaulted at search time. Defaults to `{none, window_start}` at capture, and that default is recorded rather than implied |
 | `studies` | ordered `CapturedStudy[]` | every study instance, with resolved parameters |
 | `comparisons` | `ComparisonRef[]` | comparison instruments and their normalization mode |
-| `annotations` | `CapturedAnnotation[]`, optional | drawings present at capture time |
+| `annotations` | `CapturedAnnotation[]`, optional in TypeScript | drawings present at capture time. Always emitted on the wire, as `[]` when there are none |
 | `provenance` | `MarketDataProvenance` | the data the capture was taken from |
 
 ### `SetupWindow`
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `start` | ISO timestamp | inclusive window start |
-| `end` | ISO timestamp | inclusive window end |
+| `start` | ISO timestamp | inclusive window start — the first bar the capture covers, not the chart's configured range bound |
+| `end` | ISO timestamp | inclusive window end — the last bar the capture covers |
 | `timeframe` | enum | bar interval, e.g. 1m / 5m / 1h / 1d / 1wk / 1mo |
 | `session` | enum | `regular`, `extended`, `continuous` |
-| `bar_count` | number | bars in the window at capture time |
-| `anchor_time` | ISO timestamp, optional | the bar the setup is "about", when one is distinguished |
+| `bar_count` | number | bars in the window at capture time. Zero is rejected, never stored |
+| `anchor_time` | ISO timestamp, optional | the bar the setup is "about", when one is distinguished. Must fall inside `[start, end]` |
 
 ### `Normalization`
 
@@ -63,6 +74,20 @@ both epics.
 | `mode` | enum | `none`, `percent_change`, `indexed_100`, `z_score` |
 | `anchor` | enum | `window_start`, `anchor_bar` — where the normalization is based |
 
+### `InstrumentRef` and `ComparisonRef`
+
+Re-exported from `capturedSetup.ts` so a consumer imports the whole
+contract from one module.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `instrument_id` | string | canonical and opaque; never a bare ticker |
+| `symbol` | string | display ticker — identity, not identifier |
+| `exchange` | string | ISO 10383 MIC of the listing venue |
+| `asset_type` | enum | `equity`, `etf`, `adr`, `fund`, `index`, `future`, `fx`, `crypto` |
+
+A `ComparisonRef` is `{instrument: InstrumentRef, normalization: Normalization}`.
+
 ### `CapturedStudy`
 
 | Field | Type | Description |
@@ -70,7 +95,7 @@ both epics.
 | `study_id` | stable ID, `study_`-prefixed | stable across update, reorder, and toggle |
 | `catalog_item_id` | string | resolves through EPIC-1008's catalog |
 | `params` | map of name -> value | fully resolved, defaults included — never partial |
-| `pane` | enum | `price_overlay` or `sub_pane`, as the catalog declares |
+| `pane` | enum | `price_overlay` or `sub_pane` |
 | `order` | number | display order within its pane |
 | `enabled` | boolean | toggled state at capture time |
 
@@ -78,11 +103,39 @@ both epics.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `annotation_id` | stable ID, `anno_`-prefixed | |
+| `annotation_id` | stable ID, `annotation_`-prefixed | |
 | `kind` | enum | `trendline`, `price_level`, `date_range`, `label`, `setup_window` |
 | `anchors` | kind-specific | trendline: two `{time, price}`; price level: one `price`; date range and setup window: `{start, end}`; label: one `{time, price}` plus `text` |
-| `price_adjustment` | enum | the policy in force when it was drawn; a mismatch with the chart's current policy marks it stale |
+| `price_adjustment` | enum | the policy in force when it was drawn; a mismatch with the setup's policy marks it stale. Stale drawings are captured as drawn, and the capture warns rather than dropping or re-basing them |
 | `label` | string, optional | |
+
+### How EPIC-1012 reads a captured setup
+
+Setups live in `WorkspaceDocument.extensions.chart_setups`, keyed by
+setup ID, and are read through the store exported alongside the type —
+never by reaching into `extensions` directly:
+
+| Export | Signature | Purpose |
+|--------|-----------|---------|
+| `CAPTURED_SETUP_EXTENSION_KEY` | `'chart_setups'` | the extension key, so nothing hard-codes the string |
+| `readCapturedSetup` | `(doc, setupId) => CapturedChartSetup \| null` | retrieve one by ID; the entry point for a similarity search given a setup ID |
+| `readCapturedSetups` | `(doc) => CapturedChartSetup[]` | every complete record in the workspace |
+| `writeCapturedSetup` | `(doc, setup) => WorkspaceDocument` | returns a new document; captures accumulate and never overwrite |
+| `capturedSetupIdSeed` | `(doc) => Record<string, number>` | high-water marks for `createIdSequencer`, so a reloaded workspace never re-mints an existing setup ID |
+
+Both readers normalize on read: a persisted record that cannot be read
+back as a complete setup is dropped rather than half-restored, because a
+partial setup is exactly what this contract promises never to hand
+downstream.
+
+### Refusing to capture
+
+`buildCapturedSetup` throws `CaptureSetupError` rather than returning a
+record missing an instrument or covering no bars, so a partial setup is
+never stored and never handed downstream. `capture_chart_setup` detects
+both conditions before it commits anything, and surfaces the error as
+`{error: 'capture_setup_incomplete', message, issues[]}` — `issues`
+naming every missing or invalid field at once.
 
 ## `MarketDataProvenance`
 
