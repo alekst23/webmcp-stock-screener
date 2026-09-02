@@ -22,3 +22,51 @@
 	<main class="work-area">{@render children()}</main>
 	<footer class="log-region">{@render log()}</footer>
 </div>
+
+<style>
+	.app-shell {
+		display: grid;
+		grid-template-rows: auto minmax(0, 1fr) auto;
+		min-height: 100vh;
+		background: var(--bg-app);
+	}
+
+	/* Sticky rather than a fixed-height frame: identity and session status
+	   stay in view while the work area scrolls, without trapping the page in
+	   an inner scroller at small heights. */
+	.top-bar {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-sm) var(--space-lg);
+		min-height: 2.75rem;
+		padding: var(--space-xs) var(--space-lg);
+		background: var(--bg-panel);
+		border-bottom: 1px solid var(--border);
+	}
+
+	.work-area {
+		min-width: 0;
+		padding: var(--space-lg);
+	}
+
+	.log-region {
+		min-width: 0;
+		padding: var(--space-md) var(--space-lg) var(--space-lg);
+		background: var(--bg-panel);
+		border-top: 1px solid var(--border);
+	}
+
+	@media (max-width: 680px) {
+		.top-bar,
+		.work-area,
+		.log-region {
+			padding-left: var(--space-md);
+			padding-right: var(--space-md);
+		}
+	}
+</style>

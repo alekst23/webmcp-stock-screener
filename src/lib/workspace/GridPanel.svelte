@@ -87,7 +87,6 @@
 	function handleClose(): void {
 		removePanel(store, panel.id);
 	}
-
 </script>
 
 {#if !missingData}
@@ -131,60 +130,91 @@
 
 <style>
 	.grid-panel {
-		margin-bottom: 1.5rem;
+		margin-bottom: var(--space-lg);
+		padding: var(--space-md);
+		background: var(--bg-panel);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
 	}
 	.panel-header {
 		display: flex;
 		align-items: baseline;
 		justify-content: space-between;
-		gap: 0.5rem;
+		gap: var(--space-sm);
+		margin-bottom: var(--space-sm);
+		padding-bottom: var(--space-sm);
+		border-bottom: 1px solid var(--separator);
 	}
 	h3 {
-		font-size: 1rem;
-		margin-bottom: 0.5rem;
+		margin: 0;
+		font-size: var(--font-size-sm);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-secondary);
+	}
+	h3 code {
+		text-transform: none;
+		letter-spacing: 0;
+		color: var(--text-muted);
 	}
 	.close {
-		border: 1px solid #999;
-		border-radius: 4px;
-		padding: 0.2rem 0.5rem;
-		background: #fff;
-		color: #111;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		padding: var(--space-xs) var(--space-sm);
+		background: var(--bg-elevated);
+		color: var(--text-secondary);
 		font: inherit;
-		font-size: 0.8rem;
+		font-size: var(--font-size-xs);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		cursor: pointer;
 		white-space: nowrap;
 	}
+	.close:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
 	.empty {
-		color: #888;
+		color: var(--text-muted);
 		font-style: italic;
 	}
 	.error {
-		color: #b00;
+		color: var(--error);
+		background: var(--error-bg);
+		border: 1px solid var(--error);
+		border-radius: var(--radius-sm);
+		padding: var(--space-xs) var(--space-sm);
 	}
 	.cells {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-		gap: 0.5rem;
+		gap: var(--space-sm);
 	}
 	.cell {
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		padding: 0.25rem;
-		background: #fff;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		padding: var(--space-xs);
+		background: var(--bg-elevated);
 		cursor: pointer;
 		font: inherit;
 	}
+	.cell:hover {
+		background: var(--bg-hover);
+		border-color: var(--border-strong);
+	}
 	.cell.partial {
 		border-style: dashed;
-		border-color: #c90;
+		border-color: var(--warning);
 	}
 	.label {
-		font-size: 0.7rem;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: var(--font-size-xs);
 		text-align: center;
-		margin-top: 0.25rem;
-		color: #333;
+		margin-top: var(--space-xs);
+		color: var(--text-secondary);
 	}
 </style>

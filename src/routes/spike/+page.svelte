@@ -65,17 +65,64 @@
 <style>
 	main {
 		max-width: 720px;
-		margin: 2rem auto;
-		padding: 0 1rem;
-		font-family: system-ui, sans-serif;
+		margin: 0 auto;
+		padding: var(--space-lg) var(--space-lg) var(--space-xl);
+	}
+	h1 {
+		font-size: var(--font-size-xl);
+		margin: 0 0 var(--space-sm);
+	}
+	h2 {
+		font-size: var(--font-size-xs);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-secondary);
+		margin: 0 0 var(--space-sm);
+	}
+	p {
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
+	}
+	section {
+		margin-top: var(--space-lg);
+		padding: var(--space-md);
+		background: var(--bg-panel);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+	}
+	ul {
+		margin: 0;
+		padding-left: var(--space-lg);
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
+	}
+	button {
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		padding: 0.35rem 0.65rem;
+		background: var(--bg-elevated);
+		color: var(--text-primary);
+		font: inherit;
+		font-size: var(--font-size-sm);
+		cursor: pointer;
+	}
+	button:hover {
+		background: var(--bg-hover);
+		border-color: var(--accent);
 	}
 	pre {
 		white-space: pre-wrap;
-		background: #f5f5f5;
-		padding: 0.5rem;
+		background: var(--bg-app);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		color: var(--text-secondary);
+		padding: var(--space-sm);
 		font-size: 0.85em;
+		margin: var(--space-sm) 0 0;
 	}
 	pre.error {
-		background: #fee;
+		background: var(--error-bg);
+		border-color: var(--error);
+		color: var(--error);
 	}
 </style>

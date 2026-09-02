@@ -1,23 +1,17 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { findColourLiterals, SOURCE_GLOB } from './paletteGuard';
 
-const ROOT = process.cwd();
-const PAGE_PATH = join(ROOT, 'src', 'routes', '+page.svelte');
+// Vite's glob import rather than a filesystem walk: it needs no node typings
+// (the project has none) and it resolves the same set of files SOURCE_GLOB
+// names, so the guard cannot silently walk nothing.
+const SOURCES = import.meta.glob('/src/**/*.svelte', {
+	query: '?raw',
+	import: 'default',
+	eager: true
+}) as Record<string, string>;
 
-function svelteSources(dir: string): string[] {
-	const found: string[] = [];
-	for (const entry of readdirSync(dir, { withFileTypes: true })) {
-		const full = join(dir, entry.name);
-		if (entry.isDirectory()) {
-			found.push(...svelteSources(full));
-		} else if (entry.name.endsWith('.svelte')) {
-			found.push(full);
-		}
-	}
-	return found;
-}
+const PAGE = SOURCES['/src/routes/+page.svelte'] ?? '';
+const SHELL = SOURCES['/src/lib/shell/AppShell.svelte'] ?? '';
 
 describe('colour literal detection', () => {
 	it('test_finds_a_hex_literal_with_its_line_number', () => {
@@ -81,8 +75,8 @@ describe('colour literal detection', () => {
 	});
 
 	it('test_returns_empty_for_a_fully_tokenised_source', () => {
-		const source = readFileSync(join(ROOT, 'src', 'lib', 'shell', 'AppShell.svelte'), 'utf8');
-		expect(findColourLiterals(source, 'AppShell.svelte'), 'the shell names no colour').toEqual([]);
+		expect(SHELL, 'AppShell.svelte was not resolved').toContain('app-shell');
+		expect(findColourLiterals(SHELL, 'AppShell.svelte'), 'the shell names no colour').toEqual([]);
 	});
 });
 
@@ -92,10 +86,10 @@ describe('colour literal detection', () => {
 // conversion is complete rather than partial.
 describe('no component names a colour directly', () => {
 	it('test_no_raw_colour_literals_outside_the_token_module', () => {
-		const files = svelteSources(join(ROOT, 'src'));
+		const files = Object.entries(SOURCES);
 		expect(files.length, `no sources matched ${SOURCE_GLOB}`).toBeGreaterThan(0);
-		const offenders = files.flatMap((file) =>
-			findColourLiterals(readFileSync(file, 'utf8'), relative(ROOT, file).split(sep).join('/'))
+		const offenders = files.flatMap(([file, source]) =>
+			findColourLiterals(source, file.replace(/^\//, ''))
 		);
 		expect(
 			offenders,
@@ -111,7 +105,7 @@ describe('no component names a colour directly', () => {
 // existing test -- see technical.md, "Testing", for why a source-order
 // assertion was chosen over adding a component-mounting dependency.
 describe('restyle-sensitive page invariants', () => {
-	const page = readFileSync(PAGE_PATH, 'utf8');
+	const page = PAGE;
 
 	it('test_activity_feed_renders_after_the_focus_chart', () => {
 		const focus = page.indexOf('<FocusChart');

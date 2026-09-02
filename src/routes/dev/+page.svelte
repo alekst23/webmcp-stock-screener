@@ -100,38 +100,95 @@
 
 <style>
 	main {
-		max-width: 960px;
-		margin: 2rem auto;
-		padding: 0 1rem;
-		font-family: system-ui, sans-serif;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: var(--space-lg) var(--space-lg) var(--space-xl);
+	}
+	h1 {
+		font-size: var(--font-size-xl);
+		margin: 0 0 var(--space-sm);
+	}
+	h2 {
+		font-size: var(--font-size-xs);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-secondary);
+		margin: 0 0 var(--space-sm);
+	}
+	main > p {
+		max-width: 72ch;
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
 	}
 	.tools {
 		display: grid;
-		gap: 1rem;
+		gap: var(--space-md);
 		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		margin-bottom: 2rem;
+		margin-bottom: var(--space-xl);
 	}
 	article {
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		padding: 0.75rem;
+		background: var(--bg-panel);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		padding: var(--space-md);
+	}
+	article h3 {
+		margin: 0 0 var(--space-xs);
+		font-family: var(--font-mono);
+		font-size: var(--font-size-md);
+		color: var(--accent);
+	}
+	article p {
+		margin: 0;
+		font-size: var(--font-size-sm);
+		color: var(--text-secondary);
 	}
 	article.disabled {
 		opacity: 0.5;
 	}
 	textarea {
 		width: 100%;
-		font-family: monospace;
-		margin: 0.5rem 0;
+		font-family: var(--font-mono);
+		font-size: var(--font-size-sm);
+		margin: var(--space-sm) 0;
 		box-sizing: border-box;
+		background: var(--bg-elevated);
+		color: var(--text-primary);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		padding: var(--space-sm);
+	}
+	button {
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		padding: 0.35rem 0.65rem;
+		background: var(--bg-elevated);
+		color: var(--text-primary);
+		font: inherit;
+		font-size: var(--font-size-sm);
+		cursor: pointer;
+	}
+	button:hover:not(:disabled) {
+		background: var(--bg-hover);
+		border-color: var(--accent);
+	}
+	button:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 	pre {
 		white-space: pre-wrap;
-		background: #f5f5f5;
-		padding: 0.5rem;
+		background: var(--bg-app);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		color: var(--text-secondary);
+		padding: var(--space-sm);
 		font-size: 0.8em;
+		margin: var(--space-sm) 0 0;
 	}
 	pre.error {
-		background: #fee;
+		background: var(--error-bg);
+		border-color: var(--error);
+		color: var(--error);
 	}
 </style>

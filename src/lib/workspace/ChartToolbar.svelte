@@ -86,41 +86,54 @@
 	.chart-toolbar {
 		display: grid;
 		grid-template-columns: minmax(180px, 1fr) minmax(150px, auto) auto;
-		gap: 0.75rem;
+		gap: var(--space-md);
 		align-items: end;
-		margin: 1rem 0 1.5rem;
-		padding: 0.75rem 0;
-		border-top: 1px solid #ddd;
-		border-bottom: 1px solid #ddd;
+		margin: 0 0 var(--space-lg);
+		padding: var(--space-md);
+		background: var(--bg-panel);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
 	}
 	label {
 		display: grid;
-		gap: 0.25rem;
-		font-size: 0.8rem;
-		color: #555;
+		gap: var(--space-xs);
+		font-size: var(--font-size-xs);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-muted);
 	}
 	input {
 		box-sizing: border-box;
 		width: 100%;
-		border: 1px solid #bbb;
-		border-radius: 4px;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
 		padding: 0.45rem 0.55rem;
 		font: inherit;
-		color: #111;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		background: var(--bg-elevated);
+		color: var(--text-primary);
+	}
+	input:hover {
+		border-color: var(--accent);
 	}
 	.actions {
 		display: flex;
-		gap: 0.5rem;
+		gap: var(--space-sm);
 	}
 	button {
-		border: 1px solid #999;
-		border-radius: 4px;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
 		padding: 0.45rem 0.65rem;
-		background: #fff;
-		color: #111;
+		background: var(--bg-elevated);
+		color: var(--text-primary);
 		font: inherit;
 		cursor: pointer;
 		white-space: nowrap;
+	}
+	button:hover:not(:disabled) {
+		background: var(--bg-hover);
+		border-color: var(--accent);
 	}
 	button:disabled,
 	input:disabled {
@@ -130,7 +143,11 @@
 	.error {
 		grid-column: 1 / -1;
 		margin: 0;
-		color: #b00;
+		color: var(--error);
+		background: var(--error-bg);
+		border: 1px solid var(--error);
+		border-radius: var(--radius-sm);
+		padding: var(--space-xs) var(--space-sm);
 	}
 
 	@media (max-width: 680px) {

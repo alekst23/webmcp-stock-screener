@@ -93,17 +93,26 @@
 
 <style>
 	section {
-		margin-bottom: 1.5rem;
+		margin-bottom: var(--space-lg);
+		padding: var(--space-md);
+		background: var(--bg-panel);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
 	}
 	h2 {
-		font-size: 1rem;
-		margin-bottom: 0.25rem;
+		margin: 0 0 var(--space-xs);
+		font-size: var(--font-size-xs);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-secondary);
 	}
 	.empty {
-		color: #888;
+		margin: 0;
+		color: var(--text-muted);
 		font-style: italic;
 	}
 	code {
 		font-size: 0.85em;
+		color: var(--accent);
 	}
 </style>
