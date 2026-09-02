@@ -90,10 +90,15 @@
 </script>
 
 {#if !missingData}
-	<section class="grid-panel">
+	<section class="grid-panel panel-card">
 		<div class="panel-header">
 			<h3>{panel.title ?? 'Grid'} <code>{panel.id}</code> ({windows.length} instances)</h3>
-			<button type="button" class="close" onclick={handleClose} aria-label="Close panel {panel.id}">
+			<button
+				type="button"
+				class="close control"
+				onclick={handleClose}
+				aria-label="Close panel {panel.id}"
+			>
 				Close
 			</button>
 		</div>
@@ -131,10 +136,6 @@
 <style>
 	.grid-panel {
 		margin-bottom: var(--space-lg);
-		padding: var(--space-md);
-		background: var(--bg-panel);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
 	}
 	.panel-header {
 		display: flex;
@@ -158,21 +159,10 @@
 		color: var(--text-muted);
 	}
 	.close {
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: var(--space-xs) var(--space-sm);
-		background: var(--bg-elevated);
 		color: var(--text-secondary);
-		font: inherit;
 		font-size: var(--font-size-xs);
 		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.close:hover {
-		background: var(--bg-hover);
-		color: var(--text-primary);
 	}
 	.empty {
 		color: var(--text-muted);

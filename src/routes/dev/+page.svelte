@@ -61,14 +61,16 @@
 		<section class="tools">
 			{#each tools as tool (tool.name)}
 				{@const isAvailable = tool.available($workspaceStore)}
-				<article class:disabled={!isAvailable}>
+				<article class="panel-card" class:disabled={!isAvailable}>
 					<h3>
 						{tool.name}{#if !isAvailable}
 							(locked){/if}
 					</h3>
 					<p>{tool.description}</p>
-					<textarea bind:value={inputs[tool.name]} rows="4" disabled={!isAvailable}></textarea>
-					<button onclick={() => run(tool.name)} disabled={!isAvailable}>Run</button>
+					<textarea class="field" bind:value={inputs[tool.name]} rows="4" disabled={!isAvailable}
+					></textarea>
+					<button class="control" onclick={() => run(tool.name)} disabled={!isAvailable}>Run</button
+					>
 					{#if results[tool.name]}
 						<!-- TS can't narrow an index access across two separate reads of
 						     results[tool.name]; the `!` is safe under the #if guard above. -->
@@ -126,12 +128,6 @@
 		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 		margin-bottom: var(--space-xl);
 	}
-	article {
-		background: var(--bg-panel);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
-		padding: var(--space-md);
-	}
 	article h3 {
 		margin: 0 0 var(--space-xs);
 		font-family: var(--font-mono);
@@ -148,33 +144,13 @@
 	}
 	textarea {
 		width: 100%;
+		box-sizing: border-box;
+		margin: var(--space-sm) 0;
 		font-family: var(--font-mono);
 		font-size: var(--font-size-sm);
-		margin: var(--space-sm) 0;
-		box-sizing: border-box;
-		background: var(--bg-elevated);
-		color: var(--text-primary);
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: var(--space-sm);
 	}
 	button {
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: 0.35rem 0.65rem;
-		background: var(--bg-elevated);
-		color: var(--text-primary);
-		font: inherit;
 		font-size: var(--font-size-sm);
-		cursor: pointer;
-	}
-	button:hover:not(:disabled) {
-		background: var(--bg-hover);
-		border-color: var(--accent);
-	}
-	button:disabled {
-		opacity: 0.6;
-		cursor: default;
 	}
 	pre {
 		white-space: pre-wrap;

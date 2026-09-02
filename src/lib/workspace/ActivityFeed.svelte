@@ -19,7 +19,9 @@
 <section class="activity-feed">
 	<div class="header-row">
 		<h2>Activity log ({events.length})</h2>
-		<button type="button" onclick={clear} disabled={events.length === 0}>Clear log</button>
+		<button type="button" class="control" onclick={clear} disabled={events.length === 0}>
+			Clear log
+		</button>
 	</div>
 	{#if events.length === 0}
 		<p class="empty">No activity yet.</p>
@@ -39,9 +41,6 @@
 </section>
 
 <style>
-	.activity-feed {
-		margin: 0;
-	}
 	.header-row {
 		display: flex;
 		align-items: center;
@@ -57,25 +56,10 @@
 		color: var(--text-secondary);
 	}
 	.header-row button {
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: var(--space-xs) var(--space-sm);
-		background: var(--bg-elevated);
 		color: var(--text-secondary);
-		font: inherit;
 		font-size: var(--font-size-xs);
 		letter-spacing: var(--tracking-label);
 		text-transform: uppercase;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.header-row button:hover:not(:disabled) {
-		background: var(--bg-hover);
-		color: var(--text-primary);
-	}
-	.header-row button:disabled {
-		opacity: 0.6;
-		cursor: default;
 	}
 	.empty {
 		margin: 0;

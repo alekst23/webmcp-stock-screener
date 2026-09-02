@@ -64,18 +64,20 @@
 	}
 </script>
 
-<section class="chart-toolbar" aria-label="Chart controls">
+<section class="chart-toolbar panel-card" aria-label="Chart controls">
 	<label>
 		<span>Tickers</span>
-		<input bind:value={tickers} disabled={busy} />
+		<input class="field" bind:value={tickers} disabled={busy} />
 	</label>
 	<label>
 		<span>End date</span>
-		<input type="date" bind:value={date} disabled={busy} />
+		<input class="field" type="date" bind:value={date} disabled={busy} />
 	</label>
 	<div class="actions">
-		<button type="button" onclick={clearPanels} disabled={busy}>Clear panels</button>
-		<button type="button" onclick={showMonthly} disabled={busy}>Show monthly</button>
+		<button type="button" class="control" onclick={clearPanels} disabled={busy}>Clear panels</button
+		>
+		<button type="button" class="control" onclick={showMonthly} disabled={busy}>Show monthly</button
+		>
 	</div>
 	{#if error}
 		<p class="error">{error}</p>
@@ -89,10 +91,6 @@
 		gap: var(--space-md);
 		align-items: end;
 		margin: 0 0 var(--space-lg);
-		padding: var(--space-md);
-		background: var(--bg-panel);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
 	}
 	label {
 		display: grid;
@@ -105,40 +103,12 @@
 	input {
 		box-sizing: border-box;
 		width: 100%;
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: 0.45rem 0.55rem;
-		font: inherit;
 		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
-		background: var(--bg-elevated);
-		color: var(--text-primary);
-	}
-	input:hover {
-		border-color: var(--accent);
 	}
 	.actions {
 		display: flex;
 		gap: var(--space-sm);
-	}
-	button {
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: 0.45rem 0.65rem;
-		background: var(--bg-elevated);
-		color: var(--text-primary);
-		font: inherit;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	button:hover:not(:disabled) {
-		background: var(--bg-hover);
-		border-color: var(--accent);
-	}
-	button:disabled,
-	input:disabled {
-		opacity: 0.6;
-		cursor: default;
 	}
 	.error {
 		grid-column: 1 / -1;

@@ -4,7 +4,7 @@
 	let { state }: { state: WorkspaceState } = $props();
 </script>
 
-<section>
+<section class="panel-card">
 	<h2>Studies ({state.studies.length})</h2>
 	{#if state.studies.length === 0}
 		<p class="empty">No studies defined yet.</p>
@@ -17,7 +17,7 @@
 	{/if}
 </section>
 
-<section>
+<section class="panel-card">
 	<h2>Setups ({state.setups.length})</h2>
 	{#if state.setups.length === 0}
 		<p class="empty">No setups defined yet.</p>
@@ -41,7 +41,7 @@
 	{/if}
 </section>
 
-<section>
+<section class="panel-card">
 	<h2>Instance sets ({state.instanceSets.length})</h2>
 	{#if state.instanceSets.length === 0}
 		<p class="empty">No instance sets yet.</p>
@@ -57,7 +57,7 @@
 	{/if}
 </section>
 
-<section>
+<section class="panel-card">
 	<h2>Panels ({state.panels.length})</h2>
 	{#if state.panels.length === 0}
 		<p class="empty">No panels open yet.</p>
@@ -73,7 +73,7 @@
 	{/if}
 </section>
 
-<section>
+<section class="panel-card">
 	<h2>Focus</h2>
 	{#if state.focus === null}
 		<p class="empty">Nothing focused.</p>
@@ -94,10 +94,6 @@
 <style>
 	section {
 		margin-bottom: var(--space-lg);
-		padding: var(--space-md);
-		background: var(--bg-panel);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
 	}
 	h2 {
 		margin: 0 0 var(--space-xs);

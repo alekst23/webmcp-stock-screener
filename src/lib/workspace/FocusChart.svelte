@@ -39,7 +39,7 @@
 	);
 </script>
 
-<section class="focus-chart">
+<section class="focus-chart panel-card">
 	<h2>
 		{aligned.ticker} — {aligned.date}
 		{#if aligned.isPartial}<span class="partial-tag">partial match</span>{/if}
@@ -76,10 +76,6 @@
 <style>
 	.focus-chart {
 		margin-bottom: var(--space-lg);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
-		background: var(--bg-panel);
-		padding: var(--space-md);
 	}
 	h2 {
 		margin: 0 0 var(--space-sm);

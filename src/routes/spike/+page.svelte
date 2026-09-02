@@ -39,7 +39,7 @@
 		a real agent in a WebMCP-capable browser.
 	</p>
 
-	<section>
+	<section class="panel-card">
 		<h2>Status</h2>
 		<ul>
 			<li>
@@ -52,10 +52,10 @@
 		</ul>
 	</section>
 
-	<section>
+	<section class="panel-card">
 		<h2>Manual check (no agent required)</h2>
 		<p>Calls the same code the tool's <code>execute()</code> runs, directly from this page.</p>
-		<button onclick={runManualCheck}>Call spikePing() directly</button>
+		<button class="control" onclick={runManualCheck}>Call spikePing() directly</button>
 		{#if manualResult}
 			<pre class:error={!manualResult.ok}>{manualResult.text}</pre>
 		{/if}
@@ -85,10 +85,6 @@
 	}
 	section {
 		margin-top: var(--space-lg);
-		padding: var(--space-md);
-		background: var(--bg-panel);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
 	}
 	ul {
 		margin: 0;
@@ -97,18 +93,7 @@
 		color: var(--text-secondary);
 	}
 	button {
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: 0.35rem 0.65rem;
-		background: var(--bg-elevated);
-		color: var(--text-primary);
-		font: inherit;
 		font-size: var(--font-size-sm);
-		cursor: pointer;
-	}
-	button:hover {
-		background: var(--bg-hover);
-		border-color: var(--accent);
 	}
 	pre {
 		white-space: pre-wrap;

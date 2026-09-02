@@ -95,7 +95,11 @@ describe('instance focus', () => {
 
 describe('chart geometry and hover interaction', () => {
 	it('scales bars into the chart viewport and finds the nearest bar under a pointer', () => {
-		const bars = [bar('X', '2024-01-01', 10), bar('X', '2024-01-02', 20), bar('X', '2024-01-03', 15)];
+		const bars = [
+			bar('X', '2024-01-01', 10),
+			bar('X', '2024-01-02', 20),
+			bar('X', '2024-01-03', 15)
+		];
 
 		const geometry = computeChartGeometry(bars, 100, 50);
 

@@ -76,7 +76,7 @@
 	}
 </script>
 
-<details class="snapshot-picker">
+<details class="snapshot-picker panel-card">
 	<summary>
 		Workspaces {snapshots.length ? `(${snapshots.length})` : '(none saved)'}
 	</summary>
@@ -84,9 +84,9 @@
 	<div class="save-row">
 		<label>
 			<span>Workspace name</span>
-			<input bind:value={name} placeholder="e.g. gap-fade-research" />
+			<input class="field" bind:value={name} placeholder="e.g. gap-fade-research" />
 		</label>
-		<button type="button" onclick={save}>Save workspace</button>
+		<button type="button" class="control" onclick={save}>Save workspace</button>
 	</div>
 
 	{#if error}
@@ -97,13 +97,13 @@
 		<ul>
 			{#each snapshots as snapshot (snapshot.name)}
 				<li>
-					<button type="button" class="load" onclick={() => load(snapshot.name)}>
+					<button type="button" class="load control" onclick={() => load(snapshot.name)}>
 						{snapshot.name}
 					</button>
 					<span class="saved-at">{new Date(snapshot.savedAt).toLocaleString()}</span>
 					<button
 						type="button"
-						class="delete"
+						class="control"
 						aria-label={`Delete workspace ${snapshot.name}`}
 						onclick={() => remove(snapshot.name)}
 					>
@@ -120,10 +120,6 @@
 <style>
 	.snapshot-picker {
 		margin: 0 0 var(--space-md);
-		padding: var(--space-sm) var(--space-md);
-		background: var(--bg-panel);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
 	}
 	summary {
 		cursor: pointer;
@@ -156,32 +152,11 @@
 	input {
 		box-sizing: border-box;
 		width: 100%;
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: 0.35rem 0.5rem;
-		font: inherit;
-		background: var(--bg-elevated);
-		color: var(--text-primary);
 		text-transform: none;
 		letter-spacing: normal;
 	}
-	input:hover {
-		border-color: var(--accent);
-	}
 	button {
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-sm);
-		padding: 0.35rem 0.6rem;
-		background: var(--bg-elevated);
-		color: var(--text-primary);
-		font: inherit;
 		font-size: var(--font-size-sm);
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	button:hover {
-		background: var(--bg-hover);
-		border-color: var(--accent);
 	}
 	ul {
 		list-style: none;
@@ -198,9 +173,6 @@
 	.load {
 		flex: 1;
 		text-align: left;
-	}
-	.load:hover {
-		color: var(--accent);
 	}
 	.saved-at {
 		font-family: var(--font-mono);

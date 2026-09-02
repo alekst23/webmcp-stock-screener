@@ -4,11 +4,10 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
-		<meta name="color-scheme" content="dark" />
-		<!-- Duplicated from tokens.ts's bgApp on purpose: this paints before any
-		     JS runs, so the researcher never sees a white frame before the SPA
-		     hydrates, and it is what makes native scrollbars and form controls
-		     render dark. -->
+		<!-- Duplicated from tokens.ts's bgApp on purpose, and the only place
+		     color-scheme is declared: both apply before any JS runs, so the
+		     researcher never sees a white frame before the SPA hydrates, and
+		     native scrollbars and form controls render dark from the start. -->
 		<style>
 			html {
 				color-scheme: dark;
