@@ -42,8 +42,17 @@ export function createRevisionService(deps: {
 	ids: IdSequencer;
 	idempotency: IdempotencyCache;
 }): RevisionService {
+	// A workspace that has never been stored has no "current" revision to
+	// bump from -- revision 0 here (never a real, storable revision; T-1006-1
+	// starts real documents at 1) makes the first commit land at exactly 1,
+	// satisfying create_workspace's "given a stable ID at revision 1" (T-1006-8
+	// AC3) rather than skipping straight to 2.
 	function loadCurrent(workspaceId: ResourceId): WorkspaceDocument {
-		return deps.repository.get(workspaceId) ?? normalizeWorkspace({ id: workspaceId });
+		const existing = deps.repository.get(workspaceId);
+		if (existing) {
+			return existing;
+		}
+		return { ...normalizeWorkspace({ id: workspaceId }), revision: 0 };
 	}
 
 	// Throws RevisionConflictError on mismatch; otherwise appends the

@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1006 (Workspace, Revisions & the Common Tool Contract)
 **Design**: docs/design/workspace-revisions/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1006-3, T-1006-6, T-1006-7
 **Blocks**: —
 
@@ -129,3 +129,32 @@ Nothing here imports `src/lib/webmcp/tools.ts` or
 
 Any tool outside the seven named here; a UI for the new workspace; and
 removing the old surface.
+
+## Implementation Notes
+
+- Fixed a bug in T-1006-5's `RevisionService.commit`, found while wiring
+  `create_workspace`: `loadCurrent`'s fallback for a never-before-stored
+  workspace id used `normalizeWorkspace`'s default revision (1), so the
+  first commit against a brand-new id bumped it to 2 instead of landing
+  at 1 (T-1006-8 AC3). Fallback now starts at revision 0 (never a real,
+  storable revision) so the first commit lands at exactly 1. Added a
+  regression test to `revisionService.test.ts`.
+- `save_workspace` does not go through `RevisionService.commit`/
+  `recordCommit`: naming attaches to the *current* revision without
+  creating a new one (epic Open Question 5), so it directly updates the
+  existing `SavedRevision`'s `name` field via
+  `WorkspaceRepository.putRevision`, after checking `expected_revision`
+  by hand. `idempotency_key` is accepted but not separately deduped —
+  re-saving the same name to the same revision is naturally idempotent in
+  effect.
+- `get_app_context` and every other read tool re-read repository/history
+  state inside their returned `execute` closure rather than at
+  `buildWorkbenchTools` build time, so a workspace created after the tool
+  list was built is still reflected on the next call.
+- `registerWorkbenchTools.ts` mirrors `register.ts`'s underlying
+  primitive (`ensureModelContext().registerTool(...)`) rather than
+  reusing `register.ts`'s `connect()` machinery, which is tightly coupled
+  to `ResearchEngine`/the old `WorkspaceState` for its availability
+  gating — this surface's tools are always-available, so that machinery
+  doesn't apply. `WORKBENCH_TOOLS_ENABLED = false` and nothing calls
+  `registerWorkbenchTools` from app startup yet.

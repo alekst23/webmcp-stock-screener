@@ -49,6 +49,20 @@ describe('createRevisionService', () => {
 		expect(repository.get('workspace_1')?.revision).toBe(2);
 	});
 
+	it('lands a brand-new, never-before-stored workspace at revision 1, not 2', () => {
+		const envelope = service.commit({
+			workspaceId: 'workspace_new',
+			context: { actor: 'agent' },
+			mutate: (doc) => ({
+				document: emptyWorkspace('workspace_new', 'New', '2026-01-02T00:00:00.000Z'),
+				affectedIds: [doc.id],
+				diffSummary: 'Created workspace.'
+			})
+		});
+		expect(envelope.newRevision).toBe(1);
+		expect(repository.get('workspace_new')?.revision).toBe(1);
+	});
+
 	it('refuses a mismatched expected_revision without changing stored state', () => {
 		const before = repository.get('workspace_1');
 		expect(() =>
