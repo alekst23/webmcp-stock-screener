@@ -13,19 +13,28 @@ import type { WireError } from '../../domain/errors';
 import {
 	makeProvenance,
 	type MarketDataProvenance,
-	type PriceAdjustment,
 	type ProvenanceLiveness,
 	type ReportingPeriod
 } from '../../domain/provenance';
+// The chart's timeframe, session and price-adjustment vocabulary has one
+// definition, in chartState. The port re-exports it rather than declaring a
+// parallel copy: two enumerations of the same concept drift, and a port that
+// accepted a narrower timeframe set than the chart can hold would reject
+// configurations the chart considers valid. The dependency is acyclic --
+// chartState never imports this module.
+import {
+	toProvenancePriceAdjustment,
+	type ChartPriceAdjustment,
+	type ChartSession,
+	type ChartTimeframe
+} from './chartState';
 
-// The chart's price-adjustment policy. Deliberately finer than provenance's
-// three-valued `PriceAdjustment`; see `toProvenancePriceAdjustment` for the
-// mapping between them.
-export type ChartPriceAdjustment = 'adjusted' | 'split_adjusted' | 'unadjusted';
-
-export type ChartTimeframe = '1m' | '5m' | '1h' | '1d' | '1wk' | '1mo';
-
-export type ChartSession = 'regular' | 'extended' | 'continuous';
+export {
+	toProvenancePriceAdjustment,
+	type ChartPriceAdjustment,
+	type ChartSession,
+	type ChartTimeframe
+};
 
 // What a source is documented to deliver. `'unreported'` is the honest value
 // for a source that never states its basis -- guessing 'adjusted' there would
@@ -120,14 +129,6 @@ export class ChartSeriesError extends Error {
 			instrument_id: this.instrumentId
 		};
 	}
-}
-
-// `split_adjusted` maps to `adjusted` because split-adjusted prices are
-// adjusted -- just not for distributions -- and provenance has no third value
-// to say so. Nothing is lost: every result echoes the exact chart policy in
-// `appliedPriceAdjustment` alongside the provenance record.
-export function toProvenancePriceAdjustment(adjustment: ChartPriceAdjustment): PriceAdjustment {
-	return adjustment === 'unadjusted' ? 'unadjusted' : 'adjusted';
 }
 
 export function parseWindowBound(bound: string): number | null {
