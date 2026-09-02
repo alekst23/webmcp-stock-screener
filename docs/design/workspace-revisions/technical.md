@@ -250,6 +250,11 @@ export interface RevisionService {
   commit(input: {
     workspaceId: ResourceId;
     context: MutationContext;
+    // Fingerprint inputs for idempotency-key replay detection (a `mutate`
+    // closure alone can't be hashed). Omit only when the caller never
+    // expects `idempotencyKey` to be set.
+    operationKind?: string;
+    requestInput?: unknown;
     mutate(doc: WorkspaceDocument): MutationDraft;
   }): MutationEnvelope;
 }

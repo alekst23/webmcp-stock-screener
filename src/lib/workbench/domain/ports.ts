@@ -1,7 +1,6 @@
 // Domain ports for the workbench surface: declared here, implemented in
 // infra/ or application/, per the project's hexagonal architecture rule
-// that domain never imports from infra. Extended by later tickets in this
-// epic (T-1006-5 adds Clock).
+// that domain never imports from infra.
 import type { ResourceId } from './ids';
 import type { MarketDataProvenance } from './provenance';
 import type { Revision, WorkspaceDocument } from './workspace';
@@ -40,4 +39,10 @@ export interface WorkspaceRepository {
 	listRevisions(id: ResourceId): SavedRevision[];
 	getRevision(id: ResourceId, revision: Revision): WorkspaceDocument | null;
 	putRevision(entry: SavedRevision): void;
+}
+
+// Time source, injected rather than read from Date.now() directly, so the
+// same input produces the same envelope in tests (T-1006-5).
+export interface Clock {
+	now(): string; // ISO 8601
 }
