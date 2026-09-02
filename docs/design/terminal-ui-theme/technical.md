@@ -42,7 +42,10 @@ researcher-facing surface.
 Component conversion is mechanical: each `<style>` block's literals become
 `var(--…)` references. `PriceChart.svelte` needs slightly more care than the
 rest because its colours are SVG presentation attributes and an inline
-gradient, not just CSS declarations.
+gradient, not just CSS declarations. Two idioms every component was spelling
+out by hand — the panel card and the outlined control — live as global classes
+in `+layout.svelte` alongside the other shared element styling, so a new
+panel or button cannot invent its own padding.
 
 **Deliberately not done:** no light theme, no theme toggle, no persisted
 preference — a second theme would double the contrast surface for a product
@@ -61,7 +64,7 @@ that exists today is worth that, but it should not be a surprise later.
 | Export | Type | Purpose |
 |--------|------|---------|
 | `SemanticRole` | union type | Every named colour slot in the interface. The full set of things a component may refer to. |
-| `ThemeTokens` | interface | `colors: Record<SemanticRole, string>`, plus `space`, `radius`, `fontSize`, `fontFamily` scales. |
+| `ThemeTokens` | interface | `colors: Record<SemanticRole, string>`, plus `space`, `radius`, `fontSize`, `fontFamily`, `tracking` scales. |
 | `theme` | `ThemeTokens` | The single instance. The only place a colour literal may appear. |
 | `themeCss(t?: ThemeTokens): string` | function | Renders the tokens as a `:root { --… }` declaration block for injection into `<head>`. |
 | `cssVarName(role: SemanticRole): string` | function | The custom-property name for a role, so the emitter and any consumer agree on one spelling. |
@@ -74,14 +77,19 @@ Semantic roles, grouped by what they mean rather than what they look like:
 | Lines | `border`, `borderStrong`, `separator` (decorative, exempt from the contrast floor) |
 | Text | `textPrimary`, `textSecondary`, `textMuted`, `textOnAccent` |
 | Interactive | `accent`, `accentHover`, `focusRing` |
-| Market | `positive`, `negative` |
 | Status | `warning`, `synthetic`, `syntheticBg`, `degraded`, `degradedBg`, `error`, `errorBg` |
 | Actors | `actorHuman`, `actorAgent` |
 | Chart | `chartLine`, `chartFillFrom`, `chartFillTo`, `chartGrid`, `chartAxis`, `chartAnchor`, `chartCrosshair`, `chartTooltipBg`, `chartTooltipText` |
 
 `synthetic`, `degraded`, and `error` are separate roles rather than aliases
-of `warning`/`negative` precisely because the spec requires no two of them
-render in the same colour.
+of `warning` precisely because the spec requires no two of them render in the
+same colour.
+
+`tracking` carries two treatments, not five hand-tuned letter-spacings:
+`label` is the uppercase micro-label used for every section and control name,
+`heading` the much subtler widening on real headings. A role is only in the
+palette if something renders it -- a colour nothing references is a
+documented lie about what the interface uses.
 
 ### `src/lib/theme/contrast.ts`
 
@@ -100,11 +108,14 @@ misleading number, so a malformed token fails loudly in the test that reads it.
 | Export | Signature | Purpose |
 |--------|-----------|---------|
 | `ColourLiteral` | interface | `{ file: string; line: number; literal: string }` |
-| `findColourLiterals` | `(source: string, file: string) => ColourLiteral[]` | Every hex / `rgb()` / `hsl()` literal in one file's source. |
-| `SOURCE_GLOB` | `string` | The component glob the guard test walks. |
+| `findColourLiterals` | `(source: string, file: string) => ColourLiteral[]` | Every colour literal in one file's source: hex, any CSS colour function, and the CSS named colours. |
 
 Pure over a string so it is testable without touching the filesystem; the
-test supplies the file walk.
+test supplies the file walk and names the glob it walks.
+
+A named colour counts only in a declaration value or an SVG paint attribute,
+with comments masked out, so `background: white` is caught while the word
+"red" in prose, a `silver-badge` class, and `white-space` are not.
 
 ### `src/lib/shell/AppShell.svelte`
 
@@ -125,10 +136,18 @@ without mounting, while thin Svelte wiring goes untested. This change keeps
 that convention rather than introducing a component-testing dependency for a
 CSS change.
 
-That leaves two spec invariants with no natural home — the activity log's
-position and the agent context comment — both of which a restyle could break
-silently and neither of which any existing test covers. They are guarded by
-reading `+page.svelte`'s source and asserting structure. A source-order
-assertion is a blunt instrument, and it is chosen deliberately over the
-alternative of leaving a documented, agent-facing guarantee unprotected
-during exactly the change most likely to disturb it.
+That leaves the spec invariants with no natural home — the activity log's
+position, the agent context comment, the tool counts, and the fact that the
+palette reaches the document at all — none of which any existing test covers
+and all of which a restyle could break silently. They are guarded by reading
+component source and asserting structure. A source assertion is a blunt
+instrument, and it is chosen deliberately over the alternative of leaving
+documented, agent-facing guarantees unprotected during exactly the change
+most likely to disturb them.
+
+Each guard asserts against the file that actually decides the outcome, which
+is not always the file that looks responsible: the log's position comes from
+`AppShell.svelte`'s `<footer>`, not from where `+page.svelte` declares the
+snippet, because snippet declarations are order-independent. Region and
+snippet names are read out of the source rather than spelled into the test,
+so renaming a prop stays a refactor.
