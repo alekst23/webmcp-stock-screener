@@ -34,17 +34,22 @@ function seededDocument(): WorkspaceDocument {
 }
 
 describe('registerChartTools', () => {
-	it('defaults CHART_TOOLS_ENABLED to off, so the shipping surface is untouched', async () => {
+	// T-1015-3: flipped true -- the main route's composition root now wires
+	// this group's tools in (see workbenchCompositionRoot.ts). This is a
+	// genuine global constant (not per-route config), so this test asserts
+	// the new behavior directly, matching registerWorkbenchTools.test.ts's
+	// own T-0020-1 precedent.
+	it('CHART_TOOLS_ENABLED is true now that the composition root wires this group in (T-1015-3)', async () => {
 		const { CHART_TOOLS_ENABLED } = await import('./registerChartTools');
-		expect(CHART_TOOLS_ENABLED).toBe(false);
+		expect(CHART_TOOLS_ENABLED).toBe(true);
 	});
 
-	it('registers nothing against document.modelContext while the flag is off', async () => {
+	it('registers tools against document.modelContext now that the flag is on', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		const { registerChartTools, createDefaultChartDeps } = await import('./registerChartTools');
 		await registerChartTools(createDefaultChartDeps());
-		expect(registerTool).not.toHaveBeenCalled();
+		expect(registerTool).toHaveBeenCalled();
 		vi.unstubAllGlobals();
 	});
 

@@ -3,13 +3,12 @@
 // document.modelContext, alongside the workbench composition root that does
 // the same for its seven.
 //
-// Gated behind CHART_TOOLS_ENABLED for the same reason WORKBENCH_TOOLS_ENABLED
-// exists: document.modelContext already carries the shipping 11-tool surface,
-// so registering onto it is new behavior in an existing runtime path. It stays
-// off until the surface is complete -- the panel registry that creates chart
-// panels is another epic's, and until it lands there is no route on which a
-// chart panel can exist, so an agent could configure a chart nobody can see.
-// Not called from app startup by this ticket.
+// CHART_TOOLS_ENABLED flipped true by T-1015-3: the panel registry that
+// creates chart panels (EPIC-1007) is on main now, and T-1015-3's capability
+// parity check confirmed this as a surviving capability behind a flag with
+// no caller -- workbenchCompositionRoot.ts's registerWorkbenchComposition()
+// now calls registerChartTools() unconditionally (this flag decides whether
+// that call does anything).
 import { ensureModelContext } from '../../../webmcp/bridge';
 import { createIdSequencer } from '../../domain/ids';
 import type { IdSequencer } from '../../domain/ids';
@@ -24,7 +23,7 @@ import { chartStateIdSeed } from '../domain/chartState';
 import { createInMemoryChartSeries } from '../infra/inMemoryChartSeries';
 import { buildChartTools, type ChartToolsDeps } from './index';
 
-export const CHART_TOOLS_ENABLED = false;
+export const CHART_TOOLS_ENABLED = true;
 
 // Two seeds, one sequencer. Studies and annotations live in the chart
 // extension and captured setups live in their own, so a sequencer seeded from

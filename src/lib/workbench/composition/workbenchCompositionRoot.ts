@@ -31,6 +31,20 @@ import {
 	registerWorkbenchTools,
 	type DefaultWorkbenchDeps
 } from '../tools/registerWorkbenchTools';
+// T-1015-3: the chart, similarity, and follow-up-authoring tool groups were
+// merged, tested, and flag-gated off pending exactly this -- a route that
+// calls them. Each one still builds its own default deps (its own
+// WorkspaceRepository instance, reading/writing the same localStorage-backed
+// keys the shared infra above also uses) and self-gates on its own
+// `*_TOOLS_ENABLED` constant, so calling all three here unconditionally is
+// safe regardless of flag state: a call against a flag still off is a no-op,
+// exactly like every other group's own register*Tools(). Not folded into the
+// shared-infra bag above -- doing so would mean building each group its own
+// createXDeps(shared) constructor, which is new plumbing this ticket's
+// Solution Approach explicitly does not introduce.
+import { registerChartTools } from '../chart/tools/registerChartTools';
+import { registerSimilarityTools } from '../similarity/tools/registerSimilarityTools';
+import { registerFollowupAuthoringTools } from '../followup/tools/registerFollowupTools';
 
 // T-0020-9: only `createWorkbenchSharedInfra` (the value) is ever imported
 // from this module -- no importer anywhere in the codebase reaches for the
@@ -104,6 +118,14 @@ export async function registerWorkbenchComposition(
 	await registerPanelTools(panelRuntime);
 	await registerWorkbenchTools(workbenchDeps);
 	await registerScreenerTools(screenerDeps);
+
+	// T-1015-3: registered after the three groups above so the active
+	// workspace panelRuntime just seeded already exists --
+	// createDefaultSimilarityDeps() requires one. Each call is a no-op while
+	// its own flag stays false, so this line is safe to run unconditionally.
+	await registerChartTools();
+	await registerSimilarityTools();
+	await registerFollowupAuthoringTools();
 
 	return panelRuntime;
 }

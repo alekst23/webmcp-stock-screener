@@ -1,15 +1,25 @@
-// Composition root for the computed-field/custom-study authoring surface,
-// gated the same way alerts/tools/registerAlertTools.ts gates
-// ALERT_TOOLS_ENABLED: the follow-up tool surface this belongs to is wired
-// on together by T-1014-11, not by this ticket. Not called from app
-// startup here.
+// Composition root for the computed-field/custom-study authoring surface.
+//
+// FOLLOWUP_AUTHORING_TOOLS_ENABLED flipped true by T-1015-3: the capability
+// parity check confirmed create_computed_field/create_custom_study as a
+// surviving capability behind a flag with no caller --
+// workbenchCompositionRoot.ts's registerWorkbenchComposition() now calls
+// registerFollowupAuthoringTools() unconditionally.
+//
+// Deliberately NOT registerAllFollowupTools() (T-1014-11's own, separate
+// composition root): that function also registers backtest, watchlist, and
+// alert tools unconditionally, bypassing their own *_TOOLS_ENABLED flags,
+// which this ticket's Solution Approach explicitly keeps off. This function
+// registers only the two authoring tools its own flag gates.
 //
 // T-1014-11's job also includes composing this workspace's catalog
 // registry (workspaceCatalog.ts#composeWorkspaceCatalogRegistry) into the
 // `catalog` dependency of the screener/results/chart tool groups it wires
-// alongside this one -- that is what actually makes a created field/study
-// usable as a results column, ranking input, filter operand or
-// study-output source in a live app; see the ticket's Solution Approach.
+// alongside this one -- that cross-group wiring (what makes a created
+// field/study usable as a results column, ranking input, filter operand or
+// study-output source elsewhere) is not part of what this narrower call
+// wires in; each tool call still builds its own workspace-composed catalog
+// registry at call time (see createDefaultFollowupAuthoringDeps below).
 import { ensureModelContext } from '../../../webmcp/bridge';
 import { createIdSequencer } from '../../domain/ids';
 import type { IdSequencer } from '../../domain/ids';
@@ -20,7 +30,7 @@ import { createRevisionService } from '../../application/revisionService';
 import { createLocalWorkspaceRepository } from '../../infra/workspaceRepository';
 import { buildFollowupAuthoringTools, type FollowupAuthoringToolsDeps } from './index';
 
-export const FOLLOWUP_AUTHORING_TOOLS_ENABLED = false;
+export const FOLLOWUP_AUTHORING_TOOLS_ENABLED = true;
 
 export function createDefaultFollowupAuthoringDeps(): FollowupAuthoringToolsDeps {
 	const repository = createLocalWorkspaceRepository();
