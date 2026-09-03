@@ -35,6 +35,15 @@ actually usable end-to-end.
 | 1   | T-0020-1 | Shared composition root; flip WORKBENCH_TOOLS_ENABLED and SCREENER_TOOLS_ENABLED | —                  | Done   |
 | 2   | T-0020-2 | Auto-bind a completed screener run to the default results_table panel            | T-0020-1           | Done   |
 | 3   | T-0020-3 | End-to-end integration test and architecture doc update                          | T-0020-1, T-0020-2 | Done   |
+| 4   | T-0020-4 | Test the first-wins rule when multiple results_table panels exist               | —                  | Open   |
+| 5   | T-0020-5 | Negative test — other tool-group flags stay unregistered                        | —                  | Open   |
+| 6   | T-0020-6 | De-duplicate FIXED_PROVENANCE; align the deps-split pattern across all 3 modules | —                  | Open   |
+| 7   | T-0020-7 | Add assertion messages to the composition root's identity test                  | —                  | Open   |
+| 8   | T-0020-8 | Test idempotency-replay interaction with panel-binding                          | —                  | Open   |
+| 9   | T-0020-9 | Guard against duplicate /workbench composition on remount                       | —                  | Open   |
+
+Follow-up tickets 4-9 were filed by this epic's review (2026-09-02) — all
+non-blocking, none required before merge.
 
 ## Dependency Graph
 
