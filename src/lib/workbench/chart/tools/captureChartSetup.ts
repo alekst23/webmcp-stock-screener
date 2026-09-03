@@ -12,7 +12,7 @@
 // and the undo token come from EPIC-1006. This module only translates between
 // the wire's snake_case and the operation's input, and turns typed errors into
 // tool failures.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	IdempotencyConflictError,

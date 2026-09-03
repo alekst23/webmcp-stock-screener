@@ -7,7 +7,7 @@
 // which has no method capable of starting an evaluation -- the same
 // structural absence PinnedRunStore relies on for run_screener's own
 // no-silent-rerun guarantee.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import { BacktestApiError, type BacktestApiPort } from '../domain/apiPort';
 

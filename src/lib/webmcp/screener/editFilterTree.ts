@@ -28,7 +28,7 @@ import { OperationValidationError } from '../../workbench/domain/errors';
 import { toWireEnvelope } from '../../workbench/domain/mutation';
 import type { WorkspaceDocument } from '../../workbench/domain/workspace';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
-import { fail, ok } from '../tools';
+import { fail, ok } from '../toolResult';
 import type { ToolResult, ToolSpec } from '../types';
 import { resolveWorkspaceId, toErrorResult } from './support';
 

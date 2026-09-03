@@ -71,7 +71,7 @@ describe('buildWorkbenchTools', () => {
 	it('every tool is available (not gated on the old WorkspaceState)', () => {
 		const tools = buildWorkbenchTools(deps);
 		for (const tool of tools) {
-			expect(tool.available({} as never)).toBe(true);
+			expect(tool.available()).toBe(true);
 		}
 	});
 

@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { describe, expect, it } from 'vitest';
-import { ok } from '../webmcp/tools';
+import { ok } from '../webmcp/toolResult';
 import { actorLabel, clearActivity, createActivityStore, recordAction } from './activity';
 import { memoryStorage } from './testSupport';
 
@@ -12,7 +12,7 @@ describe('activity log persistence', () => {
 		const storage = memoryStorage();
 		const activity = createActivityStore(storage);
 
-		recordAction(activity, 'human', 'clearPanels', undefined, ok({}));
+		recordAction(activity, 'human', 'close_panel', undefined, ok({}));
 
 		const raw = storage.getItem('webmcp-activity-log');
 		expect(raw, 'nothing was written to the activity log key').not.toBeNull();
@@ -23,8 +23,8 @@ describe('activity log persistence', () => {
 	it('restores the full log, in the same order, on reload in the same browser', () => {
 		const storage = memoryStorage();
 		const first = createActivityStore(storage);
-		recordAction(first, 'human', 'clearPanels', undefined, ok({}));
-		recordAction(first, 'agent', 'defineStudy', undefined, ok({ id: 'study_1' }));
+		recordAction(first, 'human', 'close_panel', undefined, ok({}));
+		recordAction(first, 'agent', 'run_screener', undefined, ok({ id: 'study_1' }));
 
 		// A page reload re-runs module init against the same storage -- a
 		// fresh createActivityStore call is the reload's equivalent here.
@@ -34,7 +34,7 @@ describe('activity log persistence', () => {
 		expect(
 			events.map((e) => `${e.actor}:${e.toolName}`),
 			`events: ${JSON.stringify(events)}`
-		).toEqual(['human:clearPanels', 'agent:defineStudy']);
+		).toEqual(['human:close_panel', 'agent:run_screener']);
 	});
 
 	it('starts with an empty log in a fresh browser with no existing key', () => {
@@ -64,7 +64,7 @@ describe('actor label', () => {
 describe('clearActivity', () => {
 	it('empties the store', () => {
 		const activity = createActivityStore(memoryStorage());
-		recordAction(activity, 'human', 'clearPanels', undefined, ok({}));
+		recordAction(activity, 'human', 'close_panel', undefined, ok({}));
 
 		clearActivity(activity);
 
@@ -74,7 +74,7 @@ describe('clearActivity', () => {
 	it('persists the cleared (empty) log to storage', () => {
 		const storage = memoryStorage();
 		const activity = createActivityStore(storage);
-		recordAction(activity, 'human', 'clearPanels', undefined, ok({}));
+		recordAction(activity, 'human', 'close_panel', undefined, ok({}));
 
 		clearActivity(activity);
 
@@ -85,14 +85,14 @@ describe('clearActivity', () => {
 
 	it('leaves the log usable afterward -- a subsequent action appends normally', () => {
 		const activity = createActivityStore(memoryStorage());
-		recordAction(activity, 'human', 'clearPanels', undefined, ok({}));
+		recordAction(activity, 'human', 'close_panel', undefined, ok({}));
 
 		clearActivity(activity);
-		recordAction(activity, 'agent', 'defineStudy', undefined, ok({ id: 'study_1' }));
+		recordAction(activity, 'agent', 'run_screener', undefined, ok({ id: 'study_1' }));
 
 		const events = get(activity);
 		expect(events, `events: ${JSON.stringify(events)}`).toHaveLength(1);
-		expect(events[0]!.toolName).toBe('defineStudy');
+		expect(events[0]!.toolName).toBe('run_screener');
 	});
 
 	it('is a no-op when the log is already empty', () => {

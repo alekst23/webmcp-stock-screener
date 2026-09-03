@@ -13,7 +13,7 @@
 // EPIC-1006's `applyOperations`, so each also becomes usable through
 // EPIC-1013's generic preview_workspace_changes / apply_previewed_changes
 // with no separate apply path of this ticket's own.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import type { CatalogRegistry } from '../../../catalog/registry';
 import type { GroupOp } from '../../../screener/definition';

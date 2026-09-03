@@ -3,7 +3,7 @@
 // named after edit_filter_tree's convention, because AC9 requires editing to
 // exist and no other tool in this ticket's or T-1014-9's surface covers it.
 import type { CatalogRegistry } from '../../../catalog/registry';
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	IdempotencyConflictError,

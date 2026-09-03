@@ -3,7 +3,7 @@
 // Pure wiring: the guarantees themselves (honesty, non-mutation, atomicity,
 // freshness, typed-operations-only) live in application/safetyUseCases.ts
 // and its collaborators. See docs/design/safety-preview-apply/spec.md.
-import { fail, ok } from '../../webmcp/tools';
+import { fail, ok } from '../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../webmcp/types';
 import {
 	IdempotencyConflictError,

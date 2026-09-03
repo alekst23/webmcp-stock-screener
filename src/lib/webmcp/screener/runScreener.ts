@@ -41,7 +41,7 @@ import type { WorkspaceDocument } from '../../workbench/domain/workspace';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import type { WorkspaceRepository } from '../../workbench/domain/ports';
 import type { ValidationProblem } from '../../screener/validation';
-import { fail, ok } from '../tools';
+import { fail, ok } from '../toolResult';
 import type { ToolResult, ToolSpec } from '../types';
 import {
 	readOptionalNumber,

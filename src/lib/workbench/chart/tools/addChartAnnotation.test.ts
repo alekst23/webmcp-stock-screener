@@ -127,7 +127,7 @@ describe('add_chart_annotation', () => {
 
 	it('is named add_chart_annotation and is always available', () => {
 		expect(tool.name).toBe('add_chart_annotation');
-		expect(tool.available({} as never)).toBe(true);
+		expect(tool.available()).toBe(true);
 	});
 
 	it('registers the chart.add_annotation operation it commits through', () => {
