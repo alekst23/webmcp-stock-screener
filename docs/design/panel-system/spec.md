@@ -59,6 +59,11 @@ source type, or a renderer type into.
    panel, a results-table panel, and a chart panel, pre-arranged on the
    grid — so a researcher opening a fresh workspace sees a working
    research layout immediately rather than a blank canvas.
+9. **Reset the workspace layout to the default seed** — a human, from a
+   control in the shared header, or an agent, discard whatever panel
+   arrangement is currently in place and restore the workspace to the
+   same default seeded arrangement a brand-new workspace gets — as a
+   single reversible change.
 
 ## Supported panel kinds
 
@@ -192,6 +197,16 @@ source type, or a renderer type into.
 | Not a template a caller can request | the default layout | an agent calls `apply_layout_template` | it is not registered under any template name — it is create-time-only behavior, not a template the agent can re-apply later; an agent that wants this arrangement again after rearranging the workspace lays it out explicitly or via a named template |
 | Restored/duplicated workspace | a workspace loaded from an existing revision, or a duplicated workspace | it is opened | the default layout is never applied — seeding happens only once, at creation of a genuinely new, empty workspace |
 
+### Reset the workspace layout to the default seed
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Happy path, human | a workspace with panels moved, resized, added, or removed from the original seed | a human clicks the header's reset control and confirms | the workspace's panels are replaced with the same default seeded arrangement described in "Seed a new workspace with the default layout," as one revisioned change; the mutation envelope names every panel affected |
+| Happy path, agent | a workspace in any arrangement | an agent invokes the reset action | the same replacement happens as the human path, with the same mutation envelope, no confirmation step required |
+| Declined confirmation | a human clicks the header's reset control | the human does not confirm | nothing in the workspace changes |
+| Undo | a workspace just reset to the default seed | the human or agent undoes the reset with the returned undo token | the workspace's panels return to exactly the arrangement they had immediately before the reset |
+| Already at default | a workspace whose panels already match the default seeded arrangement | the reset action is invoked | the call still succeeds and reports no effective change, rather than failing |
+
 ## Non-Goals
 
 - The contents of any panel — the filter builder's tree, the similarity
@@ -261,5 +276,5 @@ that the grid has a hard capacity._
 
 ---
 
-*Implemented by: EPIC-1007. Depends on the common workspace contract from
-EPIC-1006.*
+*Implemented by: EPIC-1007, hotfix/panel-system (reset-to-default feature).
+Depends on the common workspace contract from EPIC-1006.*
