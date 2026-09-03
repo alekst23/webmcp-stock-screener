@@ -1,7 +1,7 @@
 # T-1015-5: Remove the legacy tool surface
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1015-3
 **Blocks**: T-1015-6
 
@@ -129,3 +129,66 @@ status-header sections), `docs/tools.md`.
 
 The legacy workspace store, engine client, and Svelte components
 (T-1015-6). Backend changes (T-1015-4). Doc updates (T-1015-7).
+
+## Implementation Note (post-hoc, on close)
+
+Two calls this ticket had to make concretely rather than leave contingent:
+
+1. **`register.ts`/`session.ts` retired, not re-pointed.** Reading
+   `newSurfaceSession.ts` (T-1015-3) directly confirms it does not reuse
+   `register.ts`'s `connectWebmcp` diffing or `session.ts`'s
+   `startBridgeSession` state machine -- both are `ResearchEngine`-shaped,
+   and T-1015-3's own comment explains why they could not be reused as-is
+   (per-tool progressive availability, which the capability-parity check
+   found is a structural drop for the new surface: every tool group
+   registers unconditionally in one pass). With zero live callers left,
+   `register.ts`, `register.test.ts`, `session.ts`, `session.test.ts`, and
+   `webmcp/testSupport.ts`'s `FakeBridge`/`fakeBridge` (used only by those
+   two test files) retired here rather than being kept unused.
+   `bridge.ts`/`status.ts` do have real, current importers on the new
+   surface and survive; `webmcp/testSupport.ts`'s `clearModelContext` also
+   survives (`newSurfaceSession.test.ts` uses it). register.test.ts's
+   bridge-relevant coverage (ensureModelContext's page-bridge install,
+   onBridgeReplaced, and the same-document relay) was extracted into a new
+   `bridge.test.ts`, rewritten against `bridge.ts` directly with no
+   dependency on the legacy engine, so that coverage is not lost (AC4).
+
+2. **The AC2 type deletion cascaded into `workspace/`, ahead of T-1015-6.**
+   `WorkspaceState`/`ResearchEngine` (AC2's required deletions) turned out to
+   be imported directly by `workspace/store.ts`, `apiEngine.ts`,
+   `snapshots.ts`, `snapshotGuard.ts`, and by `WorkspaceView.svelte`,
+   `GridPanel.svelte`, `PriceChart.svelte`, `FocusChart.svelte`,
+   `ChartToolbar.svelte`, `SnapshotPicker.svelte` (directly or transitively
+   via `store.ts`/`apiEngine.ts`). None of these had a live importer left --
+   `+page.svelte` (T-1015-3/T-1015-9) no longer references any of them, and
+   `SnapshotPicker.svelte`'s snapshot capability was already unreachable
+   (`WORKBENCH_TOOLS_ENABLED = false`, so its would-be replacement,
+   `revisionService.ts`, is not live either). Since this ticket's AC2 cannot
+   be satisfied without breaking their compilation, and AC7 requires
+   typecheck/lint/the full suite to pass at the end of this ticket (the
+   Technical Considerations section anticipates exactly this: "will break
+   the legacy engine client and the legacy workspace store, which is
+   expected... sequence the work so the branch is green at the end of this
+   ticket"), those ten files and their tests were deleted here rather than
+   left broken for T-1015-6. `ActivityFeed.svelte` (imports only
+   `activity.ts`, which survives) and `TickerSearch.svelte`/`tickerSearch.ts`
+   (no product-type dependency) were left alone -- they still compile and
+   are genuinely T-1015-6's call. `panelStatus.ts`'s `ApiClientConfig`
+   import (still live: `+page.svelte` calls `fetchPanelStatus`) was replaced
+   with a local, narrowed interface (`{ baseUrl: string }`) rather than
+   deleted, since `apiEngine.ts`'s unused `instanceSetStorage` field was the
+   only reason it needed the wider shape.
+
+   **T-1015-6 should re-read its own Solution Approach against this before
+   starting** -- its "delete store.ts, apiEngine.ts, and their tests" and
+   most of its AC1/AC3 are already done; what remains is AC4 (verify
+   `chartScales.ts` already carries `visualization.ts`'s absorbed coverage --
+   the retirement inventory says it does, but T-1015-6 should confirm, not
+   assume), AC6 (legacy `localStorage` key migration/cleanup), and
+   `activity.ts`/`snapshots.ts`/`snapshotGuard.ts`'s still-pending,
+   correctly-untouched contingent retirement.
+
+`ToolSpec.available` also changed from `(ws: WorkspaceState) => boolean` to
+`(): boolean` -- every existing implementation across the new surface
+already ignored the argument (`() => true`, or a closure over its own
+deps), so this needed no changes outside `webmcp/` and `webmcp/screener/`.
