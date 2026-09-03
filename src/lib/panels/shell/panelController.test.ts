@@ -56,27 +56,11 @@ describe('loadWorkspace', () => {
 });
 
 describe('seedDefaultWorkspace', () => {
-	it('creates exactly six panels of the right kinds per the reference-mockup layout', () => {
+	// hotfix/empty-grid-canvas: reverses the six-panel seed back to a single
+	// filter_builder panel, full-height on the left column. See spec.md's
+	// amended "Seed a new workspace with the default layout".
+	it('creates exactly one filter_builder panel, full-height on the left column', () => {
 		const harness = createPanelTestHarness();
-		// alert_draft has no placeholder counterpart in registerDefaultPanelKinds
-		// (see defaultPanelKinds.ts's own scope: the original eight tool-spec
-		// kinds only) -- createPanelTestHarness stays kind-agnostic, so this
-		// test registers a minimal stand-in the same way
-		// panelKindReadParity.test.ts's minimalKindDefinition does, rather than
-		// reaching into workbench/alerts's real registration module.
-		harness.kinds.register({
-			kind: 'alert_draft',
-			defaultTitle: 'Alert Draft',
-			defaultSize: { colSpan: 2, rowSpan: 1 },
-			minSize: { colSpan: 1, rowSpan: 1 },
-			defaultConfig: () => ({}),
-			validateConfig: () => ({ ok: true, value: {} }),
-			configSchema: { type: 'object', properties: {} },
-			linkChannels: [],
-			bindingTypes: [],
-			defaultRenderer: null,
-			component: async () => ({})
-		});
 		const init = initializeWorkspace(harness);
 		const deps = { ...harness, workspaceId: init.workspaceId };
 		seedDefaultWorkspace(deps, init.justCreated);
@@ -86,19 +70,12 @@ describe('seedDefaultWorkspace', () => {
 		const state = readPanelState(doc!);
 		expect(
 			state.panels.length,
-			`expected exactly 6 seeded panels, got ${JSON.stringify(state.panels)}`
-		).toBe(6);
+			`expected exactly 1 seeded panel, got ${JSON.stringify(state.panels)}`
+		).toBe(1);
 
-		const byKind = Object.fromEntries(state.panels.map((p) => [p.kind, p]));
-		expect(byKind.filter_builder?.rect.col, 'expected filter_builder on the left').toBe(0);
-		expect(byKind.chart?.rect.col, 'expected chart centered').toBe(2);
-		expect(
-			byKind.similar_opportunities?.rect.col,
-			'expected similar_opportunities on the right sidebar'
-		).toBe(5);
-		expect(byKind.results_table?.rect.col, 'expected results_table along the bottom').toBe(2);
-		expect(byKind.watchlist?.rect.col, 'expected watchlist bottom right').toBe(5);
-		expect(byKind.alert_draft?.rect.col, 'expected alert_draft bottom right').toBe(5);
+		const filterBuilder = state.panels[0]!;
+		expect(filterBuilder.kind).toBe('filter_builder');
+		expect(filterBuilder.rect).toEqual({ col: 0, row: 0, colSpan: 2, rowSpan: 4 });
 		expect(
 			state.panels.every((p) => p.source === null),
 			'expected every seeded panel to start unbound'
@@ -154,22 +131,6 @@ describe('seedDefaultWorkspace', () => {
 
 	it('does not fire twice across repeated init calls against the same workspace', () => {
 		const harness = createPanelTestHarness();
-		// See the previous test's comment: alert_draft has no placeholder, so
-		// this harness needs a minimal stand-in for the first (justCreated)
-		// seed call below to succeed.
-		harness.kinds.register({
-			kind: 'alert_draft',
-			defaultTitle: 'Alert Draft',
-			defaultSize: { colSpan: 2, rowSpan: 1 },
-			minSize: { colSpan: 1, rowSpan: 1 },
-			defaultConfig: () => ({}),
-			validateConfig: () => ({ ok: true, value: {} }),
-			configSchema: { type: 'object', properties: {} },
-			linkChannels: [],
-			bindingTypes: [],
-			defaultRenderer: null,
-			component: async () => ({})
-		});
 		const first = initializeWorkspace(harness);
 		const deps = { ...harness, workspaceId: first.workspaceId };
 		seedDefaultWorkspace(deps, first.justCreated);
@@ -180,8 +141,8 @@ describe('seedDefaultWorkspace', () => {
 		const state = readPanelState(harness.repository.get(first.workspaceId)!);
 		expect(
 			state.panels.length,
-			`expected seeding to remain at exactly 6 panels after a second init, got ${state.panels.length}`
-		).toBe(6);
+			`expected seeding to remain at exactly 1 panel after a second init, got ${state.panels.length}`
+		).toBe(1);
 	});
 });
 

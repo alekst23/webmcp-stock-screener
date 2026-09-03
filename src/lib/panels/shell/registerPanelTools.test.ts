@@ -10,7 +10,7 @@
 // exercise seedDefaultWorkspace's justCreated path at all.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultPanelShellRuntime, registerPanelTools } from './registerPanelTools';
-import { readPanelState, bindPanelSource } from '../application';
+import { readPanelState, bindPanelSource, createPanel } from '../application';
 import { defaultWireResultsTableConfig } from '../../results/application/tableConfigWire';
 import { getResultsPanelRuntimeDeps } from '../../results/panel/resultsPanelContext';
 import { mintResultId } from '../../results/domain/page';
@@ -68,14 +68,26 @@ describe('createDefaultPanelShellRuntime', () => {
 		);
 	});
 
-	it('still seeds a brand-new workspace with its six default panels, one of them results_table', () => {
+	// hotfix/empty-grid-canvas: the default seed is now just filter_builder
+	// (see spec.md's amended "Seed a new workspace with the default layout");
+	// results_table is still fully addable via create_panel.
+	it('still seeds a brand-new workspace with filter_builder, and results_table remains addable', () => {
 		const { deps } = createDefaultPanelShellRuntime();
 		const doc = deps.repository.get(deps.workspaceId);
 		expect(doc, 'the seeded workspace document must exist').not.toBeNull();
 		const state = readPanelState(doc!);
-		expect(state.panels).toHaveLength(6);
-		const resultsPanel = state.panels.find((p) => p.kind === 'results_table');
-		expect(resultsPanel, 'expected a seeded results_table panel').toBeDefined();
+		expect(state.panels).toHaveLength(1);
+		expect(state.panels[0]!.kind).toBe('filter_builder');
+
+		createPanel(deps, {
+			context: { actor: 'agent' },
+			kind: 'results_table',
+			rect: { col: 2, row: 0, colSpan: 2, rowSpan: 2 }
+		});
+		const resultsPanel = readPanelState(deps.repository.get(deps.workspaceId)!).panels.find(
+			(p) => p.kind === 'results_table'
+		);
+		expect(resultsPanel, 'expected an addable results_table panel').toBeDefined();
 	});
 
 	// Bug fix (see git history): 'chart' used to be registered only as a
@@ -100,6 +112,13 @@ describe('createDefaultPanelShellRuntime', () => {
 
 	it('bind_panel_source accepts a resolved instrument on a chart panel and rejects a bare ticker', () => {
 		const { deps } = createDefaultPanelShellRuntime();
+		// hotfix/empty-grid-canvas: chart is no longer part of the default seed
+		// (just filter_builder is) -- add one explicitly.
+		createPanel(deps, {
+			context: { actor: 'agent' },
+			kind: 'chart',
+			rect: { col: 2, row: 0, colSpan: 2, rowSpan: 2 }
+		});
 		const seededDoc = deps.repository.get(deps.workspaceId)!;
 		const panelId = readPanelState(seededDoc).panels.find((p) => p.kind === 'chart')!.id;
 
@@ -170,10 +189,13 @@ describe('createDefaultPanelShellRuntime', () => {
 		const run = testRun('run_1', 3);
 		runs.putRun(run);
 
-		// The default-seeded workspace already fills the whole grid (six
-		// panels tiling all 24 cells) -- reuse the seeded results_table panel
-		// rather than creating a second one, which would have nowhere left to
-		// auto-place.
+		// hotfix/empty-grid-canvas: the default seed is now just filter_builder,
+		// leaving most of the grid free -- add a results_table panel explicitly.
+		createPanel(deps, {
+			context: { actor: 'agent' },
+			kind: 'results_table',
+			rect: { col: 2, row: 0, colSpan: 2, rowSpan: 2 }
+		});
 		const seededDoc = deps.repository.get(deps.workspaceId)!;
 		const panelId = readPanelState(seededDoc).panels.find((p) => p.kind === 'results_table')!.id;
 		bindPanelSource(deps, {

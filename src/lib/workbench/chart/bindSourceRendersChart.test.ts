@@ -14,7 +14,7 @@
 // instrument bound" refusal.
 import { describe, expect, it } from 'vitest';
 import { mount, unmount, flushSync } from 'svelte';
-import { bindPanelSource, readPanelState } from '../../panels/application';
+import { bindPanelSource, createPanel, readPanelState } from '../../panels/application';
 import {
 	createPanelShellRuntime,
 	createWorkbenchSharedInfra
@@ -43,6 +43,13 @@ describe('bind_panel_source -> ChartPanelBody, end to end', () => {
 		const runtime = createPanelShellRuntime(shared);
 		const deps = runtime.deps;
 
+		// hotfix/empty-grid-canvas: the default seed is now just
+		// filter_builder -- add the chart panel explicitly.
+		createPanel(deps, {
+			context: ctx(),
+			kind: 'chart',
+			rect: { col: 2, row: 0, colSpan: 2, rowSpan: 2 }
+		});
 		const seededDoc = deps.repository.get(deps.workspaceId)!;
 		const seededChart = readPanelState(seededDoc).panels.find((p) => p.kind === 'chart')!;
 		const panelId = seededChart.id;
