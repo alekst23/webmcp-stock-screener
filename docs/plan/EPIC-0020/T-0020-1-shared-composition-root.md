@@ -40,7 +40,7 @@ precondition every later ticket in this epic needs.
 6. Existing tests asserting `WORKBENCH_TOOLS_ENABLED`/`SCREENER_TOOLS_ENABLED`
    default to `false` are updated to reflect the new `true` default for
    `/workbench`'s actual composition — distinguish "the flag's default
-   value" (which may still start `false` for any *other* caller/route) from
+   value" (which may still start `false` for any _other_ caller/route) from
    "what `/workbench` actually registers with" if the two diverge; if the
    flags are genuinely global constants, update the tests directly and
    note the behavior change in the commit body.

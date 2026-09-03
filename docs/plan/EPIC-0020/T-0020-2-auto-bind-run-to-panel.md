@@ -92,7 +92,7 @@ those already live on `WorkbenchDeps`, which `execute()` already has.)
    - If none found, return (AC2: run already succeeded and returned;
      nothing else to do).
    - Otherwise call `bindPanelSource(panelDeps, { context: { actor: 'agent' },
-     panelId: target.id, source: { type: 'screener_results', ref: { run_id: runId } } })`
+panelId: target.id, source: { type: 'screener_results', ref: { run_id: runId } } })`
      — the exact application function T-0020-2's AC1 names, so replacing an
      existing binding (AC4) and going through
      `commitPanelChange`/`RevisionService`/change-history (AC5) both come
@@ -102,7 +102,7 @@ those already live on `WorkbenchDeps`, which `execute()` already has.)
      as a `run_screener` failure or altering its already-built `result`
      (AC2's "best-effort, never a precondition").
 2. `group.ts`'s `ScreenerToolDeps` gains an optional `panelBinding?:
-   PanelBindingDeps` field (mirroring `runStore`/`evaluationPort`'s own
+PanelBindingDeps` field (mirroring `runStore`/`evaluationPort`'s own
    optional-injection style) and `buildScreenerTools` passes it through to
    `createRunScreenerTool`'s options.
 3. `workbenchCompositionRoot.ts`'s `buildScreenerDeps` gains a second

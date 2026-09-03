@@ -40,10 +40,10 @@ and fundamentals reporting period.
 Two modules under `src/lib/surface/` implement this contract once, for the
 whole surface, rather than per-epic:
 
-| Module | Provides | Notes |
-|--------|----------|-------|
-| `src/lib/surface/ids.ts` | `makeInstrumentId`/`isInstrumentId` (`inst:<MIC>:<SYMBOL>`), `makeCatalogItemId`/`isCatalogItemId` (`<prefix>.<segment>` for field/op/study/indicator/pattern/interval/universe/template) | No workspace/panel/screener/run ID makers yet — that's expected to land as EPIC-1006 extends this module rather than starting a second one |
-| `src/lib/surface/provenance.ts` | `DiscoveryEnvelope<T>`, `envelope<T>()`, plus re-exports of EPIC-1006's `MarketDataProvenance`/`makeProvenance()` | Covers every field tool-spec.md's common contract requires for market-data results |
+| Module                          | Provides                                                                                                                                                                                  | Notes                                                                                                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/lib/surface/ids.ts`        | `makeInstrumentId`/`isInstrumentId` (`inst:<MIC>:<SYMBOL>`), `makeCatalogItemId`/`isCatalogItemId` (`<prefix>.<segment>` for field/op/study/indicator/pattern/interval/universe/template) | No workspace/panel/screener/run ID makers yet — that's expected to land as EPIC-1006 extends this module rather than starting a second one |
+| `src/lib/surface/provenance.ts` | `DiscoveryEnvelope<T>`, `envelope<T>()`, plus re-exports of EPIC-1006's `MarketDataProvenance`/`makeProvenance()`                                                                         | Covers every field tool-spec.md's common contract requires for market-data results                                                         |
 
 Both modules were built by EPIC-1008 (Discovery & Catalog), whose own tools
 needed them first, but they're deliberately scoped to the whole surface, not
@@ -59,26 +59,41 @@ types in parallel. `src/lib/surface/provenance.ts` now re-exports the
 canonical one and adds only what is genuinely discovery-specific — the
 `warnings` array on `DiscoveryEnvelope<T>`.
 
-## The composition root — currently unowned
+## The composition root — resolved for `/workbench`'s panel/workbench-core/screener slice (EPIC-0020)
 
-Per-epic builders only produce tool lists; nothing yet imports every epic's
-`build<Area>Tools`, concatenates the results, and registers them on the live
-page. As of EPIC-1008's close, no ticket in EPIC-1006 through EPIC-1015
-does this — EPIC-1006's own tool-surface ticket registers only its own
-tools, and EPIC-1015's cutover tickets presuppose the new surface is already
-assembled rather than assembling it. This is a real, program-level gap
-(tracked in `docs/plan/project.md`'s Blockers table), not a defect in any
-one epic — each epic correctly stayed in its own scope. It needs an explicit
-owner before EPIC-1015's cutover can happen: something that imports every
-epic's builder, wires real dependencies, and registers the combined tool
-list where `src/lib/webmcp/tools.ts`'s `buildTools()` is registered today.
+Per-epic builders only produce tool lists; something still has to import
+every relevant epic's `build<Area>Tools`, wire real shared dependencies
+(not each builder's own independent instances), and register the combined
+tool list. EPIC-0020 owns this for `/workbench`'s currently-live subset:
+`src/lib/workbench/composition/workbenchCompositionRoot.ts` builds exactly
+one `WorkspaceRepository`, ID sequencer, idempotency cache, revision
+service, change history, and `PinnedRunStore`, and threads that same bag
+into `registerPanelTools()`, `registerWorkbenchTools()`, and
+`registerScreenerTools()` — so a mutation or read through one tool group
+(e.g. `create_panel`) is visible through another (`get_canvas_state`), and
+a completed `run_screener` call auto-binds the workspace's `results_table`
+panel to it. `WORKBENCH_TOOLS_ENABLED` and `SCREENER_TOOLS_ENABLED` are
+both `true` for `/workbench` as of this epic; `src/routes/workbench/+page.svelte`
+calls `registerWorkbenchComposition()` (not a bare `registerPanelTools()`)
+to get this wiring.
+
+This resolves the gap for the three tool groups `/workbench` actually
+registers today. It does **not** extend to the rest of the ~33-tool
+program: `CHART_TOOLS_ENABLED`, `SIMILARITY_TOOLS_ENABLED`, and
+EPIC-1014's followup/backtest/alert/watchlist flags stay `false` and
+unregistered on `/workbench` (EPIC-0020's own explicit scope boundary), and
+EPIC-1015's cutover — presupposing the _entire_ new surface assembled
+where the old 11-tool surface registers today — remains open and paused,
+unaffected by this work.
 
 ## References
 
 - `docs/reference/tool-spec.md` — the tool inventory and common contract
-- `docs/plan/project.md` — program status, wave order, and the
-  composition-root blocker
+- `docs/plan/project.md` — program status and wave order
 - `src/lib/webmcp/discovery/group.ts` — the reference implementation of the
   per-epic builder pattern
 - `src/lib/surface/ids.ts`, `src/lib/surface/provenance.ts` — the
   surface-shared contract modules
+- `src/lib/workbench/composition/workbenchCompositionRoot.ts` — EPIC-0020's
+  shared composition root for `/workbench`'s panel/workbench-core/screener
+  tool groups
