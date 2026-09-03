@@ -82,6 +82,7 @@ at every step.
 | ------------------- | ---------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Happy path          | 2+ condition steps, later steps constrained by a trading-day window after the prior step | a setup is defined    | the setup is added to the workspace and becomes searchable via instance search                                   |
 | Sustained condition | a step marked to hold continuously across its window                                     | the setup is searched | a candidate only matches that step if the condition holds on every day of the window, not just one day within it |
+| Impossible window   | a non-anchor step declares a `within` window with a negative minimum, or a maximum below its minimum | the setup is defined | the setup is rejected at definition time with an error naming the offending step and bound(s) — it is never silently accepted as a setup that matches nothing |
 
 ### Instance search
 
@@ -91,6 +92,7 @@ at every step.
 | Sparse completed matches               | fewer than 5 completed matches are found                                                                          | the same search runs       | in-progress matches (patterns that have satisfied their earlier steps but whose final step hasn't yet resolved, because the dataset's most recent day doesn't yet cover that step's window) are also included, each carrying a completion score (fraction of steps satisfied), and the result reports completed and partial counts separately |
 | Repeated occurrences                   | a ticker independently satisfies the full pattern more than once within the search window                         | instances are searched for | each occurrence counts as a separate instance — occurrences are not merged or deduplicated across independent completions                                                                                                                                                                                                                     |
 | Redundant completion of one occurrence | a single pattern start could technically be resolved by more than one valid completion within the allowed windows | instances are searched for | only the earliest valid completion for that start is counted — this is not treated as two separate instances                                                                                                                                                                                                                                  |
+| Completion falls after the search range | a setup's anchor step is inside `[from_date, to_date]` but a later step resolves to a date after `to_date` | instances are searched for | the candidate is excluded from completed results — every step's resolved date is bounded by the search range, not just the anchor's (a partial/in-progress match at the range boundary is unaffected, per the sparse-matches scenario above) |
 
 ### Instance sampling
 
@@ -216,4 +218,4 @@ at every step.
 
 ---
 
-_Implemented by: EPIC-0001, EPIC-0002, EPIC-0003, EPIC-0004, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status, hotfix/api-base-url-trim_
+_Implemented by: EPIC-0001, EPIC-0002, EPIC-0003, EPIC-0004, EPIC-0017, hotfix/webmcp-tools-always-visible, hotfix/workbench-ui-refactor, hotfix/webmcp-bridge-status, hotfix/api-base-url-trim_

@@ -1,9 +1,10 @@
 from datetime import date, timedelta
 
 import pytest
+from pydantic import ValidationError
 
 from domain.errors import ExpressionError
-from domain.models.pattern import SetupStep
+from domain.models.pattern import Setup, SetupStep
 from domain.models.price import PriceBar
 from domain.models.universe import TickerMetadata
 from infra.pandas_engine import PandasPatternResearchEngine
@@ -105,6 +106,52 @@ class TestStudyDefinition:
             f"expected the full supported-function catalog on the error so a caller can "
             f"self-correct in one turn, got {error.catalog}"
         )
+
+
+class TestSetupWithinValidation:
+    def test_negative_min_bound_is_rejected_naming_step_index_and_bound(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            Setup(
+                id="setup_neg",
+                steps=[
+                    SetupStep(condition="close > 100"),
+                    SetupStep(condition="close > 200", within=(-1, 5)),
+                ],
+            )
+
+        message = str(exc_info.value)
+        assert "step 1" in message, f"expected the error to name step 1, got {message}"
+        assert "-1" in message, f"expected the error to name the bad min bound -1, got {message}"
+
+    def test_max_below_min_bound_is_rejected_naming_step_index_and_bounds(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            Setup(
+                id="setup_bad_range",
+                steps=[
+                    SetupStep(condition="close > 100"),
+                    SetupStep(condition="close > 200", within=(5, 2)),
+                ],
+            )
+
+        message = str(exc_info.value)
+        assert "step 1" in message, f"expected the error to name step 1, got {message}"
+        assert (
+            "5" in message and "2" in message
+        ), f"expected the error to name both bounds (5, 2), got {message}"
+
+    def test_valid_within_bounds_are_accepted(self) -> None:
+        setup = Setup(
+            id="setup_ok",
+            steps=[
+                SetupStep(condition="close > 100"),
+                SetupStep(condition="close > 200", within=(1, 5)),
+            ],
+        )
+
+        assert setup.steps[1].within == (
+            1,
+            5,
+        ), f"expected the valid within bounds to be preserved, got {setup.steps[1].within}"
 
 
 class TestSetupDefinition:
@@ -366,3 +413,39 @@ class TestInstanceSearch:
             "BIGCAP",
             "SMALLCAP",
         }, f"expected both tickers within the exact anchor-day range, got {in_range.instances}"
+
+    def test_find_instances_excludes_completed_match_whose_final_step_resolves_after_to_date(
+        self,
+    ) -> None:
+        # LATE's anchor (day 0, close > 200) is inside [from_date, to_date],
+        # but its confirming step only resolves on day 1 -- one day after
+        # to_date. Before this fix, only the anchor's date was ever bounds-
+        # checked (pandas_engine.py:179), so this showed up as a completed
+        # match; it must now be excluded from completed results and instead
+        # reclassified as a partial match.
+        bars = _sequential_bars("LATE", [201, 101])
+        engine = PandasPatternResearchEngine.from_price_bars(bars)
+        setup = engine.define_setup(
+            "late_confirm",
+            [
+                SetupStep(condition="close > 200"),
+                SetupStep(condition="close > 100", within=(1, 1)),
+            ],
+        )
+
+        result = engine.find_instances(setup, from_date=bars[0].date, to_date=bars[0].date)
+
+        completed = {inst.ticker for inst in result.instances if inst.completeness == 1.0}
+        assert "LATE" not in completed, (
+            f"expected LATE's completion (which resolves after to_date) to be excluded "
+            f"from completed matches, got completed tickers {completed}: {result.instances}"
+        )
+        late_instances = [inst for inst in result.instances if inst.ticker == "LATE"]
+        assert len(late_instances) == 1, (
+            f"expected LATE to be reclassified as a partial match rather than silently "
+            f"dropped, got {late_instances}: {result.instances}"
+        )
+        assert late_instances[0].completeness == pytest.approx(0.5), (
+            f"expected LATE's completeness to be 1/2 (anchor satisfied, confirming step "
+            f"unresolved within range), got {late_instances[0].completeness}"
+        )

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class Study(BaseModel):
@@ -27,3 +27,20 @@ class Setup(BaseModel):
     id: str
     name: str | None = None
     steps: list[SetupStep]
+
+    @model_validator(mode="after")
+    def _validate_within_bounds(self) -> "Setup":
+        # Validated here (not on SetupStep itself) because the error needs
+        # the step's position in the sequence, which only the parent Setup
+        # knows -- a SetupStep constructed on its own has no index to report.
+        for index, step in enumerate(self.steps):
+            if step.within is None:
+                continue
+            min_days, max_days = step.within
+            if min_days < 0:
+                raise ValueError(f"step {index}: within min must be >= 0, got {min_days}")
+            if max_days < min_days:
+                raise ValueError(
+                    f"step {index}: within max ({max_days}) must be >= min ({min_days})"
+                )
+        return self
