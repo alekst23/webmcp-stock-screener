@@ -24,3 +24,4 @@ export { configurePanelView, type ConfigurePanelViewRequest } from './configureP
 export { linkPanels, type LinkPanelsRequest } from './linkPanels';
 export { unlinkPanels, type UnlinkPanelsRequest } from './unlinkPanels';
 export { setPanelSelection, type SetPanelSelectionRequest } from './setPanelSelection';
+export { resetLayout, type ResetLayoutRequest } from './resetLayout';

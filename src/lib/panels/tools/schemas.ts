@@ -190,6 +190,13 @@ export function setPanelLayoutSchema(): object {
 	};
 }
 
+export function resetLayoutSchema(): object {
+	return {
+		type: 'object',
+		properties: { ...revisionFields() }
+	};
+}
+
 export function applyLayoutTemplateSchema(deps: PanelUseCaseDeps): object {
 	const templateNames = deps.templates.names();
 	return {
