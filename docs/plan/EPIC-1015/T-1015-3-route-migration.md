@@ -73,6 +73,57 @@ established convention here rather than a gap. UI-observable acceptance
 criteria are verified through a browser check at ticket close, and
 pure logic that moves should keep unit coverage.
 
+## Solution Approach
+
+**Implements**: the "Route migration" scenarios in spec.md (happy path,
+status header, surviving capability, throwaway scaffolding).
+
+**Approach**: frontend-only, proceeding under the epic's cleared launch
+gate — T-1015-2's original NO-GO verdict was superseded by an explicit
+user decision on 2026-09-03; six structural gaps were accepted as
+deliberate drops (temporal sequencing, `measure`/`splitInstances`,
+instance focus, progressive tool availability, the manual harness route),
+and the remainder became new ticket scope (T-1015-9, T-1015-10, T-1015-11)
+that this ticket does not need to close. Per the parity matrix's
+"reachability gap" list, several capabilities exist as real, merged, tested
+code gated behind a build-time flag with no route calling them; making
+"surviving capability... reachable from the UI" (AC4) true requires both
+(a) routing the main page onto the new panel/workspace composition root
+(the same one EPIC-0020 wired for `/workbench`, reusing `registerPanelTools()`
+rather than building a second composition), and (b) flipping the flag for
+each tool group the parity check confirmed as surviving. `SCREENER_TOOLS_
+ENABLED` and `WORKBENCH_TOOLS_ENABLED` are already `true` as of this design
+pass; `CHART_TOOLS_ENABLED`, `SIMILARITY_TOOLS_ENABLED`, and
+`FOLLOWUP_AUTHORING_TOOLS_ENABLED` are still `false` and, per the parity
+matrix, correspond to accepted-surviving capabilities — re-verify each
+flag's current value at implementation time rather than trusting this
+list, since the codebase has moved since the parity check was written.
+`BACKTEST_TOOLS_ENABLED`, `ALERT_TOOLS_ENABLED`, and `WATCHLIST_TOOLS_
+ENABLED` stay off unless a sibling epic needs them for a reason
+independent of this cutover — `measure`/split (backtest) was an accepted
+drop. Chart-math in `visualization.ts` is not ported here — T-1015-1 found
+it already reimplemented independently in `workbench/chart/components/
+chartScales.ts`; nothing to move. `src/routes/spike/` is deleted and
+de-linked (AC5). `src/routes/dev/+page.svelte` has no new-surface
+replacement per the parity matrix's confirmed drop, so it is removed
+outright rather than migrated (AC6) — executing an already-accepted drop,
+not a new decision. The full rebuilt workspace-status header and the new
+shared shell are T-1015-9's scope; this ticket only needs the migrated
+route to not regress what already renders (AC2), re-pointing the still-
+available `status.ts`/`session.ts` formatters at the new tool list as an
+interim measure.
+
+**Contracts to introduce**: none new — this ticket wires together
+contracts the sibling epics already defined; it does not introduce any.
+
+**Config vars introduced**: none — this ticket flips existing
+`*_TOOLS_ENABLED` module constants, it does not add environment variables.
+
+**References**: `docs/plan/EPIC-1015/retirement-inventory.md`,
+`capability-parity-matrix.md`, `docs/design/pattern-research-workbench/
+technical.md` ("Page layout", status-header sections), the design docs of
+whichever sibling epic owns the panel/workspace model.
+
 ## Out of Scope
 
 Deleting the legacy tool surface (T-1015-5) or the legacy workspace
