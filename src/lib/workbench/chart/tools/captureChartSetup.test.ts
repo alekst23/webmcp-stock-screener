@@ -189,7 +189,7 @@ describe('capture_chart_setup', () => {
 
 	it('is named capture_chart_setup and is always available', () => {
 		expect(tool.name).toBe('capture_chart_setup');
-		expect(tool.available({} as never)).toBe(true);
+		expect(tool.available()).toBe(true);
 	});
 
 	it('registers the chart.capture_setup operation it commits through', () => {

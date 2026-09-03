@@ -7,7 +7,7 @@
 // Exported as a factory rather than registered here: the composition root is
 // T-1011-9's, and a module that registers itself on import cannot be built
 // twice in a test.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import type { ResourceId } from '../../domain/ids';
 import { isChartTimeframe, type ChartTimeframe } from '../domain/chartState';

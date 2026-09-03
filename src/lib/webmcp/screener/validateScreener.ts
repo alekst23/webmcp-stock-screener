@@ -19,7 +19,7 @@ import type {
 	ValidationProblem
 } from '../../screener/validation';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
-import { fail, ok } from '../tools';
+import { fail, ok } from '../toolResult';
 import type { ToolResult, ToolSpec } from '../types';
 import { readString, resolveWorkspaceId, toErrorResult } from './support';
 

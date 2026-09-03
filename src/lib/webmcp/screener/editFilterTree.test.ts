@@ -103,7 +103,7 @@ describe('createEditFilterTreeTool', () => {
 	it('registers the edit_filter_tree tool, always available', () => {
 		const spec = tool();
 		expect(spec.name, 'tool must be named edit_filter_tree').toBe('edit_filter_tree');
-		expect(spec.available({} as never), 'tool has no availability gate').toBe(true);
+		expect(spec.available(), 'tool has no availability gate').toBe(true);
 	});
 
 	it('add_appendsUnderRoot_andReportsTheNewNodeIdInAffectedIds', async () => {

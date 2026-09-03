@@ -1,205 +1,31 @@
-// Handle-based research workbench model: every tool operates on ids the agent
-// receives from earlier calls and the human can see in the UI.
-
-export interface StudySummary {
-	id: string;
-	name: string;
-	expression: string;
-}
-
-export interface SetupStep {
-	condition: string;
-	// Trading days after the previous step in which the condition must occur.
-	within?: [number, number];
-	// Condition must hold on every day of the window, not just once.
-	sustained?: boolean;
-}
-
-export interface SetupSummary {
-	id: string;
-	name?: string;
-	steps: SetupStep[];
-}
-
-export interface InstanceEvent {
-	ticker: string;
-	// ISO date of the event anchor (t=0), i.e. the day the final step completed.
-	date: string;
-	// Fraction of setup steps satisfied (0-1). Absent or 1 for a fully
-	// completed instance; present and <1 for a partial/in-progress match.
-	completeness?: number;
-}
-
-export interface InstanceSetSummary {
-	id: string;
-	setupId: string;
-	count: number;
-	completeCount: number;
-	partialCount: number;
-	from: string;
-	to: string;
-	// Set this split was derived from, if any.
-	parentId?: string;
-	label?: string;
-}
-
-export interface PanelSummary {
-	id: string;
-	kind: 'grid' | 'histogram' | 'chart';
-	instanceSetId?: string;
-	title?: string;
-	n?: number;
-	strategy?: 'random' | 'recent' | 'best' | 'worst';
-	window?: [number, number];
-}
-
-export interface FocusState {
-	panelId: string;
-	// Instances the human has selected/highlighted by hand. Set only via
-	// direct UI interaction — focusInstance (agent-driven) never touches this.
-	selected: InstanceEvent[];
-	// Set only via focusInstance; independent of `selected` so an agent
-	// zooming in never silently overwrites the human's multi-select.
-	focusedInstance: InstanceEvent | null;
-}
-
-export interface WorkspaceState {
-	studies: StudySummary[];
-	setups: SetupSummary[];
-	instanceSets: InstanceSetSummary[];
-	panels: PanelSummary[];
-	focus: FocusState | null;
-}
-
-export interface DefineStudyInput {
-	name: string;
-	expression: string;
-}
-
-export interface DefineSetupInput {
-	name?: string;
-	steps: SetupStep[];
-}
-
-export interface FindInstancesInput {
-	setupId: string;
-	from?: string;
-	to?: string;
-	universe?: { minMarketCap?: number; sectors?: string[] };
-}
-
-export interface SampleInstancesInput {
-	instanceSetId: string;
-	n?: number;
-	strategy?: 'random' | 'recent' | 'best' | 'worst';
-	horizonDays?: number;
-}
-
-export interface MeasureInput {
-	instanceSetId: string;
-	metric?: string;
-	horizonDays: number;
-	compareToBaseRate?: boolean;
-}
-
-export interface MeasureResult {
-	metric: string;
-	horizonDays: number;
-	count: number;
-	median: number;
-	mean: number;
-	hitRate: number;
-	baseRate?: { median: number; hitRate: number };
-	// Present when the input set contained partial instances excluded from
-	// the statistic (a forward return doesn't exist yet for an unresolved match).
-	excludedPartialCount?: number;
-}
-
-export interface SplitInstancesInput {
-	instanceSetId: string;
-	mode: 'outcome' | 'condition';
-	// mode=condition: expression evaluated at each instance's t=0.
-	expression?: string;
-	// mode=outcome: forward-return horizon and threshold separating win/loss.
-	horizonDays?: number;
-	threshold?: number;
-}
-
-export interface ShowGridInput {
-	instanceSetId: string;
-	n?: number;
-	strategy?: 'random' | 'recent' | 'best' | 'worst';
-	// Trading days around t=0 to display, e.g. [-20, 20].
-	window?: [number, number];
-	overlayStudyIds?: string[];
-	normalize?: boolean;
-}
-
-export interface ShowTickerChartsInput {
-	tickers: string[];
-	date: string;
-	// Trading days around the anchor date. [-20, 0] is roughly one market month.
-	window?: [number, number];
-	title?: string;
-}
-
-export interface FocusInstanceInput {
-	ticker: string;
-	date: string;
-	panelId?: string;
-}
-
-// Mirrors backend/tests/mocks/mock_pattern_research_engine.py's
-// SUPPORTED_FUNCTIONS — a deliberate, small, documented duplication (a
-// list of names, not parsing/evaluation logic) so defineStudy/defineSetup
-// can validate synchronously without a network call, per the client-side
-// tool split in docs/plan.md. Keep the two lists in sync by hand; they're
-// short enough that this is cheaper than a shared network round trip.
-export const FUNCTION_CATALOG = ['sma', 'ema', 'atr', 'highest', 'lowest', 'days_since'];
-
-export interface ApiClientConfig {
-	// Base URL of the FastAPI backend for the 5 networked tools.
-	baseUrl: string;
-	// Optional test hook for the browser-side full instance-set cache.
-	instanceSetStorage?: Storage;
-}
-
-// Thrown by the engine when an expression fails to parse; the catalog is
-// returned to the agent so it can self-correct instead of looping.
-export class ExpressionError extends Error {
-	constructor(
-		message: string,
-		readonly catalog: string[]
-	) {
-		super(message);
-		this.name = 'ExpressionError';
-	}
-}
-
-export interface ResearchEngine {
-	defineStudy(input: DefineStudyInput): Promise<StudySummary>;
-	defineSetup(input: DefineSetupInput): Promise<SetupSummary>;
-	findInstances(input: FindInstancesInput): Promise<InstanceSetSummary>;
-	sampleInstances(input: SampleInstancesInput): Promise<InstanceEvent[]>;
-	measure(input: MeasureInput): Promise<MeasureResult>;
-	splitInstances(input: SplitInstancesInput): Promise<InstanceSetSummary[]>;
-	showGrid(input: ShowGridInput): Promise<PanelSummary>;
-	showTickerCharts(input: ShowTickerChartsInput): Promise<PanelSummary>;
-	clearPanels(): Promise<WorkspaceState>;
-	focusInstance(input: FocusInstanceInput): Promise<void>;
-	getWorkspace(): Promise<WorkspaceState>;
-}
+// WebMCP transport types (T-1015-5): what the bridge, registration layers,
+// and every tool group's ToolSpec[] builder depend on. This file used to
+// also hold the legacy 11-tool product surface (StudySummary, WorkspaceState,
+// ResearchEngine, per-tool Input/Result types, FUNCTION_CATALOG,
+// ExpressionError) -- that half retired with the tool surface itself; see
+// docs/plan/EPIC-1015/T-1015-5-remove-legacy-tool-surface.md and
+// docs/plan/EPIC-1015/retirement-inventory.md §1-3 for which symbols were
+// transport versus product and why the file was split rather than deleted.
 
 export interface ToolResult {
 	content: { type: 'text'; text: string }[];
 	isError?: boolean;
 }
 
+// `available` used to be called with the live WorkspaceState to implement
+// per-tool progressive availability (the legacy surface's only consumer,
+// register.ts's connectWebmcp/refresh). The capability-parity check
+// confirmed that mechanism as a deliberate drop for the new surface -- every
+// tool group registers unconditionally in one pass -- so nothing calls
+// `available()` with an argument any more. Left as a required field (every
+// existing ToolSpec across the new surface already implements it as
+// `() => true`) rather than removed outright, since dropping it would touch
+// every tool-group file outside this ticket's scope for no behavioral gain.
 export interface ToolSpec {
 	name: string;
 	description: string;
 	inputSchema: object;
-	available(ws: WorkspaceState): boolean;
+	available(): boolean;
 	execute(input: unknown): Promise<ToolResult>;
 }
 

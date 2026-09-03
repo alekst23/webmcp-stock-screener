@@ -169,9 +169,8 @@ describe('search_instruments', () => {
 				`a read-only tool must not declare "${mutationKey}"`
 			).toBe(false);
 		}
-		expect(
-			tool.available({ studies: [], setups: [], instanceSets: [], panels: [], focus: null }),
-			'discovery precedes state, so the tool is always available'
-		).toBe(true);
+		expect(tool.available(), 'discovery precedes state, so the tool is always available').toBe(
+			true
+		);
 	});
 });

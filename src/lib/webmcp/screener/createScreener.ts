@@ -11,7 +11,7 @@ import type { WorkbenchDeps } from '../../workbench/tools/index';
 import { createScreener as mintScreener } from '../../screener/definition';
 import { writeScreener } from '../../screener/state';
 import type { ToolResult, ToolSpec } from '../types';
-import { fail, ok } from '../tools';
+import { fail, ok } from '../toolResult';
 import { resolveWorkspaceId, toErrorResult } from './support';
 
 const DESCRIPTION =

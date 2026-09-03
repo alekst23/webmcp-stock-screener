@@ -2,7 +2,7 @@
 // parsing and result shaping only -- every decision about what makes a
 // field valid lives in the application layer this wraps.
 import type { CatalogRegistry } from '../../../catalog/registry';
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	IdempotencyConflictError,

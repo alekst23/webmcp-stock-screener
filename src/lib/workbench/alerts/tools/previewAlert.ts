@@ -2,7 +2,7 @@
 // get_chart_data.ts: a read, so it rejects expected_revision outright (there
 // is no revision for it to guard) and never touches applyOperations,
 // ChangeHistory, or anything else that writes.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	previewAlert as previewAlertUseCase,

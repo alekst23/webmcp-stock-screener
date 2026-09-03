@@ -24,7 +24,7 @@
 // already resolve in the very next call -- freezing one catalog instance
 // at runtime-build time would miss that.
 import { ensureModelContext } from '../../../webmcp/bridge';
-import { fail } from '../../../webmcp/tools';
+import { fail } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import { createChangeHistory, type ChangeHistory } from '../../application/changeHistory';
 import { createIdempotencyCache, type IdempotencyCache } from '../../application/idempotency';

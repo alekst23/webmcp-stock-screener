@@ -77,7 +77,7 @@ describe('buildChartTools', () => {
 		for (const tool of buildChartTools(chartDeps)) {
 			expect(tool.description.length, `${tool.name} has no description`).toBeGreaterThan(0);
 			expect(tool.inputSchema, `${tool.name} has no input schema`).toBeTruthy();
-			expect(tool.available({} as never), `${tool.name} is not available`).toBe(true);
+			expect(tool.available(), `${tool.name} is not available`).toBe(true);
 		}
 	});
 

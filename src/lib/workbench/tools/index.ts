@@ -4,7 +4,7 @@
 // built over the existing ToolSpec/ToolResult contract
 // (src/lib/webmcp/types.ts), alongside -- never modifying -- the shipping
 // 11-tool surface.
-import { fail, ok } from '../../webmcp/tools';
+import { fail, ok } from '../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../webmcp/types';
 import {
 	IdempotencyConflictError,

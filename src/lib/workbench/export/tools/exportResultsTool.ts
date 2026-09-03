@@ -6,7 +6,7 @@
 // app to offer as a download. Read-only with respect to workspace state
 // (AC10): no mutation envelope, no expected_revision, no idempotency_key,
 // no undo_token -- there is nothing here to undo.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import type { RunNotAvailable } from '../../../screener/ports';
 import type { TickerResolver } from '../../../results/domain/page';

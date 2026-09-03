@@ -3,7 +3,7 @@
 // This tool NEVER arms an alert -- see application/enableAlert.ts's header
 // comment -- and the response says so explicitly on every call (AC1),
 // whether it is the first request or a re-request after expiry.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	IdempotencyConflictError,

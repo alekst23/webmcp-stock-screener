@@ -2,7 +2,7 @@
 // result shaping only, wrapping the `alerts.disable_activation` operation.
 // Unlike enable_alert, this needs no human confirmation: disarming only
 // ever reduces what an agent can cause.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	IdempotencyConflictError,

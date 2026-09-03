@@ -13,7 +13,7 @@
 // newRevision echoing the current, unchanged revision and undoToken null --
 // there is nothing to undo.
 
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	readOptionalNumber,

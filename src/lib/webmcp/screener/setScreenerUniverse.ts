@@ -18,7 +18,7 @@ import { OperationValidationError } from '../../workbench/domain/errors';
 import { toWireEnvelope } from '../../workbench/domain/mutation';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import type { ToolResult, ToolSpec } from '../types';
-import { fail, ok } from '../tools';
+import { fail, ok } from '../toolResult';
 import { resolveWorkspaceId, toErrorResult } from './support';
 
 export interface SetScreenerUniverseDeps extends WorkbenchDeps {
