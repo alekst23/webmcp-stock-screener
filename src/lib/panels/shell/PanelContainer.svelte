@@ -7,7 +7,7 @@
 	// an agent-driven tool call and a human click on the collapse affordance
 	// take the exact same re-render path (AC5).
 	import { onMount, untrack } from 'svelte';
-	import { containerGridStyle } from './gridStyle';
+	import { containerGridStyle, panelFrameStyle } from './gridStyle';
 	import {
 		propagateLinkedValue,
 		readSnapshot,
@@ -17,6 +17,7 @@
 		type PanelSnapshot,
 		type PanelWorkspaceObserver
 	} from './panelController';
+	import { computeEmptyCells } from '../domain/layout';
 	import type { PanelToolDeps } from '../tools/panelTools';
 	import type { PanelLinkChannel } from '../domain/channels';
 	import PanelFrame from './PanelFrame.svelte';
@@ -36,6 +37,10 @@
 	// Client-render state only, scoped to this mounted container -- never a
 	// workspace mutation (AC6; see propagateLinkedValue's own comment).
 	let linkedValues = $state<LinkedValues>({});
+	// The empty-grid illustration (hotfix/empty-grid-canvas): recomputed from
+	// the same occupied rects the panel frames render from, so it always
+	// matches current occupancy with no stale outlines left behind.
+	let emptyCells = $derived(computeEmptyCells(snapshot.rects));
 
 	function refresh(): void {
 		snapshot = readSnapshot(deps, deps.maximized.get());
@@ -87,6 +92,13 @@
 			/>
 		{/if}
 	{/each}
+	{#each emptyCells as cell (`${cell.col},${cell.row}`)}
+		<div
+			class="empty-cell"
+			style={`${panelFrameStyle(cell)} pointer-events: none;`}
+			data-testid="empty-cell"
+		></div>
+	{/each}
 </div>
 
 <style>
@@ -94,5 +106,10 @@
 		position: fixed;
 		inset: 0;
 		background: var(--bg-app);
+	}
+
+	.empty-cell {
+		border: 1px solid var(--separator);
+		pointer-events: none;
 	}
 </style>
