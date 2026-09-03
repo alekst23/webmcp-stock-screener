@@ -19,17 +19,11 @@ const HTML_SOURCES = import.meta.glob('/src/*.html', {
 }) as Record<string, string>;
 
 const PAGE = SOURCES['/src/routes/+page.svelte'] ?? '';
-const SHELL = SOURCES['/src/lib/shell/AppShell.svelte'] ?? '';
 const LAYOUT = SOURCES['/src/routes/+layout.svelte'] ?? '';
 const APP_HTML = HTML_SOURCES['/src/app.html'] ?? '';
 // T-1015-9: the status header (agent-context comment, tool counts) moved
 // out of +page.svelte and into this new, separately-composed shell.
 const WORKBENCH_SHELL = SOURCES['/src/lib/panels/shell/WorkbenchShell.svelte'] ?? '';
-
-// The regions the shell renders, in source order, named by the snippet prop
-// each one takes -- read out of the source rather than spelled here so
-// renaming a region stays a refactor rather than a red test.
-const SHELL_REGIONS = [...SHELL.matchAll(/\{@render\s+(\w+)\(\)\}/g)].map((match) => match[1]);
 
 describe('colour literal detection', () => {
 	it('test_finds_a_hex_literal_with_its_line_number', () => {
@@ -141,8 +135,14 @@ describe('colour literal detection', () => {
 	});
 
 	it('test_returns_empty_for_a_fully_tokenised_source', () => {
-		expect(SHELL, 'AppShell.svelte was not resolved').toContain('app-shell');
-		expect(findColourLiterals(SHELL, 'AppShell.svelte'), 'the shell names no colour').toEqual([]);
+		// T-1015-6: the legacy shell (src/lib/shell/AppShell.svelte) this test
+		// exercised was deleted with no reuse -- WorkbenchShell.svelte is the
+		// live shell now and is just as fully tokenised, so it stands in.
+		expect(WORKBENCH_SHELL, 'WorkbenchShell.svelte was not resolved').toContain('status-bar');
+		expect(
+			findColourLiterals(WORKBENCH_SHELL, 'WorkbenchShell.svelte'),
+			'the shell names no colour'
+		).toEqual([]);
 	});
 });
 
@@ -190,36 +190,6 @@ describe('the theme reaches the document', () => {
 		expect(APP_HTML, 'app.html must declare the dark colour-scheme before JS runs').toContain(
 			'color-scheme: dark'
 		);
-	});
-});
-
-// Structural guarantees a restyle is uniquely likely to disturb, and that no
-// other test covers -- see technical.md, "Testing", for why a source
-// assertion was chosen over adding a component-mounting dependency.
-describe('restyle-sensitive shell invariants', () => {
-	it('test_the_log_region_renders_last_of_the_three', () => {
-		// The log's position is the shell's, not the page's: snippet
-		// declarations are order-independent, so this is the only file where
-		// "the activity log stays at the bottom" can actually be broken.
-		expect(SHELL_REGIONS.length, 'the shell no longer renders three regions').toBe(3);
-		const header = SHELL.indexOf('<header');
-		const main = SHELL.indexOf('<main');
-		const footer = SHELL.indexOf('<footer');
-		expect(header, 'the shell has no top bar landmark').toBeGreaterThan(-1);
-		expect(main, 'the work area must follow the top bar').toBeGreaterThan(header);
-		expect(footer, 'the log region must stay below the work area').toBeGreaterThan(main);
-		expect(
-			SHELL.indexOf(`{@render ${SHELL_REGIONS[2]}()}`),
-			'the last region is rendered outside the footer'
-		).toBeGreaterThan(footer);
-	});
-
-	it('test_the_grid_orders_the_three_regions_top_to_bottom', () => {
-		// DOM order alone is not the guarantee: a grid can reorder its rows.
-		expect(SHELL, 'the shell no longer lays its regions out as three rows').toMatch(
-			/grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+auto/
-		);
-		expect(SHELL, 'a region is reordering itself out of source order').not.toMatch(/\n\s*order:\s/);
 	});
 });
 

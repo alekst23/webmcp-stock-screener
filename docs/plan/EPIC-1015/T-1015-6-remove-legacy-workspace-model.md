@@ -1,7 +1,7 @@
 # T-1015-6: Remove the legacy workspace model and components
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1015-5
 **Blocks**: T-1015-7
 
@@ -133,3 +133,66 @@ workbench/spec.md`, `docs/design/workspace-snapshots/spec.md`.
 Backend changes (T-1015-4). Doc updates (T-1015-7). Live-deploy
 verification (T-1015-8). Building new-surface replacements — those
 belong to the sibling epics.
+
+## Completion Notes
+
+By the time this ticket was implemented, T-1015-5, T-1015-9, T-1015-10, and
+T-1015-12 had already merged to the epic branch, which changed most of this
+ticket's actual scope from what the Solution Approach above describes:
+
+- **Already done by T-1015-5** (verified still true, not redone): `store.ts`,
+  `apiEngine.ts`, and their tests (AC1/AC2); `WorkspaceView.svelte`,
+  `GridPanel.svelte`, `PriceChart.svelte`, `FocusChart.svelte`,
+  `ChartToolbar.svelte`, `SnapshotPicker.svelte` (part of AC3);
+  `visualization.ts` (retire, not absorb — `chartScales.ts` already
+  reimplemented the technique independently) and `snapshots.ts`/
+  `snapshotGuard.ts` (absorbed into `revisionService.ts`) (AC4/AC5).
+  `WorkspaceState`/`FocusState` were deleted outright rather than collapsed
+  into a single field, so the Technical Considerations' named risk (human-
+  vs-agent focus state merging) never materialized — there is no focus field
+  of any kind left to merge. Verified by `webmcp/toolSurfaceRemoval.test.ts`
+  and re-confirmed here.
+- **Correction to this ticket's original scope**: `panelStatus.ts` must NOT
+  be deleted, contrary to the Solution Approach above. T-1015-9's
+  `WorkbenchShell.svelte` (merged after this ticket was written) imports it
+  directly for the shell's data-freshness pill. `panelStatus.ts` and its test
+  are kept, alongside the already-correct `apiConfig.ts` "keep".
+- **This ticket's actual remaining work**: deleted `ActivityFeed.svelte` and
+  `activity.ts`/`activity.test.ts` (AC3) — held back in the original approach
+  pending T-1015-10's attributed action log, which has since shipped as
+  `ActionLogPanel.svelte` + `changeHistory.ts`'s `actor`-attributed
+  `ChangeRecord`, live in `WorkbenchShell.svelte` (AC4/AC5, verified by
+  `legacyModelRemoval.test.ts`, not just inspected). Deleted
+  `src/lib/shell/AppShell.svelte` — held back pending T-1015-9's own shell,
+  which has since shipped and does not reuse `AppShell.svelte`'s markup or
+  its three-region Snippet contract; updated `theme/paletteGuard.test.ts`
+  (which read `AppShell.svelte`'s source directly for two structural
+  invariants) to point its "fully tokenised source" check at
+  `WorkbenchShell.svelte` instead, and removed the "restyle-sensitive shell
+  invariants" tests that asserted AppShell's own three-region grid layout,
+  since that layout no longer exists anywhere. Deleted
+  `TickerSearch.svelte`/`tickerSearch.ts`/`tickerSearch.test.ts` (zero
+  importers, no blocking dependency, simply not yet reached). Deleted
+  `workspace/testSupport.ts`, orphaned once its only consumer
+  (`activity.test.ts`) was deleted.
+- **AC6 (legacy storage keys)**: deliberately abandoned, not migrated or
+  actively cleared. `store.ts` wrote `webmcp-workspace-state`, `snapshots.ts`
+  wrote `webmcp-workspace-snapshots` (both already unreachable once T-1015-5
+  landed), and `activity.ts` wrote `webmcp-activity-log` (unreachable as of
+  this ticket). None of the three keys is read by any surviving module — the
+  workbench's own `localStorage`-backed repository already uses disjoint
+  keys (`workbench-workspaces`/`workbench-revisions`/`workbench-active`,
+  established by T-1006-4 specifically so it would never need to interpret
+  the legacy slots). A returning user's browser keeps whatever JSON sits
+  under the old keys; nothing calls `getItem` on them again, so the app can
+  neither crash on stale/foreign data there nor accidentally resurrect it.
+  Migrating or actively clearing was rejected as unjustified: it would mean
+  writing new code whose only purpose is to read a shape only the deleted
+  modules ever understood. Verified by `legacyModelRemoval.test.ts`, which
+  asserts no surviving source references any of the three keys.
+- Typecheck (`svelte-check`, 0 errors), the full test suite (243 files /
+  2946 tests passed, 2 pre-existing todos, run via `npx vitest run`), and
+  `npm run build` all pass. This project has no `npm run lint` script or
+  ESLint config; `npx prettier --check src/` was run instead and found no
+  formatting issues in any file this ticket touched (10 pre-existing
+  warnings elsewhere in the tree predate this ticket and were left alone).

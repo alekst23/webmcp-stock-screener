@@ -3,9 +3,9 @@
 	// presentational -- WorkbenchShell.svelte owns the expand/collapse state
 	// and calls panelController.ts's readActionLog() to populate `records`.
 	// The actor badge is reimplemented inline rather than imported from
-	// workspace/activity.ts's actorLabel: that module is a T-1015-6 deletion
-	// target (see legacyModelRemoval.test.ts), not something new code should
-	// depend on.
+	// workspace/activity.ts's actorLabel: that module was a T-1015-6
+	// deletion target (see legacyModelRemoval.test.ts) and was never
+	// something new code should have depended on.
 	import type { ChangeRecord } from '../../workbench/application/changeHistory';
 
 	let { records }: { records: ChangeRecord[] } = $props();
