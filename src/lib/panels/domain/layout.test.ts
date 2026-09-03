@@ -436,8 +436,8 @@ describe('computeEmptyCells', () => {
 
 	it('returns all 24 cells for a fully empty grid', () => {
 		const result = computeEmptyCells([]);
-		expect(result, 'expected every returned rect to be a unit cell').toSatisfy((rects: GridRect[]) =>
-			rects.every((r) => r.colSpan === 1 && r.rowSpan === 1)
+		expect(result, 'expected every returned rect to be a unit cell').toSatisfy(
+			(rects: GridRect[]) => rects.every((r) => r.colSpan === 1 && r.rowSpan === 1)
 		);
 		expect(result.length, `expected 24 empty cells, got ${result.length}`).toBe(
 			GRID_COLUMNS * GRID_ROWS
@@ -450,9 +450,7 @@ describe('computeEmptyCells', () => {
 	});
 
 	it('returns exactly the complement of one occupied rect', () => {
-		const occupied: OccupiedRect[] = [
-			{ panelId: 'filter_builder', rect: rect(0, 0, 2, 4) }
-		];
+		const occupied: OccupiedRect[] = [{ panelId: 'filter_builder', rect: rect(0, 0, 2, 4) }];
 		const result = computeEmptyCells(occupied);
 		expect(result.length, 'expected 16 empty cells outside the 2x4 occupied rect').toBe(16);
 

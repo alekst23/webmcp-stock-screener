@@ -30,9 +30,10 @@ describe('PanelContainer renders an outline for every unoccupied cell', () => {
 		flushSync();
 
 		const panelFrames = target.querySelectorAll('.panel-frame');
-		expect(panelFrames.length, 'expected the seeded filter_builder to render as one panel frame').toBe(
-			1
-		);
+		expect(
+			panelFrames.length,
+			'expected the seeded filter_builder to render as one panel frame'
+		).toBe(1);
 
 		const emptyCells = target.querySelectorAll('[data-testid="empty-cell"]');
 		expect(
