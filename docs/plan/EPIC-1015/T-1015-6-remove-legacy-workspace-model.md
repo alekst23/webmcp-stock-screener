@@ -77,6 +77,57 @@ will surface any remaining coupling between the snapshot module and the
 legacy state shape. Resolve it by deleting or moving, never by leaving a
 shim.
 
+## Solution Approach
+
+**Implements**: the "Workspace-model removal" scenarios in spec.md (happy
+path, absorbed logic, returning user).
+
+**Approach**: frontend-only, gated on T-1015-5, T-1015-9, T-1015-10, and
+T-1015-12 per the epic's current dependency graph — the legacy workspace
+model (including the legacy shell, `AppShell.svelte`) can only go once
+every new-surface replacement it backs has actually landed, not just the
+tool surface. Delete `store.ts`, `apiEngine.ts`, and their tests;
+`WorkspaceView.svelte`, `GridPanel.svelte`, `PriceChart.svelte`,
+`FocusChart.svelte`, `ChartToolbar.svelte`, `ActivityFeed.svelte`,
+`SnapshotPicker.svelte`; and `src/lib/shell/AppShell.svelte` (T-1015-1
+found no new-surface consumer for it — `/workbench` renders no shell at
+all before T-1015-9 builds one). `visualization.ts` is deleted as a
+**retire, not absorb** — the inventory found `chartScales.ts` already
+reimplements the same technique independently, so there is nothing to
+port and no coverage to carry across for that file specifically (AC4/AC5
+are satisfied by the pre-existing `chartScales.ts` coverage, verified,
+not assumed). `activity.ts` and its test do not delete until T-1015-10's
+attributed action-log replacement is live — deleting it first would
+silently execute a capability drop the user did not actually accept
+(item 6 in the parity matrix became new scope, not a drop). `snapshots.ts`/
+`snapshotGuard.ts` delete once `WORKBENCH_TOOLS_ENABLED`-gated
+`revisionService.ts` is confirmed live (T-1015-3) — an independently-built
+replacement, not code this ticket moves. `apiConfig.ts` and `panelStatus.ts`
+need separate treatment despite living in the same directory: `apiConfig.ts`
+is **kept** (three live new-surface tool files import
+`resolveApiBaseUrl` directly) and must not be deleted; `panelStatus.ts`
+and `tickerSearch.ts`/`TickerSearch.svelte` retire, with their loss
+already flagged as accepted parity gaps (data-freshness half of the
+status header; human-driven ticker search) rather than a new decision
+made here. The legacy store's separate human-driven and agent-driven
+focus fields are a named risk from Technical Considerations: if the new
+model has collapsed them to one field, record that explicitly as a
+behavioral change rather than letting it pass silently (AC4 in spirit).
+Legacy `localStorage` keys (`workspace/store.ts`'s and `activity.ts`'s)
+are migrated, deliberately abandoned with the decision recorded, or
+actively cleared on load, so a returning user's stale data cannot break
+the new surface's parsing (AC6).
+
+**Contracts to introduce**: none — this ticket only deletes.
+
+**Config vars introduced**: none.
+
+**References**: `docs/plan/EPIC-1015/retirement-inventory.md` §4-5
+(absorb/retire entries and their corrections, including the `apiConfig.ts`
+"keep" correction), `capability-parity-matrix.md` (which drops became
+T-1015-9/10/12 scope vs. accepted drops), `docs/design/pattern-research-
+workbench/spec.md`, `docs/design/workspace-snapshots/spec.md`.
+
 ## Out of Scope
 
 Backend changes (T-1015-4). Doc updates (T-1015-7). Live-deploy
