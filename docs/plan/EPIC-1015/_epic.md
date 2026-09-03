@@ -5,12 +5,14 @@ EPIC-1011, EPIC-1012, EPIC-1013, EPIC-1014
 **Blocks**: —
 **Design**: docs/design/legacy-surface-cutover/
 
-> **GATED ON EXPLICIT USER APPROVAL.** This epic must not be launched until
-> the user has confirmed, in their own words, that the new WebMCP surface
-> built by EPIC-1006 through EPIC-1014 is good. It is the only epic in the
-> program that deletes working, shipped code, and the currently-deployed
-> hackathon submission runs on the surface it retires. `/at-epic-run
-> EPIC-1015` is not a decision an autonomous run may make on its own.
+> **LAUNCH GATE CLEARED 2026-09-03.** The user confirmed the new surface is
+> good and explicitly directed resuming this epic in full, including
+> deciding the capability-parity drops T-1015-2's audit surfaced (see the
+> Superseded note on T-1015-2, above). `/at-epic-run EPIC-1015` may now
+> proceed. **The two deletion tickets (T-1015-5, T-1015-6) still need
+> orchestrator review before merging** — this epic is not purely additive
+> like EPIC-1007-1014 were, and deleting working, shipped code warrants a
+> second look even with the launch gate cleared.
 
 ## Description
 
@@ -40,34 +42,58 @@ overlapping ones, with no capability silently lost and no broken deploy.
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
 | 1 | T-1015-1 | Retirement inventory and audit | — | Done |
-| 2 | T-1015-2 | Capability-parity check (deletion gate) | T-1015-1 | Done — verdict: NO-GO, pending user review |
+| 2 | T-1015-2 | Capability-parity check (deletion gate) | T-1015-1 | Done — verdict: NO-GO; superseded by user decision 2026-09-03 (see Decisions below) |
 | 3 | T-1015-3 | Migrate routes onto the new panel/workspace model | T-1015-2 | Open |
 | 4 | T-1015-4 | Backend reconciliation | T-1015-2 | Open |
 | 5 | T-1015-5 | Remove the legacy tool surface | T-1015-3 | Open |
-| 6 | T-1015-6 | Remove the legacy workspace model and components | T-1015-5 | Open |
+| 6 | T-1015-6 | Remove the legacy workspace model and components | T-1015-5, T-1015-9, T-1015-10, T-1015-12 | Open |
 | 7 | T-1015-7 | Docs cutover | T-1015-4, T-1015-6 | Open |
 | 8 | T-1015-8 | Deployment cutover verification | T-1015-7 | Open |
+| 9 | T-1015-9 | Build the new shared shell and consolidate onto one URL | T-1015-3 | Open |
+| 10 | T-1015-10 | Restore panel-close and action-log UI affordances | T-1015-9 | Open |
+| 11 | T-1015-11 | Fix get_canvas_state's panel-state blind spot | — | Open |
+| 12 | T-1015-12 | Enrich the default workspace layout | T-1015-9, T-1015-11 | Open |
+
+**Superseded note (T-1015-2):** the NO-GO verdict stood on two blockers —
+real capability drops and a composition-root wiring gap. The wiring gap
+is now resolved (EPIC-0020, merged 2026-09-03). The capability drops were
+individually re-confirmed with the user on 2026-09-03 (see Decisions Log
+in `docs/plan/project.md` and the spec's now-resolved Open Questions) —
+each accepted as a deliberate drop except three, which became new scope
+(T-1015-9/10/11/12) rather than drops. The epic proceeds under this
+updated verdict, not the original NO-GO.
 
 ## Dependency Graph
 
 ```
-T-1015-1 ──> T-1015-2 ──┬──> T-1015-3 ──> T-1015-5 ──> T-1015-6 ──┐
-                        │                                         ├──> T-1015-7 ──> T-1015-8
-                        └──> T-1015-4 ────────────────────────────┘
+T-1015-1 ──> T-1015-2 ──┬──> T-1015-3 ──┬──> T-1015-5 ──> T-1015-6 ──┐
+                        │               │                            ├──> T-1015-7 ──> T-1015-8
+                        │               └──> T-1015-9 ──┬──> T-1015-10 ┘
+                        │                                └──> T-1015-12 ┘
+                        │                    T-1015-11 ──────────┘
+                        └──> T-1015-4 ──────────────────────────────────┘
 ```
+
+T-1015-11 has no dependency and can start any time; it only gates
+T-1015-12 (which needs the read path fixed before adding panel kinds
+that must be visible through it).
 
 ## Wave Plan
 
 - **Wave 1**: T-1015-1 — no dependencies
 - **Wave 2**: T-1015-2 — needs the inventory to check parity against
-- **Wave 3** (parallel): T-1015-3 (frontend), T-1015-4 (backend) — disjoint
-  file sets, both gated on the parity check
-- **Wave 4**: T-1015-5 — the legacy tools can only go once nothing renders
-  against them
-- **Wave 5**: T-1015-6 — the legacy workspace model can only go once the
-  tools that write to it are gone
-- **Wave 6**: T-1015-7 — docs describe the post-deletion state
-- **Wave 7**: T-1015-8 — verify the real deploy last
+- **Wave 3** (parallel): T-1015-3 (frontend routes), T-1015-4 (backend),
+  T-1015-11 (read-path fix, independent) — all gated on the parity check
+  except T-1015-11, which has no dependency and can start immediately
+- **Wave 4**: T-1015-9 — the new shell, once routes render the new model
+- **Wave 5** (parallel): T-1015-5 (tool removal, needs routes migrated),
+  T-1015-10 (panel-close/action-log, needs the shell), T-1015-12 (rich
+  layout, needs the shell and the read-path fix)
+- **Wave 6**: T-1015-6 — the legacy workspace model and its components
+  (including the legacy shell) can only go once every new-surface
+  replacement (T-1015-5, T-1015-9, T-1015-10, T-1015-12) has landed
+- **Wave 7**: T-1015-7 — docs describe the post-deletion state
+- **Wave 8**: T-1015-8 — verify the real deploy last
 
 ## Acceptance Criteria
 
@@ -99,6 +125,21 @@ T-1015-1 ──> T-1015-2 ──┬──> T-1015-3 ──> T-1015-5 ──> T-1
 10. The deployed app (Render backend + Cloudflare Workers frontend) is
     verified working on the new surface after cutover, including its
     health check and CORS configuration.
+11. The app converges onto one canonical URL, wrapped in a newly-built
+    shared shell (product identity, freshness, WebMCP status) following
+    the established visual language — not a reuse of the legacy shell
+    component.
+12. A human can close a panel by hand, and can expand a compact header
+    icon to see the human/agent-attributed action log.
+13. The shared workspace-read tool sees every registered panel kind, not
+    a fixed closed set defined when the read model was first built.
+14. A brand-new workspace is seeded with the full intended composition
+    (filter, results, chart, watchlist, alert-draft, similar-setups), not
+    a 3-panel placeholder.
+15. Every capability confirmed as a deliberate drop (multi-step temporal
+    matching, measure/splitInstances, progressive tool availability,
+    instance sampling, the manual tool-harness route) is documented as
+    such in the cutover docs (T-1015-7) — not silently absent.
 
 ## Deployment risk
 
