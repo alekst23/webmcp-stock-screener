@@ -65,8 +65,8 @@ const SURFACE_CAVEAT =
 // bridge unaided and found the UI fallback on its own, because nothing on
 // the page mentioned one existed.
 const UI_FALLBACK =
-	`Every operation these tools perform is also reachable through the page's ` +
-	`visible UI controls — drive those instead.`;
+	`This troubleshooting route intentionally renders no visible UI fallback; ` +
+	`retry through the WebMCP bridge after checking the console error.`;
 
 // The page supplies its own document.modelContext where the browser has none,
 // so a reader whose client shows no native WebMCP tool list is not out of
@@ -76,7 +76,9 @@ const UI_FALLBACK =
 const DIRECT_CALL =
 	`If your client does not surface these natively, call them yourself: ` +
 	`await document.modelContext.executeTool('<name>', { …input }), and ` +
-	`await document.modelContext.getTools() for the live list.`;
+	`await document.modelContext.getTools() for the live list. If that object is hidden by an ` +
+	`isolated browser world, dispatch JSON CustomEvents named webmcp:agent-request and listen ` +
+	`for webmcp:agent-response; use method "getTools" or "executeTool" with {tool, input}.`;
 
 function connectedBody(status: WebmcpStatus): string {
 	return (
