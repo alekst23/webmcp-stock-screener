@@ -6,9 +6,26 @@
 	// navigation without a full reload, a future in-app link back to '/')
 	// means a second mount reuses the first mount's composition instead of
 	// silently building a second, orphaned one.
+	import { env } from '$env/dynamic/public';
+	import { resolveApiBaseUrl } from '$lib/workspace/apiConfig';
 	import { createWorkbenchCompositionGuard } from '$lib/workbench/composition/workbenchCompositionGuard';
+	import { registerWorkbenchComposition } from '$lib/workbench/composition/workbenchCompositionRoot';
 
-	const compositionGuard = createWorkbenchCompositionGuard();
+	// Resolved once, at module scope, so every mount (and the chart tool
+	// group's own composition below) agrees on which backend the app talks
+	// to -- $env/dynamic/public is populated server-side and does not change
+	// between mounts of this route module.
+	const apiBaseUrl = resolveApiBaseUrl(env.PUBLIC_API_BASE_URL);
+
+	// Bug fix (see git history): registerWorkbenchComposition() used to be
+	// called with no arguments, so the chart tool group's own HTTP bars port
+	// always pointed at DEV_API_BASE_URL regardless of the deployed
+	// PUBLIC_API_BASE_URL -- this closure is what threads the real,
+	// resolved backend address into it, the same address fetchPanelStatus
+	// below already uses.
+	const compositionGuard = createWorkbenchCompositionGuard(() =>
+		registerWorkbenchComposition({ chartBaseUrl: apiBaseUrl })
+	);
 </script>
 
 <script lang="ts">
@@ -24,16 +41,14 @@
 	// route now only owns data fetching/bridge wiring and wraps
 	// PanelContainer in that shell.
 	import { onMount } from 'svelte';
-	import { env } from '$env/dynamic/public';
 	import type { PanelShellRuntime } from '$lib/panels/shell/registerPanelTools';
 	import PanelContainer from '$lib/panels/shell/PanelContainer.svelte';
 	import WorkbenchShell from '$lib/panels/shell/WorkbenchShell.svelte';
-	import { resolveApiBaseUrl } from '$lib/workspace/apiConfig';
 	import { fetchPanelStatus, type PanelStatus } from '$lib/workspace/panelStatus';
 	import { connectNewSurfaceBridge } from '$lib/webmcp/newSurfaceSession';
 	import type { WebmcpBridgeState, WebmcpStatus } from '$lib/webmcp/status';
 
-	const apiConfig = { baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL) };
+	const apiConfig = { baseUrl: apiBaseUrl };
 
 	// The composed panel/workspace runtime PanelContainer needs. Null until
 	// the composition guard's promise settles (AC1) -- there is no partial

@@ -42,7 +42,7 @@ import {
 // shared-infra bag above -- doing so would mean building each group its own
 // createXDeps(shared) constructor, which is new plumbing this ticket's
 // Solution Approach explicitly does not introduce.
-import { registerChartTools } from '../chart/tools/registerChartTools';
+import { createChartDeps, registerChartTools } from '../chart/tools/registerChartTools';
 import { registerSimilarityTools } from '../similarity/tools/registerSimilarityTools';
 import { registerFollowupAuthoringTools } from '../followup/tools/registerFollowupTools';
 
@@ -101,6 +101,13 @@ export function buildScreenerDeps(
 // real evaluation refuses with empty_universe).
 export interface WorkbenchCompositionOverrides {
 	evaluationPort?: ScreenerEvaluationPort;
+	// The chart tool group's own backend base URL (bug fix, see git history):
+	// absent means createChartDeps' own default (DEV_API_BASE_URL). The real
+	// call site (+page.svelte) passes the same resolveApiBaseUrl(env....)
+	// value it already resolves for fetchPanelStatus, so the chart's bars
+	// port and the panel-status fetch agree on which backend they're talking
+	// to.
+	chartBaseUrl?: string;
 }
 
 // Builds the shared infra once, constructs each group's deps against it,
@@ -123,7 +130,13 @@ export async function registerWorkbenchComposition(
 	// workspace panelRuntime just seeded already exists --
 	// createDefaultSimilarityDeps() requires one. Each call is a no-op while
 	// its own flag stays false, so this line is safe to run unconditionally.
-	await registerChartTools();
+	//
+	// registerChartTools now takes createChartDeps(shared, ...) (bug fix, see
+	// git history) rather than building its own separate repository -- see
+	// registerChartTools.ts's own header for why that mattered (a write
+	// through the panel tool group, e.g. bind_panel_source, must be visible
+	// through this group's reads without a full reload).
+	await registerChartTools(createChartDeps(shared, overrides?.chartBaseUrl));
 	await registerSimilarityTools();
 	await registerFollowupAuthoringTools();
 

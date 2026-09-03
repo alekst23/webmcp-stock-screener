@@ -6,14 +6,13 @@ import { createHttpChartSeries, type HttpChartSeriesConfig } from './httpChartSe
 const CLOCK = { now: () => '2026-09-02T20:00:00.000Z' };
 
 interface FetchCall {
-	url: string;
-	body: Record<string, unknown>;
+	url: URL;
 }
 
 function stubFetch(handler: () => Promise<Response> | Response) {
 	const calls: FetchCall[] = [];
-	const impl = (async (url: string, init?: RequestInit) => {
-		calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? '{}')) });
+	const impl = (async (url: string) => {
+		calls.push({ url: new URL(String(url)) });
 		return handler();
 	}) as unknown as typeof fetch;
 	return { impl, calls };
@@ -29,11 +28,21 @@ function jsonResponse(payload: unknown, init?: { status?: number; statusText?: s
 	} as Response;
 }
 
-function panelRows(dates: string[]) {
-	return dates.map((date) => ({
+function barsResponse(dates: string[]) {
+	return {
 		ticker: 'NVDA',
-		bars: [{ ticker: 'NVDA', date, open: 1, high: 2, low: 0.5, close: 1.5, volume: 100 }]
-	}));
+		start: dates[0],
+		end: dates[dates.length - 1],
+		bars: dates.map((date) => ({
+			ticker: 'NVDA',
+			date,
+			open: 1,
+			high: 2,
+			low: 0.5,
+			close: 1.5,
+			volume: 100
+		}))
+	};
 }
 
 function config(overrides: Partial<HttpChartSeriesConfig> = {}): HttpChartSeriesConfig {
@@ -79,36 +88,18 @@ async function expectChartSeriesError(promise: Promise<unknown>): Promise<ChartS
 }
 
 describe('createHttpChartSeries request shaping', () => {
-	it('posts to the backend price route with the resolved symbol', async () => {
-		const { impl, calls } = stubFetch(() => jsonResponse(panelRows(['2026-01-02'])));
+	it('gets the backend bars route with the resolved symbol and date bounds', async () => {
+		const { impl, calls } = stubFetch(() => jsonResponse(barsResponse(['2026-01-02'])));
 		await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request());
 		const call = onlyCall(calls);
-		expect(call.url).toBe('https://backend.test/api/research/instance-windows');
-		const instanceSet = call.body.instance_set as Record<string, unknown>;
-		const instances = instanceSet.instances as { ticker: string; date: string }[];
-		expect(instances.every((entry) => entry.ticker === 'NVDA')).toBe(true);
-	});
-
-	it('bounds the request to the window: one anchor per day and no bar offset', async () => {
-		const { impl, calls } = stubFetch(() => jsonResponse([]));
-		await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request());
-		const call = onlyCall(calls);
-		const instanceSet = call.body.instance_set as Record<string, unknown>;
-		const dates = (instanceSet.instances as { date: string }[]).map((entry) => entry.date);
-		expect(dates).toEqual(['2026-01-02', '2026-01-03', '2026-01-04', '2026-01-05']);
-		expect(call.body.window).toEqual([0, 0]);
-		expect(instanceSet.from_date).toBe('2026-01-02');
-		expect(instanceSet.to_date).toBe('2026-01-05');
-	});
-
-	it('asks for every anchor rather than the backend default sample size', async () => {
-		const { impl, calls } = stubFetch(() => jsonResponse([]));
-		await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request());
-		expect(onlyCall(calls).body.n).toBe(4);
+		expect(call.url.origin + call.url.pathname).toBe('https://backend.test/api/chart/bars');
+		expect(call.url.searchParams.get('ticker')).toBe('NVDA');
+		expect(call.url.searchParams.get('start')).toBe('2026-01-02');
+		expect(call.url.searchParams.get('end')).toBe('2026-01-05');
 	});
 
 	it('refuses a window wider than the source will serve in one request', async () => {
-		const { impl, calls } = stubFetch(() => jsonResponse([]));
+		const { impl, calls } = stubFetch(() => jsonResponse(barsResponse([])));
 		const error = await expectChartSeriesError(
 			createHttpChartSeries(config({ fetchImpl: impl, maxWindowDays: 3 })).fetchSeries(
 				request({ window: { start: '2026-01-01', end: '2026-01-31' } })
@@ -121,29 +112,31 @@ describe('createHttpChartSeries request shaping', () => {
 
 describe('createHttpChartSeries results', () => {
 	it('maps backend price rows onto OHLCV bars', async () => {
-		const { impl } = stubFetch(() => jsonResponse(panelRows(['2026-01-02'])));
+		const { impl } = stubFetch(() => jsonResponse(barsResponse(['2026-01-02'])));
 		const result = await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request());
 		expect(result.bars).toEqual([
 			{ time: '2026-01-02', open: 1, high: 2, low: 0.5, close: 1.5, volume: 100 }
 		]);
 	});
 
-	it('deduplicates and orders bars the backend returns per anchor', async () => {
-		const { impl } = stubFetch(() =>
-			jsonResponse(panelRows(['2026-01-05', '2026-01-02', '2026-01-02']))
-		);
+	it('orders bars chronologically', async () => {
+		const { impl } = stubFetch(() => jsonResponse(barsResponse(['2026-01-05', '2026-01-02'])));
 		const result = await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request());
 		expect(result.bars.map((entry) => entry.time)).toEqual(['2026-01-02', '2026-01-05']);
 	});
 
 	it('drops any bar the source returns from outside the requested window', async () => {
-		const { impl } = stubFetch(() => jsonResponse(panelRows(['2025-12-30', '2026-01-02'])));
+		const { impl } = stubFetch(() =>
+			jsonResponse(barsResponse(['2025-12-30', '2026-01-02']))
+		);
 		const result = await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request());
 		expect(result.bars.map((entry) => entry.time)).toEqual(['2026-01-02']);
 	});
 
 	it('returns an empty series with valid provenance for a window with no data', async () => {
-		const { impl } = stubFetch(() => jsonResponse([{ ticker: 'NVDA', bars: [] }]));
+		const { impl } = stubFetch(() =>
+			jsonResponse({ ticker: 'NVDA', start: '2026-01-02', end: '2026-01-05', bars: [] })
+		);
 		const result = await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request());
 		expect(result.bars).toEqual([]);
 		expect(result.provenance.sourceId).toBe('src.panel.stored');
@@ -153,7 +146,7 @@ describe('createHttpChartSeries results', () => {
 	});
 
 	it('reports the basis the source applies, not the one requested', async () => {
-		const { impl } = stubFetch(() => jsonResponse(panelRows(['2026-01-02'])));
+		const { impl } = stubFetch(() => jsonResponse(barsResponse(['2026-01-02'])));
 		const result = await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(
 			request({ priceAdjustment: 'unadjusted' })
 		);
@@ -164,7 +157,7 @@ describe('createHttpChartSeries results', () => {
 	});
 
 	it('states no basis at all when the source does not report one', async () => {
-		const { impl } = stubFetch(() => jsonResponse(panelRows(['2026-01-02'])));
+		const { impl } = stubFetch(() => jsonResponse(barsResponse(['2026-01-02'])));
 		const result = await createHttpChartSeries(
 			config({ fetchImpl: impl, sourceAdjustment: 'unreported' })
 		).fetchSeries(request());
@@ -174,7 +167,7 @@ describe('createHttpChartSeries results', () => {
 	});
 
 	it('warns rather than fails when the source cannot honour the requested session', async () => {
-		const { impl } = stubFetch(() => jsonResponse(panelRows(['2026-01-02'])));
+		const { impl } = stubFetch(() => jsonResponse(barsResponse(['2026-01-02'])));
 		const result = await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(
 			request({ session: 'extended' })
 		);
@@ -184,7 +177,7 @@ describe('createHttpChartSeries results', () => {
 	});
 
 	it('carries the delay magnitude of a delayed source into provenance', async () => {
-		const { impl } = stubFetch(() => jsonResponse(panelRows(['2026-01-02'])));
+		const { impl } = stubFetch(() => jsonResponse(barsResponse(['2026-01-02'])));
 		const result = await createHttpChartSeries(
 			config({ fetchImpl: impl, liveness: 'delayed', delaySeconds: 900 })
 		).fetchSeries(request());
@@ -205,7 +198,17 @@ describe('createHttpChartSeries failures', () => {
 		expect(error.instrumentId).toBe('instrument_nvda');
 	});
 
-	it('wraps a non-OK response, keeping the status reachable through the cause', async () => {
+	it('maps a 404 (unknown to the backend panel) onto unknown_instrument', async () => {
+		const { impl } = stubFetch(() =>
+			jsonResponse({ detail: 'Unknown ticker' }, { status: 404, statusText: 'Not Found' })
+		);
+		const error = await expectChartSeriesError(
+			createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request())
+		);
+		expect(error.reason).toBe('unknown_instrument');
+	});
+
+	it('wraps a non-OK, non-404 response, keeping the status reachable through the cause', async () => {
 		const { impl } = stubFetch(() =>
 			jsonResponse({ detail: 'no panel' }, { status: 503, statusText: 'Service Unavailable' })
 		);
@@ -236,7 +239,7 @@ describe('createHttpChartSeries failures', () => {
 		expect(error.cause).toBeInstanceOf(SyntaxError);
 	});
 
-	it('rejects a body that is not a list of instance windows', async () => {
+	it('rejects a body that is not a bars response', async () => {
 		const { impl } = stubFetch(() => jsonResponse({ detail: 'surprise' }));
 		const error = await expectChartSeriesError(
 			createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request())
@@ -245,7 +248,7 @@ describe('createHttpChartSeries failures', () => {
 	});
 
 	it('rejects an unknown instrument without touching the network', async () => {
-		const { impl, calls } = stubFetch(() => jsonResponse([]));
+		const { impl, calls } = stubFetch(() => jsonResponse(barsResponse([])));
 		const error = await expectChartSeriesError(
 			createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(
 				request({ instrumentId: 'instrument_unlisted' })
@@ -256,7 +259,7 @@ describe('createHttpChartSeries failures', () => {
 	});
 
 	it('rejects a timeframe the source cannot serve without touching the network', async () => {
-		const { impl, calls } = stubFetch(() => jsonResponse([]));
+		const { impl, calls } = stubFetch(() => jsonResponse(barsResponse([])));
 		const error = await expectChartSeriesError(
 			createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request({ timeframe: '5m' }))
 		);
@@ -265,7 +268,7 @@ describe('createHttpChartSeries failures', () => {
 	});
 
 	it('rejects an inverted window without touching the network', async () => {
-		const { impl, calls } = stubFetch(() => jsonResponse([]));
+		const { impl, calls } = stubFetch(() => jsonResponse(barsResponse([])));
 		const error = await expectChartSeriesError(
 			createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(
 				request({ window: { start: '2026-01-05', end: '2026-01-02' } })
