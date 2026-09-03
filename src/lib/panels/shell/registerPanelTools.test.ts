@@ -15,6 +15,7 @@ import { defaultWireResultsTableConfig } from '../../results/application/tableCo
 import { getResultsPanelRuntimeDeps } from '../../results/panel/resultsPanelContext';
 import { mintResultId } from '../../results/domain/page';
 import { testRun } from '../../results/testSupport';
+import { readChartState } from '../../workbench/chart/domain/chartState';
 
 beforeEach(() => {
 	localStorage.clear();
@@ -75,6 +76,91 @@ describe('createDefaultPanelShellRuntime', () => {
 		expect(state.panels).toHaveLength(6);
 		const resultsPanel = state.panels.find((p) => p.kind === 'results_table');
 		expect(resultsPanel, 'expected a seeded results_table panel').toBeDefined();
+	});
+
+	// Bug fix (see git history): 'chart' used to be registered only as a
+	// placeholder (defaultPanelKinds.ts) with a placeholder 'chart_grid'
+	// renderer/'instrument' entry never even declared
+	// (defaultSourceRendererTypes.ts) -- these prove the real registration.
+	it('registers the real chart kind and the real chart_grid renderer/instrument source, not the placeholders', () => {
+		const { deps } = createDefaultPanelShellRuntime();
+		const kind = deps.kinds.require('chart');
+		expect(kind.bindingTypes, 'the real kind only accepts the real instrument source type').toEqual(
+			['instrument']
+		);
+		expect(kind.defaultRenderer).toBe('chart_grid');
+
+		const renderer = deps.sourceRenderer.requireRendererType('chart_grid');
+		expect(
+			renderer.acceptedSourceTypes,
+			'the real chart_grid renderer only accepts an instrument source, unlike the placeholder'
+		).toEqual(['instrument']);
+		expect(deps.sourceRenderer.requireSourceType('instrument')).toBeDefined();
+	});
+
+	it('bind_panel_source accepts a resolved instrument on a chart panel and rejects a bare ticker', () => {
+		const { deps } = createDefaultPanelShellRuntime();
+		const seededDoc = deps.repository.get(deps.workspaceId)!;
+		const panelId = readPanelState(seededDoc).panels.find((p) => p.kind === 'chart')!.id;
+
+		const accepted = deps.sourceRenderer.validateSource({
+			source: {
+				type: 'instrument',
+				ref: {
+					instrument: {
+						instrument_id: 'inst:XNAS:AAPL',
+						symbol: 'AAPL',
+						exchange: 'XNAS',
+						asset_type: 'equity'
+					}
+				}
+			},
+			panelKind: 'chart',
+			renderer: 'chart_grid'
+		});
+		expect(
+			accepted.ok,
+			`expected a resolved instrument to be accepted, got ${JSON.stringify(accepted)}`
+		).toBe(true);
+
+		const envelope = bindPanelSource(deps, {
+			context: { actor: 'agent' },
+			panelId,
+			source: {
+				type: 'instrument',
+				ref: {
+					instrument: {
+						instrument_id: 'inst:XNAS:AAPL',
+						symbol: 'AAPL',
+						exchange: 'XNAS',
+						asset_type: 'equity'
+					}
+				}
+			}
+		});
+		expect(envelope.affectedIds).toEqual([panelId]);
+
+		// The deep half of this bug fix (see git history): bind_panel_source
+		// used to only ever set panel.source -- readChartData/ChartPanelBody.svelte
+		// read the instrument off the chart extension instead
+		// (ChartState.config.instrument), which nothing populated, so a chart
+		// panel kept refusing "no instrument bound" even after a fully
+		// successful bind. This proves the real chart source type's
+		// applyBinding hook (chartPanelKind.ts) actually closes that gap.
+		const chartState = readChartState(deps.repository.get(deps.workspaceId)!, panelId);
+		expect(
+			chartState.config.instrument?.instrumentId,
+			"expected bind_panel_source to also populate the chart extension's own instrument, not just panel.source"
+		).toBe('inst:XNAS:AAPL');
+
+		const rejected = deps.sourceRenderer.validateSource({
+			source: { type: 'instrument', ref: { instrument: 'AAPL' } },
+			panelKind: 'chart',
+			renderer: 'chart_grid'
+		});
+		expect(rejected.ok, 'a bare ticker must never be accepted as an instrument reference').toBe(
+			false
+		);
 	});
 
 	it('closes the real panel kind and the real renderer contract over the same PinnedRunStore', () => {

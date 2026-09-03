@@ -6,6 +6,11 @@
 // fixed at creation time like a kind is.
 import type { ConfigError, ConfigValidation } from './panelKindRegistry';
 import type { Panel, PanelSourceRef } from '../domain/panel';
+// Not a cycle risk the way application/support.ts's PanelUseCaseDeps would
+// be (see this file's own comment on SelectionValidationInput.deps below):
+// workbench/domain/workspace.ts is a leaf domain module with no dependency
+// back onto this registry.
+import type { WorkspaceDocument } from '../../workbench/domain/workspace';
 
 export type { ConfigError, ConfigValidation } from './panelKindRegistry';
 
@@ -37,6 +42,25 @@ export interface SourceTypeDefinition {
 	// source type. Renderer is null when a panel has no renderer chosen yet.
 	isCompatible(context: { panelKind: string; renderer: string | null }): boolean;
 	compatibilityDescription: string;
+	// Optional (bug fix, see git history): a source type whose binding has a
+	// real effect beyond `panel.source` itself defines this to fold that
+	// effect into the same document bindPanelSource.ts is already writing
+	// (via PanelMutationResult.documentPatch, application/support.ts). The
+	// chart source type is the motivating case: its `ref` carries an
+	// instrument/timeframe/range/comparisons that live in the chart
+	// extension (readChartData/ChartPanelBody.svelte read that, never
+	// panel.source) -- without this hook, bind_panel_source validated and
+	// stored the source ref correctly but the chart engine never saw it, so
+	// the panel kept refusing "no chart on it" after a successful bind.
+	// Absent means no further effect, which is every source type's real
+	// behavior before this hook existed -- adding it changes nothing for a
+	// source type that doesn't define it. Receives the already-validated
+	// `value` from validateRef, never the raw caller input.
+	applyBinding?(
+		doc: WorkspaceDocument,
+		panelId: string,
+		ref: Record<string, unknown>
+	): WorkspaceDocument;
 }
 
 export interface RendererTypeDefinition<

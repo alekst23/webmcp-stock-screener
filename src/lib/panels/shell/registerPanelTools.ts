@@ -16,6 +16,12 @@ import { buildResultsTools } from '../../results/tools/resultsTools';
 import { registerWatchlistPanelKind } from '../../workbench/watchlist/registry/watchlistPanelKind';
 import { registerAlertDraftPanelKind } from '../../workbench/alerts/registry/alertDraftPanelKind';
 import { similarOpportunitiesPanelKindDefinition } from '../../workbench/similarity/panel/domain/panelKind';
+import {
+	registerChartPanelKind,
+	registerChartSourceRenderer
+} from '../../workbench/chart/registry/chartPanelKind';
+import { defaultSeriesPort } from '../../workbench/chart/tools/registerChartTools';
+import { DEV_API_BASE_URL } from '../../workspace/apiConfig';
 import { createChangeHistory, type ChangeHistory } from '../../workbench/application/changeHistory';
 import {
 	createIdempotencyCache,
@@ -98,12 +104,24 @@ export function createWorkbenchSharedInfra(): WorkbenchSharedInfra {
 	return { repository, clock, ids, idempotency, history, revisions, runs };
 }
 
+export interface PanelShellRuntimeOptions {
+	// The chart panel kind's own real series port needs a backend address at
+	// registration time (a default-seeded workspace already includes a
+	// 'chart' panel -- see DEFAULT_SEED_PANELS -- so the real kind, not the
+	// placeholder, must exist before seedDefaultWorkspace runs below).
+	// Absent means defaultSeriesPort's own DEV_API_BASE_URL default.
+	chartBaseUrl?: string;
+}
+
 // Builds the panel shell's runtime against a given shared infra bag rather
 // than building its own repository/revisions/etc -- the shape
 // createDefaultPanelShellRuntime below now delegates to, and the shape a
 // shared composition root (T-0020-1) calls directly with its own bag so the
 // panel tool group never builds independent instances in that composition.
-export function createPanelShellRuntime(shared: WorkbenchSharedInfra): PanelShellRuntime {
+export function createPanelShellRuntime(
+	shared: WorkbenchSharedInfra,
+	options: PanelShellRuntimeOptions = {}
+): PanelShellRuntime {
 	// idempotency is intentionally not read here: it is already folded into
 	// `shared.revisions`, and the panel tool group has no other use for the
 	// cache directly -- only workbench-core/screener deps need it as its own
@@ -168,6 +186,24 @@ export function createPanelShellRuntime(shared: WorkbenchSharedInfra): PanelShel
 	registerAlertDraftPanelKind(kinds, { useCaseDeps: deps });
 	kinds.register(similarOpportunitiesPanelKindDefinition);
 
+	// The real 'chart' kind plus its real 'instrument' source type / real
+	// 'chart_grid' renderer (bug fix, see git history) -- chart/registry/
+	// chartPanelKind.ts, replacing defaultPanelKinds.ts's and
+	// defaultSourceRendererTypes.ts's placeholders the same way the three
+	// kinds above do. The series port built here is real (createHttpChartSeries
+	// via defaultSeriesPort), not the empty in-memory stub the chart tool
+	// group used to default to.
+	const chartRenderer = registerChartSourceRenderer(sourceRenderer, {
+		clock,
+		catalog: builtinCatalogRegistry
+	});
+	registerChartPanelKind(kinds, {
+		useCaseDeps: deps,
+		series: defaultSeriesPort(clock, options.chartBaseUrl ?? DEV_API_BASE_URL),
+		catalog: builtinCatalogRegistry,
+		renderer: chartRenderer
+	});
+
 	registerDefaultPanelKinds(kinds);
 	registerDefaultSourceRendererTypes(sourceRenderer);
 
@@ -183,8 +219,10 @@ export function createPanelShellRuntime(shared: WorkbenchSharedInfra): PanelShel
 // actual composition (workbench/composition/workbenchCompositionRoot.ts,
 // T-0020-1) calls createPanelShellRuntime directly with its own shared bag
 // instead, so the panel tool group never builds independent instances there.
-export function createDefaultPanelShellRuntime(): PanelShellRuntime {
-	return createPanelShellRuntime(createWorkbenchSharedInfra());
+export function createDefaultPanelShellRuntime(
+	options: PanelShellRuntimeOptions = {}
+): PanelShellRuntime {
+	return createPanelShellRuntime(createWorkbenchSharedInfra(), options);
 }
 
 // Registers the fourteen panel tools plus the two Results tools this epic

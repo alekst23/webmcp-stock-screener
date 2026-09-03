@@ -87,7 +87,14 @@ export const CHART_OPERATION_KINDS: readonly string[] = [
 	CHART_CAPTURE_SETUP_KIND
 ];
 
-function sourceDeps(deps: ChartToolsDeps): ChartSourceDeps {
+// Exported (and narrowed to just `clock`/`availability`, the same way
+// buildChartRendererDefinition below is narrowed to `catalog`) so
+// chart/registry/chartPanelKind.ts's registerChartSourceRenderer -- the
+// real, non-placeholder panel-registry wiring, called before a full
+// ChartToolsDeps exists -- can build the same ChartSourceDeps this module's
+// own registerChartPanelContract does, without duplicating the
+// availability-omission logic.
+export function sourceDeps(deps: Pick<ChartToolsDeps, 'clock' | 'availability'>): ChartSourceDeps {
 	return {
 		clock: deps.clock,
 		...(deps.availability !== undefined ? { availability: deps.availability } : {})
@@ -130,7 +137,16 @@ function withoutStudies(config: unknown): unknown {
 // (candle type, scale, session, adjustment policy) folded together with the
 // study-editing half into one definition, so there is one `chart_grid` rather
 // than two partial ones.
-export function buildChartRendererDefinition(deps: ChartToolsDeps): RendererTypeDefinition {
+//
+// Narrowed to only the one field this actually reads (`catalog`) rather than
+// the full ChartToolsDeps -- registerPanelTools.ts's real chart-panel-kind
+// wiring (chart/registry/chartPanelKind.ts's registerChartSourceRenderer)
+// calls this before a full ChartToolsDeps (repository, series, ...) exists
+// at panel-kind-registration time, and building one just to satisfy this
+// signature would be wasted construction, not a real dependency.
+export function buildChartRendererDefinition(
+	deps: Pick<ChartToolsDeps, 'catalog'>
+): RendererTypeDefinition {
 	const viewHalf: RendererTypeDefinition = {
 		...chartRendererTypeDefinition,
 		validateConfig: (config) => chartRendererTypeDefinition.validateConfig(withoutStudies(config))

@@ -95,7 +95,14 @@ function resolveSymbolFromInstrumentId(instrumentId: string): string | null {
 // panel_market_data.py): 'adjusted' prices, UTC, historical liveness -- this
 // client-side config has to restate them because the bars response itself
 // carries no provenance, only rows.
-function defaultSeriesPort(clock: Clock, baseUrl: string): ChartSeriesPort {
+//
+// Exported (not just used internally by createChartDeps/createDefaultChartDeps
+// below) so registerPanelTools.ts's createPanelShellRuntime can build the
+// same real series port for the chart panel kind's runtime-deps singleton
+// (chart/registry/chartPanelKind.ts) at panel-kind-registration time --
+// before the chart tool group's own ChartToolsDeps exists -- without a
+// second, divergent construction.
+export function defaultSeriesPort(clock: Clock, baseUrl: string): ChartSeriesPort {
 	return createHttpChartSeries({
 		baseUrl,
 		resolveSymbol: resolveSymbolFromInstrumentId,

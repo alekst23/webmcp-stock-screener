@@ -46,6 +46,18 @@ export interface PanelMutationResult {
 	affectedIds: ResourceId[];
 	diffSummary: string;
 	warnings?: string[];
+	// Optional: applied to the projected document immediately after
+	// writePanelState, for a use case whose mutation has a real effect
+	// beyond the panel_system extension itself. bindPanelSource.ts's own
+	// case: a source type's binding can carry state a generic PanelSourceRef
+	// cannot hold (the chart source type's instrument/timeframe/range/
+	// comparisons, which live in the chart extension readChartData/
+	// ChartPanelBody.svelte actually read, not in panel.source) -- see
+	// SourceTypeDefinition.applyBinding (sourceRendererRegistry.ts). Absent
+	// means no further change, which is every use case's real behavior
+	// before this field existed -- adding it changes nothing for a use case
+	// that doesn't set it.
+	documentPatch?: (doc: WorkspaceDocument) => WorkspaceDocument;
 }
 
 // Every use case's entire integration with EPIC-1006: load the current
@@ -71,7 +83,8 @@ export function commitPanelChange(
 			mutate: (doc) => {
 				const state = readPanelState(doc);
 				const result = build(doc, state);
-				const nextDoc = writePanelState(doc, result.nextState, deps.kinds);
+				const projected = writePanelState(doc, result.nextState, deps.kinds);
+				const nextDoc = result.documentPatch ? result.documentPatch(projected) : projected;
 				return {
 					document: nextDoc,
 					affectedIds: result.affectedIds,

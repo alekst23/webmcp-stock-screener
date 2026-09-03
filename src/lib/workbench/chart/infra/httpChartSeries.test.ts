@@ -126,9 +126,7 @@ describe('createHttpChartSeries results', () => {
 	});
 
 	it('drops any bar the source returns from outside the requested window', async () => {
-		const { impl } = stubFetch(() =>
-			jsonResponse(barsResponse(['2025-12-30', '2026-01-02']))
-		);
+		const { impl } = stubFetch(() => jsonResponse(barsResponse(['2025-12-30', '2026-01-02'])));
 		const result = await createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request());
 		expect(result.bars.map((entry) => entry.time)).toEqual(['2026-01-02']);
 	});

@@ -118,7 +118,7 @@ export async function registerWorkbenchComposition(
 	overrides?: WorkbenchCompositionOverrides
 ): Promise<PanelShellRuntime> {
 	const shared = createWorkbenchSharedInfra();
-	const panelRuntime = createPanelShellRuntime(shared);
+	const panelRuntime = createPanelShellRuntime(shared, { chartBaseUrl: overrides?.chartBaseUrl });
 	const workbenchDeps = buildWorkbenchDeps(shared);
 	const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps, overrides);
 
