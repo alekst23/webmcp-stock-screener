@@ -13,6 +13,20 @@ EPIC-1011, EPIC-1012, EPIC-1013, EPIC-1014
 > orchestrator review before merging** — this epic is not purely additive
 > like EPIC-1007-1014 were, and deleting working, shipped code warrants a
 > second look even with the launch gate cleared.
+>
+> **CLOSED 2026-09-03 with T-1015-8 open.** 11 of 12 tickets are Done; the
+> code cutover, docs cutover, and local CI gate are complete. T-1015-8
+> (deployment cutover verification) is explicitly a hands-on runbook against
+> the real Render/Cloudflare deployment — not something to run
+> autonomously — and stays Open as a tracked follow-up rather than gating
+> this PR, per explicit user direction. Live testing on the epic branch
+> during close also surfaced and fixed four real bugs in the chart panel
+> tool contract (ID collision, `bind_panel_source`/`configure_panel_view`
+> schema confusion, no real chart rendering wired in, and a backend bars
+> endpoint T-1015-4 had deleted out from under the chart's data adapter
+> without noticing) — see the "chart panel integration fix" commits after
+> T-1015-7 for detail; this was post-cutover hardening, not scoped to any
+> single ticket above.
 
 ## Description
 
@@ -43,16 +57,16 @@ overlapping ones, with no capability silently lost and no broken deploy.
 |---|--------|-------|------------|--------|
 | 1 | T-1015-1 | Retirement inventory and audit | — | Done |
 | 2 | T-1015-2 | Capability-parity check (deletion gate) | T-1015-1 | Done — verdict: NO-GO; superseded by user decision 2026-09-03 (see Decisions below) |
-| 3 | T-1015-3 | Migrate routes onto the new panel/workspace model | T-1015-2 | Open |
-| 4 | T-1015-4 | Backend reconciliation | T-1015-2 | Open |
-| 5 | T-1015-5 | Remove the legacy tool surface | T-1015-3 | Open |
-| 6 | T-1015-6 | Remove the legacy workspace model and components | T-1015-5, T-1015-9, T-1015-10, T-1015-12 | Open |
-| 7 | T-1015-7 | Docs cutover | T-1015-4, T-1015-6 | Open |
-| 8 | T-1015-8 | Deployment cutover verification | T-1015-7 | Open |
-| 9 | T-1015-9 | Build the new shared shell and consolidate onto one URL | T-1015-3 | Open |
-| 10 | T-1015-10 | Restore panel-close and action-log UI affordances | T-1015-9 | Open |
+| 3 | T-1015-3 | Migrate routes onto the new panel/workspace model | T-1015-2 | Done |
+| 4 | T-1015-4 | Backend reconciliation | T-1015-2 | Done |
+| 5 | T-1015-5 | Remove the legacy tool surface | T-1015-3 | Done |
+| 6 | T-1015-6 | Remove the legacy workspace model and components | T-1015-5, T-1015-9, T-1015-10, T-1015-12 | Done |
+| 7 | T-1015-7 | Docs cutover | T-1015-4, T-1015-6 | Done |
+| 8 | T-1015-8 | Deployment cutover verification | T-1015-7 | **Open — tracked follow-up, does not gate this PR** |
+| 9 | T-1015-9 | Build the new shared shell and consolidate onto one URL | T-1015-3 | Done |
+| 10 | T-1015-10 | Restore panel-close and action-log UI affordances | T-1015-9 | Done |
 | 11 | T-1015-11 | Fix get_canvas_state's panel-state blind spot | — | Done |
-| 12 | T-1015-12 | Enrich the default workspace layout | T-1015-9, T-1015-11 | Open |
+| 12 | T-1015-12 | Enrich the default workspace layout | T-1015-9, T-1015-11 | Done |
 
 **Superseded note (T-1015-2):** the NO-GO verdict stood on two blockers —
 real capability drops and a composition-root wiring gap. The wiring gap
