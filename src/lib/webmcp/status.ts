@@ -63,10 +63,13 @@ const SURFACE_CAVEAT =
 
 // The half the original text lacked: a real agent diagnosed the missing
 // bridge unaided and found the UI fallback on its own, because nothing on
-// the page mentioned one existed.
+// the page mentioned one existed. Ticker/universe search is the one
+// exception -- that control is WebMCP-only by design, so it isn't offered
+// as a fallback here.
 const UI_FALLBACK =
-	`This troubleshooting route intentionally renders no visible UI fallback; ` +
-	`retry through the WebMCP bridge after checking the console error.`;
+	`Most operations these tools perform are also reachable through the page's ` +
+	`visible UI controls — drive those instead. Ticker/universe search has no UI ` +
+	`control; it is WebMCP-only by design.`;
 
 // The page supplies its own document.modelContext where the browser has none,
 // so a reader whose client shows no native WebMCP tool list is not out of

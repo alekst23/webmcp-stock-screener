@@ -253,12 +253,12 @@
 	}
 
 	.lede {
-		color: var(--text-secondary, #666);
+		color: var(--text-secondary);
 		margin: 0;
 	}
 
 	section {
-		border: 1px solid var(--border-subtle, #ddd);
+		border: 1px solid var(--border);
 		border-radius: 8px;
 		padding: 1rem 1.25rem;
 	}
@@ -275,8 +275,8 @@
 		font-size: 1rem;
 		font-family: inherit;
 		color: inherit;
-		background: var(--bg-panel, #fff);
-		border: 1px solid var(--border-strong, #999);
+		background: var(--bg-panel);
+		border: 1px solid var(--border-strong);
 		border-radius: 6px;
 	}
 
@@ -290,8 +290,8 @@
 		font: inherit;
 		padding: 0.4rem 0.75rem;
 		border-radius: 6px;
-		border: 1px solid var(--border-strong, #999);
-		background: var(--bg-panel, #fff);
+		border: 1px solid var(--border-strong);
+		background: var(--bg-panel);
 		color: inherit;
 		cursor: pointer;
 	}
@@ -304,7 +304,7 @@
 	}
 
 	dt {
-		color: var(--text-secondary, #666);
+		color: var(--text-secondary);
 	}
 
 	dd {
@@ -312,23 +312,26 @@
 		overflow-wrap: anywhere;
 	}
 
+	/* This design system has no dedicated success/positive role (see
+	   tokens.ts's SemanticRole) -- text-primary reads as a neutral, non-alarming
+	   "this succeeded" rather than inventing a colour the palette doesn't have. */
 	.ok {
-		color: var(--positive, #1a7f37);
+		color: var(--text-primary);
 	}
 
 	.bad {
-		color: var(--negative, #b3261e);
+		color: var(--error);
 	}
 
 	.muted {
-		color: var(--text-secondary, #666);
+		color: var(--text-secondary);
 		margin: 0;
 	}
 
 	pre {
 		margin: 0.75rem 0 0;
 		padding: 0.6rem;
-		background: var(--bg-app, #f6f6f6);
+		background: var(--bg-app);
 		border-radius: 6px;
 		overflow-x: auto;
 		font-size: 0.85rem;
