@@ -24,6 +24,7 @@ an identical `idempotency_key` and a `panelBinding` supplied, and proves
   replay.
 
 Mutation-checked twice:
+
 1. Made the idempotency short-circuit fall through instead of returning
    early — confirmed the test fails on the `run_id` assertion (a second
    run actually executes).
@@ -33,7 +34,7 @@ Mutation-checked twice:
    specifically, proving that assertion is the one actually catching a
    "double-bind, same value" regression the other two assertions would
    miss.
-Both mutations were reverted after confirming failure.
+   Both mutations were reverted after confirming failure.
 
 ## Goal
 

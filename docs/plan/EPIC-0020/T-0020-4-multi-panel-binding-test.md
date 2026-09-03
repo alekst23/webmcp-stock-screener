@@ -17,7 +17,7 @@ equal `{ type: 'screener_results', ref: { run_id } }` and the second's
 must stay `null` (a freshly created panel's default, unrequested source).
 
 Mutation-checked per this codebase's convention: temporarily changed
-`bindRunToResultsPanel`'s `Array.find()` to bind the *last* matching panel
+`bindRunToResultsPanel`'s `Array.find()` to bind the _last_ matching panel
 instead of the first, confirmed the new test fails
 (`expected null to deeply equal { type: 'screener_results', ... }` on the
 first panel's source), then reverted.

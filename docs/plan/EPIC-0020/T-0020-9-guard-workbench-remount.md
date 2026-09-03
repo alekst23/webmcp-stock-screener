@@ -8,7 +8,7 @@
 - Added `src/lib/workbench/composition/workbenchCompositionGuard.ts`:
   `createWorkbenchCompositionGuard(compose = registerWorkbenchComposition)`
   returns a `{ ensure() }` object that composes on the first `ensure()` call
-  and caches the *promise* (not just its resolved value, so two concurrent
+  and caches the _promise_ (not just its resolved value, so two concurrent
   callers before the first composition settles still only compose once) —
   every later `ensure()` returns that same cached promise. Kept as a small,
   plain, injectable wrapper (rather than a guard baked into

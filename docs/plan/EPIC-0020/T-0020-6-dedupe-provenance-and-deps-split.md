@@ -13,7 +13,7 @@
   `workbenchCompositionRoot.ts`.
 - Gave `registerWorkbenchTools.ts` the same two-layer split
   `registerPanelTools.ts` already has: `createWorkbenchDeps(shared:
-  WorkbenchSharedInfra)` builds `DefaultWorkbenchDeps` directly against a
+WorkbenchSharedInfra)` builds `DefaultWorkbenchDeps` directly against a
   shared infra bag, and `createDefaultWorkbenchDeps()` is now a thin
   `createWorkbenchDeps(createWorkbenchSharedInfra())` wrapper.
 - Did the same for `registerScreenerTools.ts`: `createScreenerDeps(shared)`
