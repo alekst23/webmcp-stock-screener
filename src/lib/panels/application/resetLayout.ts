@@ -12,15 +12,35 @@
 // CONTRACT STUB -- signature only; see docs/design/panel-system/technical.md
 // for the intended implementation. Body replaced by the implementing agent,
 // driven by resetLayout.test.ts.
+import { DEFAULT_SEED_PANELS } from '../domain/defaultLayout';
+import { emptyLinkGraph } from '../domain/links';
+import { makePanel, type Panel } from '../domain/panel';
 import type { MutationContext, MutationEnvelope } from '../../workbench/domain/mutation';
-import { commitPanelChange, type PanelUseCaseDeps } from './support';
+import { commitPanelChange, requirePanelKind, type PanelUseCaseDeps } from './support';
 
 export interface ResetLayoutRequest {
 	context: MutationContext;
 }
 
 export function resetLayout(deps: PanelUseCaseDeps, request: ResetLayoutRequest): MutationEnvelope {
-	return commitPanelChange(deps, request.context, 'panels.reset_layout', request, () => {
-		throw new Error('resetLayout: not implemented');
+	return commitPanelChange(deps, request.context, 'panels.reset_layout', request, (_doc, state) => {
+		const panels: Panel[] = DEFAULT_SEED_PANELS.map((spec) => {
+			const kindDef = requirePanelKind(deps.kinds, spec.kind);
+			const id = deps.ids.next('panel', spec.kind);
+			return makePanel({
+				id,
+				kind: spec.kind,
+				title: kindDef.defaultTitle,
+				config: kindDef.defaultConfig(),
+				rect: spec.rect,
+				renderer: kindDef.defaultRenderer
+			});
+		});
+
+		return {
+			nextState: { ...state, panels, links: emptyLinkGraph(), selections: {} },
+			affectedIds: panels.map((p) => p.id),
+			diffSummary: 'Reset workspace layout to the default arrangement.'
+		};
 	});
 }
