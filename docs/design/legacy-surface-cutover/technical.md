@@ -25,6 +25,25 @@ panel into `doc.panels` once, but the next `repository.get()` (a real
 localStorage-backed read re-parses JSON and re-normalizes) drops it again
 via the first, unwidened filter.
 
+### WebMCP status wrapper for the new surface (T-1015-9)
+
+`webmcp/session.ts`'s `startBridgeSession` and `webmcp/register.ts`'s
+`connectWebmcp` are legacy-`ResearchEngine`-specific (they internally call
+`buildTools(engine)`, the 11-tool builder) and are not reusable for the new
+surface's tool groups, each of which registers directly against
+`ensureModelContext()` with no connection-state tracking today. T-1015-9
+adds a small new wrapper — not a shared domain contract, a local type in
+the shell's own module — with this shape:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `state` | `WebmcpBridgeState` (kept, from `webmcp/status.ts`) | `'connecting'` before the composition-root registration call resolves, `'connected'` after, `'failed'` if it throws. |
+| `toolCount` | `number` | Total `ToolSpec` count across every tool group the composition registers. Reused for both `formatDefinedStatus` and `formatAvailableStatus` — progressive availability is a confirmed drop, so the two numbers are always equal on the new surface. |
+
+`webmcp/bridge.ts` (`ensureModelContext`, `onBridgeReplaced`) and
+`webmcp/status.ts` (`WebmcpBridgeState` and the format functions) are
+reused as-is — they are generic and already kept per the epic's AC6.
+
 ### Action log entry (attribution field)
 
 | Field | Type | Description |
@@ -45,10 +64,14 @@ current filter/results/chart set:
 ## Data Flow
 
 The shared shell is a presentation-layer component wrapping the panel
-container; it reads WebMCP bridge/tool-registration state the same way
-the legacy header did, and reads panel data through the widened
-workspace-read model above for the action-log and panel-close
-affordances.
+container; it reads WebMCP status via the new wrapper above (the
+underlying formatters and `WebmcpBridgeState` type are the same ones the
+legacy header used, but the connection wrapper itself is new — see
+"WebMCP status wrapper" above), and reads panel/action-log data directly
+from the panel/workbench application layer (`ChangeHistory.list`,
+`readPanelState`) for the action-log and panel-close affordances, the
+same direct-use-case-call convention `panelController.ts` already
+establishes for human-triggered UI actions.
 
 ---
 
