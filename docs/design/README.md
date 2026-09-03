@@ -51,6 +51,12 @@ alongside the Core Product surface above and cut over at the end.
 - [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — retire the
   original 11-tool surface once the above reaches capability parity,
   keeping the WebMCP transport layer.
+- [Workbench Composition Root](workbench-composition-root/spec.md) — the
+  shared runtime that lets `/workbench`'s tool groups actually talk to each
+  other (one `WorkspaceRepository`/`PinnedRunStore` instead of each tool
+  group building its own), plus auto-binding a completed screener run to
+  the results panel — the first live, end-to-end demonstration of the new
+  surface.
 
 ## Presentation
 
