@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
 **Design**: docs/design/legacy-surface-cutover/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1015-9, T-1015-11
 **Blocks**: T-1015-6
 
@@ -148,3 +148,22 @@ screener-followup-tools/spec.md`, `docs/design/similarity-search/spec.md`,
 Changing what EPIC-1014's watchlist/alert tools do — this ticket only
 gives them a panel kind to render in. Building the shell (T-1015-9) or
 fixing the read-path blind spot (T-1015-11), both prerequisites.
+
+## Verification
+
+- `npm run typecheck`: 0 errors.
+- `npx vitest run`: all new/updated tests pass (richDefaultLayout.test.ts,
+  panelController.test.ts, registerPanelTools.test.ts,
+  watchlistPanelKind.test.ts, alertDraftPanelKind.test.ts,
+  WatchlistPanel.test.ts, AlertDraftPanel.test.ts). The 34 pre-existing
+  failures elsewhere (toolSurfaceRemoval.test.ts, legacyModelRemoval.test.ts,
+  panelCloseAndActionLog.test.ts) are sibling tickets' (T-1015-5, T-1015-6,
+  T-1015-10) own not-yet-implemented stubs, confirmed present on the
+  pre-ticket baseline too — unrelated to this change.
+- `npm run build`: production build succeeds.
+- AC5 browser check: **outstanding**. `npm run preview` served the build
+  successfully (verified via `curl`, HTTP 200 on `/`), but the
+  chrome-devtools MCP browser instance was already held by a concurrent
+  session on this machine (`chrome-profile` lock error on every call), so no
+  exclusive browser session was available to drive the check. Needs a
+  follow-up browser check once a chrome-devtools MCP session is free.

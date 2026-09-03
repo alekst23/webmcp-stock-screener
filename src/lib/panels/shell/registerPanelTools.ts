@@ -13,6 +13,9 @@ import type { PinnedRunStore } from '../../screener/ports';
 import { registerResultsTableRendererContract } from '../../results/tools/tableRendererContract';
 import { registerResultsTablePanelKind } from '../../results/registry/resultsTablePanelKind';
 import { buildResultsTools } from '../../results/tools/resultsTools';
+import { registerWatchlistPanelKind } from '../../workbench/watchlist/registry/watchlistPanelKind';
+import { registerAlertDraftPanelKind } from '../../workbench/alerts/registry/alertDraftPanelKind';
+import { similarOpportunitiesPanelKindDefinition } from '../../workbench/similarity/panel/domain/panelKind';
 import { createChangeHistory, type ChangeHistory } from '../../workbench/application/changeHistory';
 import {
 	createIdempotencyCache,
@@ -143,6 +146,19 @@ export function createPanelShellRuntime(shared: WorkbenchSharedInfra): PanelShel
 		runs,
 		catalog: builtinCatalogRegistry
 	});
+
+	// T-1015-12: the real watchlist and alert_draft kinds (this ticket), and
+	// the real similar_opportunities kind (T-1012-6) -- previously only ever
+	// registered into registerSimilarityTools.ts's own standalone,
+	// disconnected PanelRegistry (see that module's header), never this
+	// shared one DEFAULT_SEED_PANELS/seedDefaultWorkspace below actually
+	// seeds against. Registering here, before the placeholder defaults and
+	// before seedDefaultWorkspace runs, is what makes a brand-new workspace's
+	// seeded panels bake in each kind's real defaultConfig() (AC1-AC3)
+	// instead of defaultPanelKinds.ts's placeholder shape.
+	registerWatchlistPanelKind(kinds, { useCaseDeps: deps });
+	registerAlertDraftPanelKind(kinds, { useCaseDeps: deps });
+	kinds.register(similarOpportunitiesPanelKindDefinition);
 
 	registerDefaultPanelKinds(kinds);
 	registerDefaultSourceRendererTypes(sourceRenderer);

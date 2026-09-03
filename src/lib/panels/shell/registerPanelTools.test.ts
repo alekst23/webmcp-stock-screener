@@ -41,7 +41,13 @@ describe('createDefaultPanelShellRuntime', () => {
 		expect(deps.sourceRenderer.requireSourceType('screener_results')).toBeDefined();
 	});
 
-	it('still registers the other seven placeholder kinds and three placeholder source/renderer types', () => {
+	// T-1015-12: watchlist, alert_draft and similar_opportunities are also
+	// real kinds now (registered before registerDefaultPanelKinds, same as
+	// results_table) -- alert_draft is a brand-new kind with no placeholder
+	// counterpart at all, so the registry's name list grows to nine (the
+	// original eight plus alert_draft); 'alerts' (plural) is untouched and
+	// stays a placeholder, per this ticket's own scope note.
+	it('registers watchlist, alert_draft and similar_opportunities as real kinds too, alongside the remaining placeholders', () => {
 		const { deps } = createDefaultPanelShellRuntime();
 		expect(deps.kinds.names().sort()).toEqual(
 			[
@@ -52,7 +58,8 @@ describe('createDefaultPanelShellRuntime', () => {
 				'similar_opportunities',
 				'watchlist',
 				'alerts',
-				'symbol_details'
+				'symbol_details',
+				'alert_draft'
 			].sort()
 		);
 		expect(deps.sourceRenderer.rendererTypeNames().sort()).toEqual(
@@ -60,12 +67,12 @@ describe('createDefaultPanelShellRuntime', () => {
 		);
 	});
 
-	it('still seeds a brand-new workspace with its three default panels, one of them results_table', () => {
+	it('still seeds a brand-new workspace with its six default panels, one of them results_table', () => {
 		const { deps } = createDefaultPanelShellRuntime();
 		const doc = deps.repository.get(deps.workspaceId);
 		expect(doc, 'the seeded workspace document must exist').not.toBeNull();
 		const state = readPanelState(doc!);
-		expect(state.panels).toHaveLength(3);
+		expect(state.panels).toHaveLength(6);
 		const resultsPanel = state.panels.find((p) => p.kind === 'results_table');
 		expect(resultsPanel, 'expected a seeded results_table panel').toBeDefined();
 	});
@@ -77,10 +84,10 @@ describe('createDefaultPanelShellRuntime', () => {
 		const run = testRun('run_1', 3);
 		runs.putRun(run);
 
-		// The default-seeded workspace already fills the whole grid (three
-		// panels, one full-height column each) -- reuse the seeded
-		// results_table panel rather than creating a second one, which would
-		// have nowhere left to auto-place.
+		// The default-seeded workspace already fills the whole grid (six
+		// panels tiling all 24 cells) -- reuse the seeded results_table panel
+		// rather than creating a second one, which would have nowhere left to
+		// auto-place.
 		const seededDoc = deps.repository.get(deps.workspaceId)!;
 		const panelId = readPanelState(seededDoc).panels.find((p) => p.kind === 'results_table')!.id;
 		bindPanelSource(deps, {
