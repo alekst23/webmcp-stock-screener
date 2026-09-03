@@ -113,7 +113,7 @@ const DESCRIPTION =
 	'reduces what an agent can cause. Calling it on an already-disarmed alert succeeds without ' +
 	'error and leaves it disarmed. Calling it on a draft or a pending activation request is ' +
 	'rejected: disable_alert only applies to an alert that is (or was) armed. Returns the mutation ' +
-	"envelope; the undo_token is always null -- disabling can never be undone through this tool, " +
+	'envelope; the undo_token is always null -- disabling can never be undone through this tool, ' +
 	'so an agent can never use undo to work back toward armed.';
 
 export function buildDisableAlertTool(deps: DisableAlertDeps): ToolSpec {

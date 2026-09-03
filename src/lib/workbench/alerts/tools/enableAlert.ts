@@ -44,7 +44,7 @@ interface WireInput {
 }
 
 const NOT_ARMED_MESSAGE =
-	"Not armed. This only records a pending activation request; a human must confirm it in the " +
+	'Not armed. This only records a pending activation request; a human must confirm it in the ' +
 	"app's alerts surface -- an explicit confirm or decline gesture the app performs, never a tool " +
 	'call -- before the alert can arm and fire.';
 

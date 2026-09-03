@@ -15,7 +15,10 @@
 import { describe, expect, it } from 'vitest';
 import { mount, unmount, flushSync } from 'svelte';
 import { bindPanelSource, readPanelState } from '../../panels/application';
-import { createPanelShellRuntime, createWorkbenchSharedInfra } from '../../panels/shell/registerPanelTools';
+import {
+	createPanelShellRuntime,
+	createWorkbenchSharedInfra
+} from '../../panels/shell/registerPanelTools';
 import { CHART_SOURCE_TYPE } from './tools/chartRendererContract';
 import { createInMemoryChartSeries } from './infra/inMemoryChartSeries';
 import type { ChartPanelRuntimeDeps } from './registry/chartPanelContext';
@@ -60,7 +63,9 @@ describe('bind_panel_source -> ChartPanelBody, end to end', () => {
 				}
 			}
 		});
-		expect(envelope.newRevision, 'expected bind_panel_source to actually commit').toBeGreaterThan(0);
+		expect(envelope.newRevision, 'expected bind_panel_source to actually commit').toBeGreaterThan(
+			0
+		);
 
 		// A test-local in-memory series port stands in for the real HTTP one
 		// (no live backend in this test run) -- everything else (the
