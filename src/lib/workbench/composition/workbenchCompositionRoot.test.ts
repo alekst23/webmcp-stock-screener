@@ -33,18 +33,30 @@ import {
 	registerWorkbenchComposition
 } from './workbenchCompositionRoot';
 
-// T-0020-5: every tool name gated behind a flag this epic's AC2 says must
-// stay false (chart, similarity, backtest, alert, watchlist, followup) --
-// imported as each tool's own exported *_TOOL_NAME constant, not a hand-typed
-// string, so a future rename of one of these tools cannot silently make this
-// negative test pass for the wrong reason.
-const OUT_OF_SCOPE_TOOL_NAMES = [
+// T-1015-3: chart, similarity, and follow-up-authoring flipped from the
+// out-of-scope list below to the in-scope one -- the capability parity
+// check confirmed all three as surviving, UI-observable capabilities, and
+// registerWorkbenchComposition() now calls their register*Tools()
+// unconditionally (see this file's own registration test further down).
+const IN_SCOPE_TOOL_NAMES = [
 	ADD_CHART_ANNOTATION_TOOL_NAME,
 	CAPTURE_CHART_SETUP_TOOL_NAME,
 	GET_CHART_DATA_TOOL_NAME,
 	FIND_SIMILAR_SETUPS_TOOL_NAME,
 	EXPLAIN_SIMILARITY_TOOL_NAME,
 	COMPARE_SETUPS_TOOL_NAME,
+	CREATE_CUSTOM_STUDY_TOOL_NAME,
+	CREATE_COMPUTED_FIELD_TOOL_NAME
+] as const;
+
+// T-0020-5, narrowed by T-1015-3: backtest/alert/watchlist stay behind a
+// flag with no caller -- `measure`/`splitInstances` (backtest) was an
+// accepted drop, and the other two have no reason to enable independent of
+// this cutover (see T-1015-3's Solution Approach). Imported as each tool's
+// own exported *_TOOL_NAME constant, not a hand-typed string, so a future
+// rename of one of these tools cannot silently make this negative test pass
+// for the wrong reason.
+const OUT_OF_SCOPE_TOOL_NAMES = [
 	BACKTEST_SCREENER_TOOL_NAME,
 	GET_BACKTEST_RESULTS_TOOL_NAME,
 	PREVIEW_ALERT_TOOL_NAME,
@@ -53,9 +65,7 @@ const OUT_OF_SCOPE_TOOL_NAMES = [
 	ENABLE_ALERT_TOOL_NAME,
 	DISABLE_ALERT_TOOL_NAME,
 	UPSERT_WATCHLIST_TOOL_NAME,
-	SAVE_RESULTS_TO_WATCHLIST_TOOL_NAME,
-	CREATE_CUSTOM_STUDY_TOOL_NAME,
-	CREATE_COMPUTED_FIELD_TOOL_NAME
+	SAVE_RESULTS_TO_WATCHLIST_TOOL_NAME
 ] as const;
 
 beforeEach(() => {
@@ -214,12 +224,34 @@ describe('registerWorkbenchComposition', () => {
 		}
 	});
 
-	// T-0020-5: today this is true by inspection (chart/similarity/backtest/
-	// alert/watchlist/followup all still have their own flags off), but
-	// nothing asserted it -- a future accidental flip of one of those flags
-	// without also updating this composition root would go uncaught without
-	// this test.
-	it('never registers a chart/similarity/backtest/alert/watchlist/followup tool name (AC2)', async () => {
+	// T-1015-3: chart/similarity/follow-up-authoring are now wired in too --
+	// this is the positive counterpart to the out-of-scope negative test
+	// below, proving the composition root's new calls actually register
+	// their tools rather than merely not-crash.
+	it('registers the chart, similarity, and follow-up-authoring tool groups too (T-1015-3)', async () => {
+		const registerTool = vi.fn();
+		vi.stubGlobal('document', { modelContext: { registerTool } });
+		try {
+			await registerWorkbenchComposition();
+			const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
+			for (const inScopeName of IN_SCOPE_TOOL_NAMES) {
+				expect(
+					names,
+					`"${inScopeName}" belongs to a tool group T-1015-3 confirmed surviving -- ` +
+						'registerWorkbenchComposition() must register it'
+				).toContain(inScopeName);
+			}
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	// T-0020-5, narrowed by T-1015-3: today this is true by inspection
+	// (backtest/alert/watchlist still have their own flags off), but nothing
+	// asserted it -- a future accidental flip of one of those flags without
+	// also updating this composition root would go uncaught without this
+	// test.
+	it('never registers a backtest/alert/watchlist tool name (T-1015-3 Solution Approach)', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		try {

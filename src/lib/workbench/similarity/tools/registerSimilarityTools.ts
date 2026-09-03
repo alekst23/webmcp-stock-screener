@@ -1,13 +1,14 @@
 // Composition root for the three similarity tools (T-1012-8): wires real
 // infrastructure to buildFindSimilarSetupsTool/buildExplainSimilarityTool/
 // buildCompareSetupsTool and registers them against document.modelContext.
-// Mirrors chart/tools/registerChartTools.ts's shape exactly -- same
-// flagged-off, not-called-from-app-startup pattern every sibling "new
-// surface" composition root uses (registerChartTools.ts, registerWorkbenchTools.ts).
-// See this ticket's Solution Approach for why: even EPIC-1011's chart tools,
-// already merged, are not live in the running app yet -- flipping every
-// surface on together is a later, whole-program decision this ticket does
-// not make.
+// Mirrors chart/tools/registerChartTools.ts's shape exactly.
+//
+// SIMILARITY_TOOLS_ENABLED flipped true by T-1015-3: the capability parity
+// check confirmed this group as a surviving capability behind a flag with no
+// caller -- workbenchCompositionRoot.ts's registerWorkbenchComposition() now
+// calls registerSimilarityTools() unconditionally, after the panel/
+// workbench/screener groups (createDefaultSimilarityDeps() below requires
+// the active workspace those already seed).
 //
 // The panel-kind registry this factory builds carries ONLY the real
 // `similar_opportunities` definition, never combined with
@@ -15,7 +16,10 @@
 // throws `PanelKindConflictError`, since that function unconditionally
 // registers a placeholder under the same name and the registry has no
 // unregister/replace method. T-1012-4/6/7 hit and documented this same gap;
-// see the ticket doc's Solution Approach for the consolidated finding.
+// see the ticket doc's Solution Approach for the consolidated finding. This
+// keeps find_similar_setups/compare_setups on their own, disconnected panel
+// registry rather than the live one PanelContainer renders from -- a
+// pre-existing gap this ticket does not close (no new contracts).
 import { ensureModelContext } from '../../../webmcp/bridge';
 import { createChangeHistory } from '../../application/changeHistory';
 import { createIdempotencyCache } from '../../application/idempotency';
@@ -41,7 +45,7 @@ import { buildFindSimilarSetupsTool, type FindSimilarSetupsDeps } from './findSi
 import { buildExplainSimilarityTool } from './explainSimilarity';
 import { buildCompareSetupsTool } from '../comparison/tools/compareSetups';
 
-export const SIMILARITY_TOOLS_ENABLED = false;
+export const SIMILARITY_TOOLS_ENABLED = true;
 
 export interface SimilarityToolsDeps extends PanelUseCaseDeps {
 	api: SimilarityApiPort;

@@ -1,7 +1,7 @@
 # T-1015-3: Migrate routes onto the new panel/workspace model
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
-**Status**: Open
+**Status**: Done — see Implementation Notes below
 **Depends on**: T-1015-2
 **Blocks**: T-1015-5
 
@@ -129,3 +129,72 @@ whichever sibling epic owns the panel/workspace model.
 Deleting the legacy tool surface (T-1015-5) or the legacy workspace
 model and components (T-1015-6). Backend changes (T-1015-4). Doc
 updates (T-1015-7).
+
+## Implementation Notes
+
+**Status**: implemented.
+
+- `src/routes/+page.svelte` now composes through
+  `workbench/composition/workbenchCompositionRoot.ts`'s
+  `registerWorkbenchComposition()` (the same composition root
+  `/workbench` uses, via its own `WorkbenchCompositionGuard` instance),
+  renders `PanelContainer`, and reads no legacy workspace state (AC1,
+  AC8). It no longer imports `workspace/store.ts`, `workspace/apiEngine.ts`,
+  or `webmcp/tools.ts`.
+- `PanelContainer`'s `position: fixed; inset: 0` (built for `/workbench`'s
+  shell-less page) is trapped inside the new page's `.panel-viewport` via
+  `contain: layout`, which the CSS Containment spec makes a containing
+  block for `position: fixed` descendants — no change to
+  `PanelContainer.svelte` itself. `AppShell.svelte` is not reused (per the
+  retirement inventory, it has no new-surface consumer and is left for
+  T-1015-6); the status bar is now a small inline header in `+page.svelte`,
+  an interim measure ahead of T-1015-9's shared shell.
+- AC2: added `src/lib/webmcp/newSurfaceSession.ts` (`connectNewSurfaceBridge`)
+  as the new surface's bridge state machine, since `webmcp/session.ts`'s
+  `startBridgeSession` is signature-bound to the legacy `ResearchEngine`
+  (AC8 forbids importing it) and internally implements per-tool progressive
+  availability, a confirmed structural drop for the new surface. The
+  formatters in `webmcp/status.ts` (`buildWebmcpStatus`,
+  `formatDefinedStatus`, `formatAvailableStatus`, `formatBridgeStatus`,
+  `formatAgentToolsContext`) are reused unchanged, now fed
+  `document.modelContext.getTools()`'s live result instead of
+  `buildTools(engine)`.
+- AC3: the action log is a confirmed, already-signed-off drop for this
+  route (capability-parity-matrix.md: "no replacement in progress under
+  any current epic"); `ActivityFeed` is not rendered. T-1015-10 owns
+  building its new-surface affordance.
+- AC4: `workbenchCompositionRoot.ts`'s `registerWorkbenchComposition()` now
+  also calls `registerChartTools()`, `registerSimilarityTools()`, and
+  `registerFollowupAuthoringTools()` unconditionally (each still self-gates
+  on its own flag), and `CHART_TOOLS_ENABLED`, `SIMILARITY_TOOLS_ENABLED`,
+  and `FOLLOWUP_AUTHORING_TOOLS_ENABLED` are flipped `true` — re-verified at
+  implementation time per the Solution Approach, not trusted from the
+  design pass. `SCREENER_TOOLS_ENABLED`/`WORKBENCH_TOOLS_ENABLED` were
+  already `true`. `BACKTEST_TOOLS_ENABLED`/`ALERT_TOOLS_ENABLED`/
+  `WATCHLIST_TOOLS_ENABLED` stay `false`
+  (`workbenchCompositionRoot.test.ts`'s negative test enforces this).
+  `find_similar_setups`/`compare_setups` still build their own,
+  disconnected panel-kind registry (`createDefaultSimilarityDeps`'s own
+  `createSimilarityPanelRegistry()`) rather than the live one
+  `PanelContainer` renders from — a pre-existing gap this ticket does not
+  close (no new contracts, per the Solution Approach).
+- AC5: `src/routes/spike/` and its only consumer, `src/lib/webmcp/spike.ts`
+  (+ its test), are deleted outright — orphaned dead code once the route is
+  gone, distinct from the legacy 11-tool surface T-1015-5 owns.
+- AC6: `src/routes/dev/+page.svelte` is removed outright, not migrated —
+  the parity matrix recorded no new-surface replacement for the manual
+  tool-harness route (an accepted drop, not a new decision here).
+  `src/routes/tool-test/+page.svelte` is untouched: it is a standalone
+  browser-bridge diagnostic page that imports no app code (not `$lib/webmcp`,
+  not the legacy workspace model) and was not named in the retirement
+  inventory or parity matrix, so it is outside this ticket's scope.
+- AC7: `npm run build` succeeds. The interactive "loads with no console
+  errors on first paint" browser check could not be run from this worktree
+  (the shared chrome-devtools MCP browser profile was held by a concurrent
+  session) — outstanding, to be run via `/at-browser-check` before/at
+  ticket close.
+- Verification run from this worktree: `npm run typecheck` (0 errors),
+  `npx vitest run` (routeMigration.test.ts and every file this ticket
+  touched pass; the only failures in the full suite are pre-existing
+  failing stubs for sibling tickets T-1015-5/6/9/10/11/12, none of which
+  this ticket modifies), `npm run build` (succeeds).
