@@ -32,7 +32,7 @@ describe('formatDefinedStatus', () => {
 	it('is unaffected by toolNames -- the name list is not folded into this string', () => {
 		const result = formatDefinedStatus({
 			toolCount: 2,
-			toolNames: ['defineStudy', 'getWorkspace']
+			toolNames: ['run_screener', 'create_panel']
 		});
 		expect(result).toBe('2 WebMCP tools defined');
 	});
@@ -106,11 +106,11 @@ describe('formatBridgeStatus', () => {
 // list so the header can list every tool the app defines, not just a count.
 describe('buildWebmcpStatus', () => {
 	it('returns the tool count and the ordered list of tool names', () => {
-		const tools = [{ name: 'defineStudy' }, { name: 'getWorkspace' }];
+		const tools = [{ name: 'run_screener' }, { name: 'create_panel' }];
 
 		const status = buildWebmcpStatus(tools);
 
-		expect(status).toEqual({ toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] });
+		expect(status).toEqual({ toolCount: 2, toolNames: ['run_screener', 'create_panel'] });
 	});
 
 	it('returns an empty name list and zero count for no tools', () => {
@@ -126,29 +126,29 @@ describe('buildWebmcpStatus', () => {
 describe('formatAgentToolsContext', () => {
 	it('includes the tool count, every tool name, and how to call them', () => {
 		const result = formatAgentToolsContext(
-			{ toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] },
+			{ toolCount: 2, toolNames: ['run_screener', 'create_panel'] },
 			'connected'
 		);
 
 		expect(result).toContain('2');
-		expect(result).toContain('defineStudy');
-		expect(result).toContain('getWorkspace');
+		expect(result).toContain('run_screener');
+		expect(result).toContain('create_panel');
 		expect(result).toContain('document.modelContext');
 	});
 
 	it('is not just a bare name list -- it reads as a sentence with a preface', () => {
 		const result = formatAgentToolsContext(
-			{ toolCount: 1, toolNames: ['getWorkspace'] },
+			{ toolCount: 1, toolNames: ['create_panel'] },
 			'connected'
 		);
 
-		expect(result.length).toBeGreaterThan('getWorkspace'.length + 20);
+		expect(result.length).toBeGreaterThan('create_panel'.length + 20);
 		expect(result).toMatch(/^WebMCP agent context:/);
 	});
 
 	it('tells the agent to treat document.modelContext as the live source, not this static list', () => {
 		const result = formatAgentToolsContext(
-			{ toolCount: 1, toolNames: ['getWorkspace'] },
+			{ toolCount: 1, toolNames: ['create_panel'] },
 			'connected'
 		);
 
@@ -162,7 +162,7 @@ describe('formatAgentToolsContext', () => {
 	// apparently dead tool list unaided.
 	it('tells a connected reader how to call the tools directly', () => {
 		const result = formatAgentToolsContext(
-			{ toolCount: 2, toolNames: ['defineStudy', 'showTickerCharts'] },
+			{ toolCount: 2, toolNames: ['run_screener', 'get_chart_data'] },
 			'connected'
 		);
 		const lower = result.toLowerCase();
@@ -180,7 +180,7 @@ describe('formatAgentToolsContext', () => {
 	// document.modelContext.
 	it('never tells the reader the browser lacks a bridge', () => {
 		const states = ['connecting', 'connected', 'failed'] as const;
-		const status = { toolCount: 2, toolNames: ['defineStudy', 'showTickerCharts'] };
+		const status = { toolCount: 2, toolNames: ['run_screener', 'get_chart_data'] };
 
 		for (const state of states) {
 			const lower = formatAgentToolsContext(status, state).toLowerCase();
@@ -196,7 +196,7 @@ describe('formatAgentToolsContext', () => {
 	// off because an agent read it as "callable".
 	it('labels the list as defined, not available, even when connected', () => {
 		const result = formatAgentToolsContext(
-			{ toolCount: 1, toolNames: ['getWorkspace'] },
+			{ toolCount: 1, toolNames: ['create_panel'] },
 			'connected'
 		);
 
@@ -211,7 +211,7 @@ describe('formatAgentToolsContext', () => {
 	// every agent to the UI fallback on every page load.
 	it('does not report a dead bridge while the connection is still in flight', () => {
 		const result = formatAgentToolsContext(
-			{ toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] },
+			{ toolCount: 2, toolNames: ['run_screener', 'create_panel'] },
 			'connecting'
 		);
 		const lower = result.toLowerCase();
@@ -227,13 +227,13 @@ describe('formatAgentToolsContext', () => {
 			lower,
 			'a reader must be told to check document.modelContext rather than trust this snapshot'
 		).toContain('query document.modelcontext');
-		expect(result, 'the tool names are useful in every state').toContain('defineStudy');
+		expect(result, 'the tool names are useful in every state').toContain('run_screener');
 	});
 
 	// A bridge IS present when registration throws. Telling the reader
 	// document.modelContext is missing would be flatly false.
 	it('reports a failed connection as a present bridge whose registration failed', () => {
-		const result = formatAgentToolsContext({ toolCount: 1, toolNames: ['getWorkspace'] }, 'failed');
+		const result = formatAgentToolsContext({ toolCount: 1, toolNames: ['create_panel'] }, 'failed');
 		const lower = result.toLowerCase();
 
 		expect(lower).toContain('not callable');
@@ -247,7 +247,7 @@ describe('formatAgentToolsContext', () => {
 
 	it('gives every bridge state its own wording', () => {
 		const states = ['connecting', 'connected', 'failed'] as const;
-		const status = { toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] };
+		const status = { toolCount: 2, toolNames: ['run_screener', 'create_panel'] };
 
 		const rendered = states.map((state) => formatAgentToolsContext(status, state));
 
@@ -264,7 +264,7 @@ describe('formatAgentToolsContext', () => {
 
 		for (const state of states) {
 			const result = formatAgentToolsContext(
-				{ toolCount: 2, toolNames: ['defineStudy', 'getWorkspace'] },
+				{ toolCount: 2, toolNames: ['run_screener', 'create_panel'] },
 				state
 			);
 			expect(
