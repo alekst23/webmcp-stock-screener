@@ -28,7 +28,12 @@ import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceR
 import { ensureModelContext } from '../bridge';
 import { buildScreenerTools, type ScreenerToolDeps } from './group';
 
-export const SCREENER_TOOLS_ENABLED = false;
+// T-0020-1: on for real -- /workbench's shared composition root
+// (workbench/composition/workbenchCompositionRoot.ts) now wires this
+// group's tools to the same repository/revisions/history/idempotency/
+// PinnedRunStore every other registered group shares, so a run_screener
+// call mutates the same workspace state the panel grid reads.
+export const SCREENER_TOOLS_ENABLED = true;
 
 // Matches registerWorkbenchTools.ts's FIXED_PROVENANCE: `static` rather
 // than a zero-second delay, and no currency/price-adjustment claim, since

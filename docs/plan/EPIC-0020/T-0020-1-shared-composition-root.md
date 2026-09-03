@@ -2,6 +2,7 @@
 
 **Epic**: EPIC-0020 (Wire the workbench composition root)
 **Design**: docs/design/workbench-composition-root/
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-0020-2
 
@@ -73,3 +74,52 @@ precondition every later ticket in this epic needs.
 - Auto-binding a screener run to the results panel (T-0020-2).
 - The end-to-end integration test proving the full flow (T-0020-3).
 - Any other tool group's flag.
+
+## Solution Approach
+
+New module: `src/lib/workbench/composition/workbenchCompositionRoot.ts`.
+
+1. `createWorkbenchSharedInfra()` builds exactly one `repository`
+   (`createLocalWorkspaceRepository`), `clock`, `ids`
+   (`createIdSequencer`), `idempotency` (`createIdempotencyCache`),
+   `history` (`createChangeHistory`), `revisions`
+   (`createRevisionService({ repository, clock, ids, idempotency })`),
+   and `runs` (`createPinnedRunStore`). Returned as one `WorkbenchSharedInfra`
+   bag.
+2. `registerPanelTools.ts` is refactored to extract
+   `createDefaultPanelShellRuntime`'s body into a new exported
+   `createPanelShellRuntime(shared: WorkbenchSharedInfra): PanelShellRuntime`
+   that takes the 7 shared instances instead of building its own; panel-only
+   registries (`kinds`, `sourceRenderer`, `templates`, `maximized`) stay
+   locally constructed (AC1 does not name them). `createDefaultPanelShellRuntime()`
+   becomes a 2-line wrapper: build a fresh `WorkbenchSharedInfra`, call
+   `createPanelShellRuntime`. Existing tests calling
+   `createDefaultPanelShellRuntime()` are unaffected.
+3. `workbenchCompositionRoot.ts` builds `WorkbenchDeps` and `ScreenerToolDeps`
+   objects directly (not via `createDefaultWorkbenchDeps`/
+   `createDefaultScreenerToolDeps`, per AC2), reusing the shared
+   `repository`/`revisions`/`history`/`clock`/`ids`/`idempotency`, plus each
+   group's own non-shared extras (`registry: operationRegistry` — already a
+   module singleton so naturally shared; a local fixed `provenance`;
+   `catalog`/`instrumentDirectory` for screener; `runStore: shared.runs`).
+4. `registerWorkbenchComposition()` builds the shared infra once, constructs
+   the panel runtime + workbench deps + screener deps from it, calls
+   `registerPanelTools(panelRuntime)`, `registerWorkbenchTools(workbenchDeps)`,
+   `registerScreenerTools(screenerDeps)` in that order, and returns the
+   `PanelShellRuntime` (so `+page.svelte` can still hand `deps`/`observer`
+   to `PanelContainer`).
+5. `src/routes/workbench/+page.svelte` calls `registerWorkbenchComposition()`
+   instead of `registerPanelTools()`.
+6. Flip `WORKBENCH_TOOLS_ENABLED` and `SCREENER_TOOLS_ENABLED` to `true` in
+   their respective files. These are genuine global constants (not
+   per-route config), so per AC6 the two "defaults to off" unit tests are
+   updated in place to assert `true`/the new registered-tool-count behavior,
+   and the commit body notes the behavior change explicitly.
+7. New test (in `workbenchCompositionRoot.test.ts`): call
+   `registerWorkbenchComposition()` against a stubbed
+   `document.modelContext`, invoke the registered `create_panel` tool
+   (panel tool group), then invoke the registered `get_canvas_state` tool
+   (workbench-core tool group) and assert the new panel's id appears in
+   its `panels` list — proving a mutation through one tool group is read
+   through another against the same repository/revision state, not just
+   that both are registered.

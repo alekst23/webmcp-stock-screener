@@ -13,10 +13,17 @@ import type { PinnedRunStore } from '../../screener/ports';
 import { registerResultsTableRendererContract } from '../../results/tools/tableRendererContract';
 import { registerResultsTablePanelKind } from '../../results/registry/resultsTablePanelKind';
 import { buildResultsTools } from '../../results/tools/resultsTools';
-import { createChangeHistory } from '../../workbench/application/changeHistory';
-import { createIdempotencyCache } from '../../workbench/application/idempotency';
-import { createRevisionService } from '../../workbench/application/revisionService';
-import { createIdSequencer } from '../../workbench/domain/ids';
+import { createChangeHistory, type ChangeHistory } from '../../workbench/application/changeHistory';
+import {
+	createIdempotencyCache,
+	type IdempotencyCache
+} from '../../workbench/application/idempotency';
+import {
+	createRevisionService,
+	type RevisionService
+} from '../../workbench/application/revisionService';
+import { createIdSequencer, type IdSequencer } from '../../workbench/domain/ids';
+import type { Clock, WorkspaceRepository } from '../../workbench/domain/ports';
 import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceRepository';
 import {
 	createLayoutTemplateRegistry,
@@ -50,16 +57,47 @@ export interface PanelShellRuntime {
 	runs: PinnedRunStore;
 }
 
-// Fresh registry instances every call -- never the module-global defaults --
-// so a second mount (or a test) never sees another instance's registrations,
-// matching application/testSupport.ts's own isolation convention.
-export function createDefaultPanelShellRuntime(): PanelShellRuntime {
+// T-0020-1: the seven cross-tool-group instances a shared composition root
+// threads into every /workbench tool group (panel, workbench-core,
+// screener). Kept minimal and structural (no import of a WorkbenchDeps-style
+// interface) so this module does not have to depend on workbench/tools or
+// webmcp/screener -- those compose *against* this shape, not the reverse.
+export interface WorkbenchSharedInfra {
+	repository: WorkspaceRepository;
+	clock: Clock;
+	ids: IdSequencer;
+	idempotency: IdempotencyCache;
+	history: ChangeHistory;
+	revisions: RevisionService;
+	runs: PinnedRunStore;
+}
+
+// Builds one fresh instance of each of the seven shared infra pieces --
+// callers that need one-off isolation (unit tests, createDefaultPanelShellRuntime
+// below) use this; a real composition root instead builds this once and
+// threads the same bag into every tool group's own deps builder.
+export function createWorkbenchSharedInfra(): WorkbenchSharedInfra {
 	const repository = createLocalWorkspaceRepository();
 	const clock = { now: () => new Date().toISOString() };
 	const ids = createIdSequencer();
 	const idempotency = createIdempotencyCache();
 	const history = createChangeHistory();
 	const revisions = createRevisionService({ repository, clock, ids, idempotency });
+	const runs = createPinnedRunStore();
+	return { repository, clock, ids, idempotency, history, revisions, runs };
+}
+
+// Builds the panel shell's runtime against a given shared infra bag rather
+// than building its own repository/revisions/etc -- the shape
+// createDefaultPanelShellRuntime below now delegates to, and the shape a
+// shared composition root (T-0020-1) calls directly with its own bag so the
+// panel tool group never builds independent instances in that composition.
+export function createPanelShellRuntime(shared: WorkbenchSharedInfra): PanelShellRuntime {
+	// idempotency is intentionally not read here: it is already folded into
+	// `shared.revisions`, and the panel tool group has no other use for the
+	// cache directly -- only workbench-core/screener deps need it as its own
+	// field (save_workspace's and run_screener's own idempotency replay).
+	const { repository, clock, ids, history, revisions, runs } = shared;
 
 	const kinds = createPanelRegistry();
 	const sourceRenderer = createSourceRendererRegistry();
@@ -67,14 +105,12 @@ export function createDefaultPanelShellRuntime(): PanelShellRuntime {
 	const templates = createLayoutTemplateRegistry();
 	registerDefaultLayoutTemplates(templates);
 
-	// T-1010-7: no screener-execution surface is wired into this route yet
-	// (registerScreenerTools.ts is gated behind SCREENER_TOOLS_ENABLED=false),
-	// so this store starts empty every load -- a results_table panel with no
-	// pinned run renders its own "no run" state rather than fabricating one.
-	// The same store instance is closed over by both the table renderer
-	// contract's validateSelection hook and the panel body's own reads, so
-	// they can never disagree about what's pinned.
-	const runs = createPinnedRunStore();
+	// T-1010-7 / T-0020-1: `runs` comes from the shared infra bag rather than
+	// this function building its own -- the same store instance is closed
+	// over by both the table renderer contract's validateSelection hook and
+	// the panel body's own reads (so they can never disagree about what's
+	// pinned), and, since T-0020-1, by the screener tool group's run_screener
+	// too, so a run executed through the screener group is visible here.
 
 	// T-1007-9: seeding runs synchronously, right here, before this function
 	// returns -- there is no await between initializeWorkspace deciding
@@ -114,6 +150,17 @@ export function createDefaultPanelShellRuntime(): PanelShellRuntime {
 	seedDefaultWorkspace(deps, init.justCreated);
 
 	return { deps, observer: createPanelWorkspaceObserver(), runs };
+}
+
+// Fresh instances every call -- never the module-global defaults -- so a
+// second mount (or a test) never sees another instance's registrations,
+// matching application/testSupport.ts's own isolation convention. Kept for
+// this module's own unit tests and any standalone caller; /workbench's
+// actual composition (workbench/composition/workbenchCompositionRoot.ts,
+// T-0020-1) calls createPanelShellRuntime directly with its own shared bag
+// instead, so the panel tool group never builds independent instances there.
+export function createDefaultPanelShellRuntime(): PanelShellRuntime {
+	return createPanelShellRuntime(createWorkbenchSharedInfra());
 }
 
 // Registers the fourteen panel tools plus the two Results tools this epic

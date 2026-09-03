@@ -19,7 +19,12 @@ import { createLocalWorkspaceRepository } from '../infra/workspaceRepository';
 import { buildWorkbenchTools, type WorkbenchDeps } from './index';
 import { buildSafetyTools, type SafetyToolDeps } from './safetyTools';
 
-export const WORKBENCH_TOOLS_ENABLED = false;
+// T-0020-1: on for real -- /workbench's shared composition root
+// (workbench/composition/workbenchCompositionRoot.ts) now wires this
+// group's tools to the same repository/revisions/history/idempotency every
+// other registered group shares, so the sibling epics this flag was
+// waiting on are no longer a blocker.
+export const WORKBENCH_TOOLS_ENABLED = true;
 
 // WorkbenchDeps already carries every field SafetyDeps needs besides
 // `previews` (repository, revisions, history, registry, idempotency, clock,

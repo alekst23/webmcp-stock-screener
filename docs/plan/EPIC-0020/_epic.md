@@ -32,7 +32,7 @@ actually usable end-to-end.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-0020-1 | Shared composition root; flip WORKBENCH_TOOLS_ENABLED and SCREENER_TOOLS_ENABLED | — | Open |
+| 1 | T-0020-1 | Shared composition root; flip WORKBENCH_TOOLS_ENABLED and SCREENER_TOOLS_ENABLED | — | Done |
 | 2 | T-0020-2 | Auto-bind a completed screener run to the default results_table panel | T-0020-1 | Open |
 | 3 | T-0020-3 | End-to-end integration test and architecture doc update | T-0020-1, T-0020-2 | Open |
 
