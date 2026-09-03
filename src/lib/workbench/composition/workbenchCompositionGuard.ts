@@ -37,8 +37,18 @@ export function createWorkbenchCompositionGuard(
 			// Caches the promise itself, not just its resolved value, so two
 			// concurrent ensure() calls made before the first composition
 			// settles still only ever compose once.
+			//
+			// A REJECTED promise is deliberately not cached (bug fix, see git
+			// history): a transient failure (backend briefly unreachable at
+			// first paint) used to strand every later ensure() call on the same
+			// rejection forever, with no way to recover short of a full reload.
+			// Clearing `promise` back to null on rejection lets the next
+			// ensure() retry a fresh compose() instead.
 			if (!promise) {
-				promise = compose();
+				promise = compose().catch((error: unknown) => {
+					promise = null;
+					throw error;
+				});
 			}
 			return promise;
 		}

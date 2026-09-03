@@ -73,11 +73,14 @@
 	// Match, exact, shared code").
 	let panelStatus = $state<PanelStatus | null>(null);
 
-	onMount(() => {
-		fetchPanelStatus(apiConfig)
-			.then((status) => (panelStatus = status))
-			.catch(() => (panelStatus = null));
-
+	// Bug fix (see git history): a failed composition used to leave `runtime`
+	// null forever with no visible signal beyond a small header string --
+	// the main viewport just showed "Preparing workspace…" indefinitely.
+	// connectNewSurfaceBridge() never rejects (it swallows a failed compose
+	// into bridgeState: 'failed' + result: null), so connectComposition()
+	// below always settles; the viewport branches on bridgeState instead of
+	// waiting on a runtime that will never arrive.
+	function connectComposition(): void {
 		connectNewSurfaceBridge(
 			() => compositionGuard.ensure(),
 			(state) => (bridgeState = state)
@@ -85,6 +88,14 @@
 			runtime = result;
 			webmcpStatus = status;
 		});
+	}
+
+	onMount(() => {
+		fetchPanelStatus(apiConfig)
+			.then((status) => (panelStatus = status))
+			.catch(() => (panelStatus = null));
+
+		connectComposition();
 	});
 </script>
 
@@ -104,6 +115,11 @@
 	<div class="panel-viewport">
 		{#if runtime}
 			<PanelContainer deps={runtime.deps} observer={runtime.observer} />
+		{:else if bridgeState === 'failed'}
+			<div class="composition-error" role="alert">
+				<p>The workspace failed to load. Check the console for details.</p>
+				<button type="button" onclick={connectComposition}>Retry</button>
+			</div>
 		{:else}
 			<p class="loading">Preparing workspace…</p>
 		{/if}
@@ -126,5 +142,14 @@
 		padding: var(--space-lg);
 		color: var(--text-muted);
 		font-style: italic;
+	}
+
+	.composition-error {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-sm);
+		padding: var(--space-lg);
+		color: var(--text-muted);
 	}
 </style>

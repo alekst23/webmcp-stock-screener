@@ -136,12 +136,31 @@ export function readPanelState(doc: WorkspaceDocument): PanelSystemState {
 		return emptyPanelState();
 	}
 	const panels: Panel[] = [];
+	// A duplicate id here means the persisted document was written before
+	// this class of bug was fixed (an unseeded IdSequencer re-minting an id
+	// an earlier panel already held -- see panelIdSeed above and
+	// createPanel.ts's own collision guard) -- corruption already baked into
+	// browser storage, which the write-side fix cannot repair after the
+	// fact. Reading is where every consumer (PanelContainer's keyed each
+	// block included) actually breaks, so this is where it's made safe:
+	// first occurrence wins, later ones are dropped rather than crashing the
+	// whole panel grid on an `each_key_duplicate` error.
+	const seenIds = new Set<string>();
 	if (Array.isArray(raw.panels)) {
 		for (const item of raw.panels) {
 			const normalized = normalizePanel(item);
-			if (normalized !== null) {
-				panels.push(normalized);
+			if (normalized === null) {
+				continue;
 			}
+			if (seenIds.has(normalized.id)) {
+				console.warn(
+					`Dropping duplicate panel id "${normalized.id}" found in stored workspace state ` +
+						'-- the document was corrupted by a since-fixed bug; keeping the first occurrence.'
+				);
+				continue;
+			}
+			seenIds.add(normalized.id);
+			panels.push(normalized);
 		}
 	}
 	return {

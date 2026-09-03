@@ -10,16 +10,22 @@
 // workbench/screener groups (createDefaultSimilarityDeps() below requires
 // the active workspace those already seed).
 //
-// The panel-kind registry this factory builds carries ONLY the real
-// `similar_opportunities` definition, never combined with
-// `registerDefaultPanelKinds()` in the same registry instance -- doing so
-// throws `PanelKindConflictError`, since that function unconditionally
-// registers a placeholder under the same name and the registry has no
-// unregister/replace method. T-1012-4/6/7 hit and documented this same gap;
-// see the ticket doc's Solution Approach for the consolidated finding. This
-// keeps find_similar_setups/compare_setups on their own, disconnected panel
-// registry rather than the live one PanelContainer renders from -- a
-// pre-existing gap this ticket does not close (no new contracts).
+// createSimilarityDeps(shared, panelDeps, baseUrl) below (bug fix, see git
+// history): this composition root used to build its own, separate
+// WorkspaceRepository with a fully unseeded IdSequencer -- the same "builds
+// its own infra" bug already found and fixed for chart
+// (registerChartTools.ts's createChartDeps) -- so a reload could re-mint a
+// panel id `find_similar_setups`'s own `bindPanel()` already held, and it
+// also built its own, second `PanelRegistry` carrying only
+// `similar_opportunities`, disconnected from the live one
+// `registerPanelTools.ts`'s `createPanelShellRuntime` builds and
+// `PanelContainer` actually renders from. T-1012-4/6/7's original note that
+// registering the real kind alongside `registerDefaultPanelKinds()` throws
+// `PanelKindConflictError` is stale against `panelKindRegistry.ts`'s current
+// placeholder-precedence `register()` -- T-1015-12 already proved this by
+// registering the real kind into the shared registry directly
+// (registerPanelTools.ts). createSimilarityDeps below reuses that shared
+// registry via `panelDeps` instead of building a second one.
 import { ensureModelContext } from '../../../webmcp/bridge';
 import { createChangeHistory } from '../../application/changeHistory';
 import { createIdempotencyCache } from '../../application/idempotency';
@@ -38,6 +44,7 @@ import {
 import { createSourceRendererRegistry } from '../../../panels/registry/sourceRendererRegistry';
 import { registerDefaultSourceRendererTypes } from '../../../panels/registry/defaultSourceRendererTypes';
 import type { PanelUseCaseDeps } from '../../../panels/application';
+import type { WorkbenchSharedInfra } from '../../../panels/shell/registerPanelTools';
 import { createHttpSimilarityApi } from '../infra/httpSimilarityApi';
 import type { SimilarityApiPort } from '../domain/apiPort';
 import { similarOpportunitiesPanelKindDefinition } from '../panel/domain/panelKind';
@@ -52,12 +59,42 @@ export interface SimilarityToolsDeps extends PanelUseCaseDeps {
 }
 
 // A workspace-scoped panel registry carrying only this epic's own real kind
-// -- never `registerDefaultPanelKinds()` in the same instance, see this
-// file's header.
+// -- used only by createDefaultSimilarityDeps below for isolated/standalone
+// use (tests, a caller with no shared composition). The real composition
+// root reuses the live registry instead (createSimilarityDeps).
 function createSimilarityPanelRegistry(): PanelRegistry {
 	const kinds = createPanelRegistry();
 	kinds.register(similarOpportunitiesPanelKindDefinition);
 	return kinds;
+}
+
+// Built directly against the shared infra bag and the panel tool group's
+// already-built registries, exactly like registerChartTools.ts's
+// createChartDeps and registerFollowupTools.ts's createFollowupAuthoringDeps.
+// `ids` reuses `shared.ids` directly rather than a group-local sequencer:
+// unlike chart/followup, this group only ever mints the `panel` resource
+// kind (bindPanel()'s create_panel-equivalent), and `shared.ids` is already
+// correctly panel-seeded (registerPanelTools.ts's panelIdSeed) -- a second,
+// separately-seeded sequencer here would only reintroduce the risk of the
+// two panel-minting paths drifting out of sync with each other.
+export function createSimilarityDeps(
+	shared: WorkbenchSharedInfra,
+	panelDeps: Pick<PanelUseCaseDeps, 'workspaceId' | 'kinds' | 'sourceRenderer' | 'templates'>,
+	baseUrl: string = DEV_API_BASE_URL
+): SimilarityToolsDeps {
+	const { repository, clock, revisions, history, ids } = shared;
+	return {
+		workspaceId: panelDeps.workspaceId,
+		repository,
+		revisions,
+		history,
+		clock,
+		ids,
+		kinds: panelDeps.kinds,
+		sourceRenderer: panelDeps.sourceRenderer,
+		templates: panelDeps.templates,
+		api: createHttpSimilarityApi({ baseUrl })
+	};
 }
 
 export function createDefaultSimilarityDeps(

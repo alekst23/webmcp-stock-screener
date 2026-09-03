@@ -228,4 +228,43 @@ describe('createPanel', () => {
 		const state = readPanelState(deps.repository.get(deps.workspaceId)!);
 		expect(state.panels.map((p) => p.id)).toEqual(['panel_chart_1', 'panel_chart_2']);
 	});
+
+	// Bug fix (see git history): mirrors bindPanelSource.test.ts's own
+	// "applyBinding hook is folded into the same commit" test -- the same
+	// generic hook (SourceTypeDefinition.applyBinding, sourceRendererRegistry.ts)
+	// must fire for a panel's *initial* source too, not only a later rebind.
+	// Uses a fake source type rather than chart's real one so this stays a
+	// test of createPanel's generic wiring, not of chart's own logic.
+	it("bug fix: a source type's applyBinding hook fires for a panel's initial source, not only a later rebind", () => {
+		const deps = createPanelTestHarness();
+		deps.sourceRenderer.registerSourceType({
+			name: 'test_source_with_effect',
+			refSchema: { type: 'object' },
+			validateRef: (ref) => ({ ok: true, value: ref as Record<string, unknown> }),
+			isCompatible: () => true,
+			compatibilityDescription: 'test only',
+			applyBinding: (doc, panelId, ref) => ({
+				...doc,
+				extensions: { ...doc.extensions, test_marker: { panelId, ref } }
+			})
+		});
+
+		const envelope = createPanel(deps, {
+			context: ctx(),
+			kind: 'chart',
+			source: { type: 'test_source_with_effect', ref: { foo: 'bar' } }
+		});
+		expect(envelope.affectedIds).toEqual(['panel_chart_1']);
+
+		const doc = deps.repository.get(deps.workspaceId)!;
+		expect(
+			doc.extensions.test_marker,
+			"expected applyBinding's document effect to have landed in the same commit as the create"
+		).toEqual({ panelId: 'panel_chart_1', ref: { foo: 'bar' } });
+		const state = readPanelState(doc);
+		expect(
+			state.panels[0]!.source,
+			'applyBinding must not replace the normal panel.source write, only add to it'
+		).toEqual({ type: 'test_source_with_effect', ref: { foo: 'bar' } });
+	});
 });

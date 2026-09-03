@@ -89,6 +89,41 @@ describe('readPanelState', () => {
 		expect(() => readPanelState(doc)).not.toThrow();
 		expect(readPanelState(doc)).toEqual(emptyPanelState());
 	});
+
+	// Bug fix (see git history): a persisted document written before
+	// panelIdSeed existed can hold two panels sharing one id (an unseeded
+	// sequencer re-minting an already-used id). PanelContainer.svelte's keyed
+	// `{#each ... (occupied.panelId)}` throws Svelte's own fatal
+	// each_key_duplicate error on a raw duplicate, so this must be repaired
+	// on read rather than left to crash the whole panel grid.
+	it('drops a later panel sharing an id an earlier one already used, keeping the first', () => {
+		const doc = emptyWorkspace('workspace_1', 'Test', '2026-01-01T00:00:00.000Z');
+		doc.extensions['panel_system'] = {
+			panels: [
+				{
+					id: 'panel_chart_1',
+					kind: 'chart',
+					title: 'First',
+					config: {},
+					rect: { col: 0, row: 0, colSpan: 2, rowSpan: 2 }
+				},
+				{
+					id: 'panel_chart_1',
+					kind: 'chart',
+					title: 'Second (corrupted duplicate)',
+					config: {},
+					rect: { col: 2, row: 0, colSpan: 2, rowSpan: 2 }
+				}
+			]
+		};
+
+		const state = readPanelState(doc);
+
+		expect(state.panels.length, `expected the duplicate dropped, got ${state.panels.length}`).toBe(
+			1
+		);
+		expect(state.panels[0]?.title, 'the first occurrence must win, not the last').toBe('First');
+	});
 });
 
 describe('writePanelState', () => {

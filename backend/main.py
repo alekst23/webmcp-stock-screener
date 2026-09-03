@@ -3,12 +3,15 @@
 Run locally from backend/:
     uv run uvicorn main:app --reload
 
-Serves the liveness health check plus the similarity, backtest and chart
-routes that back the new panel/workspace surface. The platform spike
-endpoint and the legacy 5-endpoint research/pattern-search surface (api/
-routes/research.py), along with the pandas pattern-research engine
+Serves the liveness health check plus the similarity, backtest, chart and
+panel-status routes that back the new panel/workspace surface. The platform
+spike endpoint and the legacy 5-endpoint research/pattern-search surface
+(api/routes/research.py), along with the pandas pattern-research engine
 underneath it, have been retired -- neither has an importer left in the
-tree.
+tree. (api/routes/chart.py and api/routes/panel.py are their own small,
+new-surface routes added post-cutover after research.py's deletion turned
+out to have taken two live new-surface dependencies down with it -- see
+their own module docstrings.)
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ from api.routes.backtest import router as backtest_router
 from api.routes.chart import router as chart_router
 from api.routes.health import HEALTH_PATH
 from api.routes.health import router as health_router
+from api.routes.panel import router as panel_router
 from api.routes.similarity import router as similarity_router
 from application.backtest_jobs import BacktestJobStore
 from application.load_panel import load_panel
@@ -195,6 +199,7 @@ app.include_router(health_router)
 app.include_router(similarity_router)
 app.include_router(backtest_router)
 app.include_router(chart_router)
+app.include_router(panel_router)
 
 
 def main() -> None:
