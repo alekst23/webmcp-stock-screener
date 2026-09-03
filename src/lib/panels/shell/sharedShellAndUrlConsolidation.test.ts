@@ -20,6 +20,12 @@ const SOURCES = import.meta.glob('/src/**/*.svelte', {
 const MAIN_ROUTE = SOURCES['/src/routes/+page.svelte'] ?? '';
 const WORKBENCH_SHELL = SOURCES['/src/lib/panels/shell/WorkbenchShell.svelte'] ?? '';
 
+// hotfix/panel-system: header index of `.log-toggle`, the sibling header
+// button the Reset control must sit next to (top-right of the status bar).
+function indexOfLogToggle(source: string): number {
+	return source.indexOf('class="log-toggle"');
+}
+
 describe('new shell component shows product identity, freshness, and WebMCP status', () => {
 	// spec.md "Route migration / Shared shell", "Status header"; T-1015-9 AC1
 	it('resolved WorkbenchShell.svelte source at all (glob sanity)', () => {
@@ -164,5 +170,38 @@ describe('no visual regression to the panel grid', () => {
 		expect(MAIN_ROUTE).toContain(
 			"import PanelContainer from '$lib/panels/shell/PanelContainer.svelte'"
 		);
+	});
+});
+
+describe('header Reset control (hotfix/panel-system: reset layout to default)', () => {
+	// spec.md "Reset the workspace layout to the default seed"
+	it('renders a reset button in the header, after (top-right of) the log toggle', () => {
+		const logIndex = indexOfLogToggle(WORKBENCH_SHELL);
+		expect(logIndex, 'expected the existing .log-toggle button to still be present').toBeGreaterThan(
+			-1
+		);
+		const resetIndex = WORKBENCH_SHELL.indexOf('class="reset-layout"');
+		expect(resetIndex, 'expected a .reset-layout button in WorkbenchShell.svelte').toBeGreaterThan(
+			-1
+		);
+		expect(
+			resetIndex,
+			'expected the reset button to come after .log-toggle (top-right of the status bar)'
+		).toBeGreaterThan(logIndex);
+	});
+
+	it('confirms with the user before resetting', () => {
+		expect(
+			WORKBENCH_SHELL,
+			'expected a window.confirm(...) gate before the reset action fires'
+		).toMatch(/window\.confirm\(/);
+	});
+
+	it('is wired to the human-facing resetLayoutByHuman use case, disabled until deps are ready', () => {
+		expect(WORKBENCH_SHELL).toContain('resetLayoutByHuman');
+		expect(
+			WORKBENCH_SHELL,
+			'expected the reset button disabled until resetLayoutDeps is ready, same gating as .log-toggle/historyDeps'
+		).toMatch(/disabled=\{!resetLayoutDeps\}/);
 	});
 });

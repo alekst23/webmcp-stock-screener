@@ -174,4 +174,31 @@ describe('layoutTools', () => {
 			expect(payload.error).toBe('unknown_panel');
 		});
 	});
+
+	describe('reset_layout', () => {
+		// hotfix/panel-system: agent-invokable parity with the header's Reset
+		// control -- both call the resetLayout use case (currently a
+		// throwing stub; this tool test is red until it's implemented).
+		it('is registered among the layout tools', () => {
+			const deps = createPanelToolTestHarness();
+			expect(() => tool(buildLayoutTools(deps), 'reset_layout')).not.toThrow();
+		});
+
+		it('replaces the current panel arrangement with the default seed', async () => {
+			const deps = createPanelToolTestHarness();
+			const lifecycle = buildLifecycleTools(deps);
+			await tool(lifecycle, 'create_panel').execute({
+				kind: 'chart',
+				rect: { col: 0, row: 0, col_span: 6, row_span: 4 }
+			});
+			const spec = tool(buildLayoutTools(deps), 'reset_layout');
+
+			const result = await spec.execute({});
+			expect(result.isError, `expected success, got ${JSON.stringify(result)}`).not.toBe(true);
+			const payload = resultPayload(result) as { affected_ids: string[] };
+			expect(payload.affected_ids.length, 'expected the default six-panel seed named as affected').toBe(
+				6
+			);
+		});
+	});
 });
