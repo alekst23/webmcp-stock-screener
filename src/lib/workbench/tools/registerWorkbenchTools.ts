@@ -8,18 +8,22 @@
 // Not called from app startup by this ticket -- flip the flag (or make it a
 // real runtime toggle) once the program's surface is complete.
 import { ensureModelContext } from '../../webmcp/bridge';
-import { createIdSequencer } from '../domain/ids';
-import { makeProvenance, type MarketDataProvenance } from '../domain/provenance';
-import { createChangeHistory } from '../application/changeHistory';
-import { createIdempotencyCache } from '../application/idempotency';
+import {
+	createWorkbenchSharedInfra,
+	type WorkbenchSharedInfra
+} from '../../panels/shell/registerPanelTools';
+import { NOT_CONFIGURED_PROVENANCE } from '../domain/provenance';
 import { operationRegistry } from '../application/operationRegistry';
-import { createRevisionService } from '../application/revisionService';
 import { createPreviewStore } from '../infra/previewStore';
-import { createLocalWorkspaceRepository } from '../infra/workspaceRepository';
 import { buildWorkbenchTools, type WorkbenchDeps } from './index';
 import { buildSafetyTools, type SafetyToolDeps } from './safetyTools';
 
-export const WORKBENCH_TOOLS_ENABLED = false;
+// T-0020-1: on for real -- /workbench's shared composition root
+// (workbench/composition/workbenchCompositionRoot.ts) now wires this
+// group's tools to the same repository/revisions/history/idempotency every
+// other registered group shares, so the sibling epics this flag was
+// waiting on are no longer a blocker.
+export const WORKBENCH_TOOLS_ENABLED = true;
 
 // WorkbenchDeps already carries every field SafetyDeps needs besides
 // `previews` (repository, revisions, history, registry, idempotency, clock,
@@ -28,47 +32,39 @@ export const WORKBENCH_TOOLS_ENABLED = false;
 // WorkbenchDeps itself in tools/index.ts.
 export type DefaultWorkbenchDeps = WorkbenchDeps & Pick<SafetyToolDeps, 'previews'>;
 
-// A trivial fixed-value provenance source, matching T-1006-3's "no mock
-// pipeline" boundary -- the separate reference/fundamental-data workstream
-// supplies a real ProvenanceSource later.
-// `static` rather than a zero-second delay: nothing ticks behind this, and a
-// delay of zero would read as "live enough", which is the claim it must not
-// make. Currency and price adjustment are omitted because it carries neither.
-const FIXED_PROVENANCE: MarketDataProvenance = makeProvenance({
-	asOf: new Date(0).toISOString(),
-	sourceId: 'not_configured',
-	sourceLabel: 'No market-data source configured',
-	liveness: 'static',
-	timezone: 'America/New_York'
-});
-
-export function createDefaultWorkbenchDeps(): DefaultWorkbenchDeps {
-	const repository = createLocalWorkspaceRepository();
-	const clock = { now: () => new Date().toISOString() };
-	const ids = createIdSequencer();
-	// One instance shared with revisions below: save_workspace replays
-	// idempotency_key against the same cache mutating tools use, so a
-	// caller can't tell save's bypass of RevisionService.commit apart from
-	// any other tool's idempotency behavior.
-	const idempotency = createIdempotencyCache();
+// T-0020-6: built directly against a given shared infra bag -- repository,
+// revisions, history, clock, ids, and idempotency are the exact same
+// instances every other /workbench tool group's deps object is built
+// against -- rather than this module constructing its own independent
+// copies. Mirrors registerPanelTools.ts's createPanelShellRuntime(shared) /
+// createDefaultPanelShellRuntime() split: createDefaultWorkbenchDeps below
+// now delegates here, and workbenchCompositionRoot.ts's own
+// buildWorkbenchDeps calls this directly with its shared bag instead of
+// duplicating this field list.
+export function createWorkbenchDeps(shared: WorkbenchSharedInfra): DefaultWorkbenchDeps {
 	return {
-		repository,
-		revisions: createRevisionService({
-			repository,
-			clock,
-			ids,
-			idempotency
-		}),
-		history: createChangeHistory(),
+		repository: shared.repository,
+		revisions: shared.revisions,
+		history: shared.history,
 		registry: operationRegistry,
-		provenance: { current: () => FIXED_PROVENANCE },
+		provenance: { current: () => NOT_CONFIGURED_PROVENANCE },
+		clock: shared.clock,
+		ids: shared.ids,
+		idempotency: shared.idempotency,
 		// Session-scoped, in-memory: previews never outlive the runtime that
 		// created them, matching the epic's stated preview-lifetime assumption.
-		previews: createPreviewStore({ clock }),
-		clock,
-		ids,
-		idempotency
+		previews: createPreviewStore({ clock: shared.clock })
 	};
+}
+
+// Fresh instances every call -- never a module-global default -- so a
+// second mount (or a test) never sees another instance's registrations.
+// Kept for this module's own unit tests and any standalone caller;
+// /workbench's actual composition (workbenchCompositionRoot.ts, T-0020-1)
+// calls createWorkbenchDeps directly with its own shared bag instead, so
+// this group never builds independent instances in that composition.
+export function createDefaultWorkbenchDeps(): DefaultWorkbenchDeps {
+	return createWorkbenchDeps(createWorkbenchSharedInfra());
 }
 
 export async function registerWorkbenchTools(

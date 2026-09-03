@@ -33,11 +33,19 @@
 	// already typed has to survive the control folding back up, whether that
 	// happens by Escape or by focus simply moving elsewhere.
 	function handleFocusOut(event: FocusEvent): void {
+		if (!expanded) {
+			return;
+		}
 		const next = event.relatedTarget;
 		if (next instanceof Node && container?.contains(next)) {
 			return;
 		}
-		collapse();
+		queueMicrotask(() => {
+			if (document.activeElement instanceof Node && container?.contains(document.activeElement)) {
+				return;
+			}
+			collapse();
+		});
 	}
 
 	function handleKeydown(event: KeyboardEvent): void {

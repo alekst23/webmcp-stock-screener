@@ -5,6 +5,9 @@ import type {
 	ToolResult
 } from './types';
 
+export const WEBMCP_AGENT_REQUEST_EVENT = 'webmcp:agent-request';
+export const WEBMCP_AGENT_RESPONSE_EVENT = 'webmcp:agent-response';
+
 // `document.modelContext` ships in almost no browser today, and which ones
 // have it is not knowable from inside the page: a flag, an extension, or a
 // future release can add it at any moment, and an extension can install it
@@ -13,9 +16,11 @@ import type {
 // supplied one, otherwise the page's own. Registration therefore always has
 // somewhere to land, and nothing downstream branches on browser support.
 //
-// The page-provided bridge is not a lesser fallback. Any agent that can
-// evaluate JS in the tab -- which is most of them -- can call getTools() and
-// executeTool() on it and drive the full tool surface.
+// The page-provided bridge is not a lesser fallback. Some browser automation
+// clients evaluate JavaScript in an isolated world where page-world expando
+// properties on `document` are invisible, so ensureModelContext also installs
+// a JSON-only same-document event relay. Those agents can still call the
+// canonical page-world bridge without driving the visible UI.
 
 // The tools this page registered when the browser supplied no bridge of its
 // own. Kept at module scope so repeated mounts share one registry, exactly as
@@ -32,6 +37,7 @@ let accessorInstalled = false;
 let assignedContext: ModelContext | undefined;
 
 const replacementListeners = new Set<(mc: ModelContext) => void>();
+let relayDocument: Document | undefined;
 
 // Held as stable references so syncInstalledState can recognise this module's
 // own accessor on the document and tell it apart from anyone else's.
@@ -107,10 +113,113 @@ export function createPageModelContext(): ModelContext {
 	};
 }
 
+interface AgentRelayRequest {
+	id?: unknown;
+	method?: unknown;
+	tool?: unknown;
+	input?: unknown;
+}
+
+interface AgentRelayResponse {
+	id: string;
+	ok: boolean;
+	result?: unknown;
+	error?: string;
+}
+
+function parseRelayRequest(detail: unknown): AgentRelayRequest | null {
+	if (typeof detail !== 'string') {
+		return null;
+	}
+	try {
+		return JSON.parse(detail) as AgentRelayRequest;
+	} catch {
+		return null;
+	}
+}
+
+function dispatchRelayResponse(response: AgentRelayResponse): void {
+	document.dispatchEvent(
+		new CustomEvent(WEBMCP_AGENT_RESPONSE_EVENT, {
+			detail: JSON.stringify(response)
+		})
+	);
+}
+
+function relayToolName(tool: unknown): string | { name: string } {
+	if (typeof tool === 'string') {
+		return tool;
+	}
+	if (tool && typeof tool === 'object' && typeof (tool as { name?: unknown }).name === 'string') {
+		return { name: (tool as { name: string }).name };
+	}
+	throw new Error('Relay executeTool request requires a string tool name');
+}
+
+async function executeRelayRequest(request: AgentRelayRequest): Promise<unknown> {
+	const mc = document.modelContext;
+	if (!mc) {
+		throw new Error('WebMCP bridge is not installed');
+	}
+	switch (request.method) {
+		case 'getTools':
+			if (!mc.getTools) {
+				throw new Error('WebMCP bridge does not expose getTools');
+			}
+			return mc.getTools();
+		case 'executeTool':
+			if (!mc.executeTool) {
+				throw new Error('WebMCP bridge does not expose executeTool');
+			}
+			return mc.executeTool(relayToolName(request.tool), request.input);
+		default:
+			throw new Error(`Unknown WebMCP relay method: ${String(request.method)}`);
+	}
+}
+
+async function respondToRelayRequest(
+	request: AgentRelayRequest,
+	respond: (response: AgentRelayResponse) => void
+): Promise<void> {
+	if (typeof request.id !== 'string' || !request.id) {
+		return;
+	}
+	try {
+		respond({ id: request.id, ok: true, result: await executeRelayRequest(request) });
+	} catch (error) {
+		respond({
+			id: request.id,
+			ok: false,
+			error: error instanceof Error ? error.message : String(error)
+		});
+	}
+}
+
+function installAgentRelay(): void {
+	if (relayDocument === document) {
+		return;
+	}
+	// Several existing tests stub `document` as a plain object carrying only
+	// `modelContext`, with no event target methods -- guard rather than
+	// assume a full Document, the same caution ensureModelContext already
+	// takes with document.modelContext itself.
+	if (typeof document.addEventListener !== 'function') {
+		return;
+	}
+	relayDocument = document;
+	document.addEventListener(WEBMCP_AGENT_REQUEST_EVENT, (event) => {
+		const request = parseRelayRequest(event instanceof CustomEvent ? event.detail : undefined);
+		if (request) {
+			void respondToRelayRequest(request, dispatchRelayResponse);
+		}
+	});
+}
+
 // Returns the bridge to register against, installing the page's own if the
 // browser supplied none. Never returns undefined -- that is the whole point.
 export function ensureModelContext(): ModelContext {
 	syncInstalledState();
+	installAgentRelay();
 	const supplied = document.modelContext;
 	if (supplied) {
 		return supplied;

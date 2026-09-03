@@ -1,18 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 
 describe('registerScreenerTools', () => {
-	it('defaults SCREENER_TOOLS_ENABLED to off, so main stays deployable until the epic ships', async () => {
+	// T-0020-1: flipped true -- /workbench's shared composition root now
+	// wires this group's tools to the same shared repository/revisions/
+	// PinnedRunStore every other registered group uses. This is a genuine
+	// global constant (not per-route config), so this test asserts the new
+	// behavior directly rather than distinguishing a route-specific override.
+	it('SCREENER_TOOLS_ENABLED is true now that the shared composition root wires this group in (T-0020-1)', async () => {
 		const { SCREENER_TOOLS_ENABLED } = await import('./registerScreenerTools');
-		expect(SCREENER_TOOLS_ENABLED).toBe(false);
+		expect(SCREENER_TOOLS_ENABLED).toBe(true);
 	});
 
-	it('registers nothing against document.modelContext while the flag is off', async () => {
+	it('registers tools against document.modelContext now that the flag is on', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		const { registerScreenerTools, createDefaultScreenerToolDeps } =
 			await import('./registerScreenerTools');
 		await registerScreenerTools(createDefaultScreenerToolDeps());
-		expect(registerTool).not.toHaveBeenCalled();
+		expect(registerTool).toHaveBeenCalled();
 		vi.unstubAllGlobals();
 	});
 

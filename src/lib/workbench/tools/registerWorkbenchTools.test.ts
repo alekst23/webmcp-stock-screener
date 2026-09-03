@@ -1,18 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 
 describe('registerWorkbenchTools', () => {
-	it('defaults WORKBENCH_TOOLS_ENABLED to off, so main stays deployable while sibling epics land', async () => {
+	// T-0020-1: flipped true -- /workbench's shared composition root now
+	// wires this group's tools to the same shared repository/revisions
+	// every other registered group uses. This is a genuine global constant
+	// (not per-route config), so this test asserts the new behavior
+	// directly rather than distinguishing a route-specific override.
+	it('WORKBENCH_TOOLS_ENABLED is true now that the shared composition root wires this group in (T-0020-1)', async () => {
 		const { WORKBENCH_TOOLS_ENABLED } = await import('./registerWorkbenchTools');
-		expect(WORKBENCH_TOOLS_ENABLED).toBe(false);
+		expect(WORKBENCH_TOOLS_ENABLED).toBe(true);
 	});
 
-	it('registers nothing against document.modelContext while the flag is off', async () => {
+	it('registers tools against document.modelContext now that the flag is on', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		const { registerWorkbenchTools, createDefaultWorkbenchDeps } =
 			await import('./registerWorkbenchTools');
 		await registerWorkbenchTools(createDefaultWorkbenchDeps());
-		expect(registerTool).not.toHaveBeenCalled();
+		expect(registerTool).toHaveBeenCalled();
 		vi.unstubAllGlobals();
 	});
 

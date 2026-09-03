@@ -28,7 +28,6 @@
 	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
 	import ChartToolbar from '$lib/workspace/ChartToolbar.svelte';
 	import SnapshotPicker from '$lib/workspace/SnapshotPicker.svelte';
-	import TickerSearch from '$lib/workspace/TickerSearch.svelte';
 
 	const apiConfig = { baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL) };
 
@@ -58,10 +57,11 @@
 	// claiming an unknown as-of date would be worse than showing none.
 	let panelStatus = $state<PanelStatus | null>(null);
 
-	// Lifted out of ChartToolbar (hotfix/marketpane-rebrand): the header's
-	// collapsed TickerSearch and the toolbar's "Show monthly" action both
-	// read/write this one value now, so moving where it's typed cannot
-	// change what the next search does.
+	// No header search control on this page: ticker/universe selection is a
+	// WebMCP tool-only action here, so an agent can't be bypassed by a human
+	// typing directly into a text box. ChartToolbar's "Show monthly" action
+	// still reads this value; only the control that let a human write to it
+	// is gone.
 	let tickers = $state('MOCK02, MOCK03');
 
 	// Derived rather than computed inline in the template ({@const} may only
@@ -137,7 +137,6 @@
 			>
 				{freshness.label}
 			</span>
-			<TickerSearch bind:value={tickers} />
 		</div>
 		{#if webmcpStatus}
 			<div class="webmcp-status" bind:this={statusBar}>

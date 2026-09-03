@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Writable } from 'svelte/store';
+import { WEBMCP_AGENT_REQUEST_EVENT, WEBMCP_AGENT_RESPONSE_EVENT } from './bridge';
 import { connectWebmcp } from './register';
 import { clearModelContext, fakeBridge } from './testSupport';
 import { createApiEngine } from '../workspace/apiEngine';
@@ -14,6 +15,34 @@ function workspace(): { store: Writable<WorkspaceState>; engine: ResearchEngine 
 
 function engine(): ResearchEngine {
 	return workspace().engine;
+}
+
+function relayRequest(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+	const id = `request-${Math.random()}`;
+	return new Promise((resolve, reject) => {
+		const timeout = window.setTimeout(() => {
+			document.removeEventListener(WEBMCP_AGENT_RESPONSE_EVENT, onResponse);
+			reject(new Error('Timed out waiting for WebMCP relay response'));
+		}, 1000);
+		function onResponse(event: Event): void {
+			if (!(event instanceof CustomEvent) || typeof event.detail !== 'string') {
+				return;
+			}
+			const response = JSON.parse(event.detail) as Record<string, unknown>;
+			if (response.id !== id) {
+				return;
+			}
+			window.clearTimeout(timeout);
+			document.removeEventListener(WEBMCP_AGENT_RESPONSE_EVENT, onResponse);
+			resolve(response);
+		}
+		document.addEventListener(WEBMCP_AGENT_RESPONSE_EVENT, onResponse);
+		document.dispatchEvent(
+			new CustomEvent(WEBMCP_AGENT_REQUEST_EVENT, {
+				detail: JSON.stringify({ id, ...payload })
+			})
+		);
+	});
 }
 
 // Feature #10 gates sampling/measuring/splitting/grid on an existing result
@@ -79,6 +108,33 @@ describe('connectWebmcp bridge detection', () => {
 		expect(result.isError ?? false, `defineStudy must run, got: ${JSON.stringify(result)}`).toBe(
 			false
 		);
+	});
+
+	it('lists tools through the same-document relay when document.modelContext is hidden from an agent world', async () => {
+		clearModelContext();
+
+		const connection = await connectWebmcp(engine());
+		const response = await relayRequest({ method: 'getTools' });
+
+		expect(response.ok, `relay failed: ${JSON.stringify(response)}`).toBe(true);
+		expect(
+			(response.result as { name: string }[]).map((tool) => tool.name).sort(),
+			'the relay must expose the same live list as the canonical bridge'
+		).toEqual(connection.registeredNames().sort());
+	});
+
+	it('executes tools through the same-document relay', async () => {
+		clearModelContext();
+
+		await connectWebmcp(engine());
+		const response = await relayRequest({
+			method: 'executeTool',
+			tool: 'defineStudy',
+			input: { name: 'relay_gap', expression: 'sma(close, 20)' }
+		});
+
+		expect(response.ok, `relay failed: ${JSON.stringify(response)}`).toBe(true);
+		expect((response.result as { isError?: boolean }).isError ?? false).toBe(false);
 	});
 
 	// A native bridge must win outright: shadowing it with the page's own

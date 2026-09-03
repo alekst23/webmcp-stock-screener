@@ -63,10 +63,13 @@ const SURFACE_CAVEAT =
 
 // The half the original text lacked: a real agent diagnosed the missing
 // bridge unaided and found the UI fallback on its own, because nothing on
-// the page mentioned one existed.
+// the page mentioned one existed. Ticker/universe search is the one
+// exception -- that control is WebMCP-only by design, so it isn't offered
+// as a fallback here.
 const UI_FALLBACK =
-	`Every operation these tools perform is also reachable through the page's ` +
-	`visible UI controls — drive those instead.`;
+	`Most operations these tools perform are also reachable through the page's ` +
+	`visible UI controls — drive those instead. Ticker/universe search has no UI ` +
+	`control; it is WebMCP-only by design.`;
 
 // The page supplies its own document.modelContext where the browser has none,
 // so a reader whose client shows no native WebMCP tool list is not out of
@@ -76,7 +79,9 @@ const UI_FALLBACK =
 const DIRECT_CALL =
 	`If your client does not surface these natively, call them yourself: ` +
 	`await document.modelContext.executeTool('<name>', { …input }), and ` +
-	`await document.modelContext.getTools() for the live list.`;
+	`await document.modelContext.getTools() for the live list. If that object is hidden by an ` +
+	`isolated browser world, dispatch JSON CustomEvents named webmcp:agent-request and listen ` +
+	`for webmcp:agent-response; use method "getTools" or "executeTool" with {tool, input}.`;
 
 function connectedBody(status: WebmcpStatus): string {
 	return (
