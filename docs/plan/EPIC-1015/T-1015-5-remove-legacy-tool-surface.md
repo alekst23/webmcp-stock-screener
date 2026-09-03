@@ -76,6 +76,55 @@ the legacy workspace store, which is expected — they are removed in
 T-1015-6. Sequence the work so the branch is green at the end of this
 ticket, not so each intermediate commit is.
 
+## Solution Approach
+
+**Implements**: the "Tool-surface removal" scenarios in spec.md (happy
+path, shared module, transport preserved, legacy-only test).
+
+**Approach**: frontend-only, gated on T-1015-3 (no route renders against
+the legacy tools any more). Split `src/lib/webmcp/types.ts` at the symbol
+level per T-1015-1's inventory: the transport slice (`ModelContext`,
+`ModelContextToolDescriptor`, `ToolResult`, `ToolSpec`, the ambient
+`declare global` block) survives; the product slice (`StudySummary`,
+`SetupStep`, `SetupSummary`, `InstanceEvent`, `InstanceSetSummary`,
+`PanelSummary`, `FocusState`, `WorkspaceState`, every `*Input`/`*Result`
+type, `ResearchEngine`, `FUNCTION_CATALOG`, `ExpressionError`) is deleted.
+Before deleting `tools.ts`, extract its `ok()`/`fail()` `ToolResult`
+constructors to a small transport-side module (e.g. `webmcp/
+toolResult.ts`) — the inventory found 19 new-surface files import them
+today, so deleting `tools.ts` wholesale would break those builds; this is
+a mandatory extraction, not a plain retire. Delete `tools.ts`,
+`tools.test.ts`, `spike.ts`, `spike.test.ts`, `integration.test.ts`.
+`register.ts`, `session.ts`, `status.ts` and their tests were classified
+"absorb, contingent" in the inventory: keep and re-point them only if
+T-1015-3 or a sign-off decision actually reused `register.ts`'s
+desired-vs-registered diffing or `session.ts`'s bridge state machine for
+something live on the new surface; if nothing does (progressive
+availability was an accepted drop per T-1015-2), downgrade them to retire
+here rather than leaving unused code behind — this ticket makes that call
+concrete by checking what T-1015-3 actually wired. Whichever way that
+lands, `register.ts` must not import `buildTools`/`ResearchEngine`
+directly any more (AC5); if kept, it takes a `ToolSpec[]` and an engine as
+parameters instead. The registration layer's remount-generation ownership
+and best-effort dispose semantics (the earlier T-1006 bug fix) must not
+regress — its existing tests are the guard and must keep passing
+unweakened (AC4). The legacy per-tool result summarizer (`activity.ts`'s
+`summarizeToolCall`) is not carried across regardless — the action log's
+attribution replacement is T-1015-10's scope, not this ticket's, and
+`activity.ts` itself does not retire until T-1015-6.
+
+**Contracts to introduce**: none — this ticket deletes contracts, it does
+not add any. Moving the transport types or extracting `ok`/`fail` is a
+file move, not a new contract.
+
+**Config vars introduced**: none.
+
+**References**: `docs/plan/EPIC-1015/retirement-inventory.md` §2-3 (which
+symbols in `types.ts`/`tools.ts` are transport vs. product, and the
+mandatory `ok`/`fail` extraction), `docs/design/pattern-research-
+workbench/technical.md` (`WebmcpConnection` lifecycle, `startBridgeSession`,
+status-header sections), `docs/tools.md`.
+
 ## Out of Scope
 
 The legacy workspace store, engine client, and Svelte components
