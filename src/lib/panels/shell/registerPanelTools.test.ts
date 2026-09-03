@@ -197,17 +197,18 @@ describe('createDefaultPanelShellRuntime', () => {
 
 // T-1010-8 AC1/AC8: registerPanelTools() (not just the sync runtime builder
 // above) registers the two Results tools this epic adds directly, alongside
-// the fourteen existing panel tools -- neither surface crowds out the other,
-// and the table-renderer contract stays reachable only through
-// configure_panel_view/set_panel_selection, never as its own listed tool.
+// the fifteen existing panel tools (hotfix/panel-system added reset_layout)
+// -- neither surface crowds out the other, and the table-renderer contract
+// stays reachable only through configure_panel_view/set_panel_selection,
+// never as its own listed tool.
 describe('registerPanelTools', () => {
-	it('registers get_screener_results and explain_result alongside the fourteen existing panel tools', async () => {
+	it('registers get_screener_results and explain_result alongside the fifteen existing panel tools', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		try {
 			await registerPanelTools();
 			const names = registerTool.mock.calls.map(([tool]) => tool.name as string);
-			expect(names).toHaveLength(16);
+			expect(names).toHaveLength(17);
 			expect(names).toContain('get_screener_results');
 			expect(names).toContain('explain_result');
 			expect(names).not.toContain('configure_results_table');

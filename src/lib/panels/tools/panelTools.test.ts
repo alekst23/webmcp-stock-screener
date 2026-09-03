@@ -33,11 +33,12 @@ const TOOL_NAMES = [
 	'configure_panel_view',
 	'link_panels',
 	'unlink_panels',
-	'set_panel_selection'
+	'set_panel_selection',
+	'reset_layout'
 ];
 
 describe('buildPanelTools', () => {
-	it('AC1/AC11: builds all fourteen tools with no browser and no document.modelContext', () => {
+	it('AC1/AC11: builds all fifteen tools with no browser and no document.modelContext (hotfix/panel-system: reset_layout)', () => {
 		const deps = createPanelToolTestHarness();
 		const tools = buildPanelTools(deps);
 		expect(tools.map((t) => t.name).sort()).toEqual([...TOOL_NAMES].sort());
