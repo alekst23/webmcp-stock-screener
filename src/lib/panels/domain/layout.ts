@@ -290,13 +290,24 @@ export function fullGridRect(): GridRect {
 	return { col: 0, row: 0, colSpan: GRID_COLUMNS, rowSpan: GRID_ROWS };
 }
 
-// CONTRACT STUB — signature only; see docs/design/panel-system/technical.md
-// "Illustrate the empty grid" for the intended implementation. Body
-// replaced by the implementing agent, driven by layout.test.ts.
+// Walks every unit cell of the columns x rows grid, row-major from (0, 0),
+// and returns the ones not covered by any rect in `occupied` as their own
+// 1x1 GridRect -- used to render the empty-grid illustration. Reuses
+// rectsOverlap rather than re-deriving overlap math.
 export function computeEmptyCells(
 	occupied: OccupiedRect[],
 	columns: number = GRID_COLUMNS,
 	rows: number = GRID_ROWS
 ): GridRect[] {
-	throw new Error('not implemented');
+	const empty: GridRect[] = [];
+	for (let row = 0; row < rows; row++) {
+		for (let col = 0; col < columns; col++) {
+			const cell: GridRect = { col, row, colSpan: 1, rowSpan: 1 };
+			const covered = occupied.some((o) => rectsOverlap(cell, o.rect));
+			if (!covered) {
+				empty.push(cell);
+			}
+		}
+	}
+	return empty;
 }
