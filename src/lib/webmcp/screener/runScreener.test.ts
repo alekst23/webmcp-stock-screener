@@ -645,4 +645,93 @@ describe('run_screener: auto-bind to the results_table panel (T-0020-2)', () => 
 			: [];
 		expect(resultsPanels, 'AC4: no duplicate panel was created by the second bind').toHaveLength(1);
 	});
+
+	// T-0020-4: the spec's "Multiple results panels present" scenario -- the
+	// first results_table panel found (by workspace panel order) is bound,
+	// the rest are left untouched. Implemented correctly by construction
+	// (bindRunToResultsPanel's Array.find()), but nothing seeded two
+	// results_table panels and asserted on the second one before this test.
+	it('test_runScreener_twoResultsTablePanels_bindsOnlyTheFirstOne', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const firstPanel = createPanel(panelUseCaseDeps(workspaceId), {
+			context: { actor: 'agent' },
+			kind: 'results_table',
+			rect: { col: 0, row: 0, colSpan: 2, rowSpan: 4 }
+		});
+		const secondPanel = createPanel(panelUseCaseDeps(workspaceId), {
+			context: { actor: 'agent' },
+			kind: 'results_table',
+			rect: { col: 2, row: 0, colSpan: 2, rowSpan: 4 }
+		});
+		const firstPanelId = firstPanel.affectedIds[0]!;
+		const secondPanelId = secondPanel.affectedIds[0]!;
+
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, panelBinding });
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const json = jsonOf(result) as { run_id: string };
+
+		expect(result.isError, 'AC2: the run itself must still succeed').toBeFalsy();
+
+		const doc = deps.repository.get(workspaceId);
+		if (!doc) {
+			throw new Error(`Workspace not found: ${workspaceId}`);
+		}
+		const panels = readPanelState(doc).panels;
+		const firstSource = panels.find((p) => p.id === firstPanelId)?.source;
+		const secondSource = panels.find((p) => p.id === secondPanelId)?.source;
+
+		expect(
+			firstSource,
+			'the first results_table panel by workspace panel order must be bound to the new run'
+		).toEqual({ type: 'screener_results', ref: { run_id: json.run_id } });
+		expect(
+			secondSource,
+			'the second results_table panel must be left unaffected -- binding only ever touches the first'
+		).toBeNull();
+	});
+
+	// T-0020-8: by code inspection, replayCache.lookup() returns before a
+	// runId is even minted, so a replay can never reach
+	// bindRunToResultsPanel -- but nothing in the suite proved it, and a
+	// future refactor reordering the replay check relative to the binding
+	// call could silently introduce a double-bind with zero test signal.
+	// The workspace's own revision counter is the proof: bindPanelSource
+	// commits through RevisionService, so a second bind would advance the
+	// revision a second time even if the bound value ends up looking
+	// identical.
+	it('test_runScreener_replayedIdempotencyKey_doesNotRebindPanel', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		createPanel(panelUseCaseDeps(workspaceId), {
+			context: { actor: 'agent' },
+			kind: 'results_table'
+		});
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, panelBinding });
+		const input = {
+			workspace_id: workspaceId,
+			screener_id: screenerId,
+			idempotency_key: 'bind-replay-key'
+		};
+
+		const first = jsonOf(await tool.execute(input)) as { run_id: string };
+		const revisionAfterFirst = deps.repository.get(workspaceId)?.revision;
+
+		const second = jsonOf(await tool.execute(input)) as { run_id: string };
+		const revisionAfterReplay = deps.repository.get(workspaceId)?.revision;
+
+		expect(
+			second.run_id,
+			'AC10: a replayed key must return the original run_id, not mint a new one'
+		).toBe(first.run_id);
+		expect(fake.callCount(), 'a replayed key must not execute a second evaluation').toBe(1);
+		expect(
+			revisionAfterReplay,
+			'a replay must not re-run the panel-binding side effect -- the workspace revision must not advance a second time'
+		).toBe(revisionAfterFirst);
+		expect(
+			resultsTablePanelSource(workspaceId),
+			'the panel must still resolve to the original run after a replay, not be double-processed'
+		).toEqual({ type: 'screener_results', ref: { run_id: first.run_id } });
+	});
 });
