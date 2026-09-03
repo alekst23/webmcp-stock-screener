@@ -83,6 +83,66 @@ The likely split, from reading the backend during epic authoring:
 Backend style: 4-space indent, Black at line length 100, type hints,
 exception chaining at infra boundaries.
 
+## Solution Approach
+
+**Implements**: the "Backend reconciliation" scenarios in spec.md (dead
+module, surviving module, health check on retired endpoint, layering).
+
+**Approach**: gated on T-1015-2's (superseded) verdict. Classification is
+already largely settled by T-1015-1's inventory §6, verified against real
+import graphs — this ticket executes it rather than re-deriving it.
+Delete `backend/api/routes/research.py`, `backend/api/schemas/
+research.py` (the 5-endpoint legacy surface plus `GET /api/research/
+panel`), `backend/domain/models/instance.py`, `measurement.py`,
+`pattern.py`, `backend/domain/contracts/engine.py`, and `backend/infra/
+pandas_engine.py`, none of which has an importer outside the retiring
+set. Also delete the already-orphaned `backend/tests/mocks/
+mock_pattern_research_engine.py` (zero importers today, independent of
+this cutover) and the tests that exist only to cover the modules above
+(`test_research_routes.py`, `test_pattern_research_engine.py`,
+`test_query_engine_stats.py`). `backend/tests/unit/
+test_universe_metadata.py` also retires, but only after its incidental
+`nasdaq_screener.py` parsing coverage (shared, kept infra) is re-homed
+into a surviving test file — deleting it outright would silently drop
+that coverage. `backend/scripts/measure_universe_scale.py`,
+`analyze_universe_scope.py`, and `measure_container_memory.py` use
+`pandas_engine.py` purely as a memory-measurement harness and need a
+different harness or an accepted capability loss, decided here rather
+than left broken. **Health check**: the epic doc's stated hazard
+(`render.yaml` pointing at `/api/spike/ping`) is stale — `render.yaml`
+already points `healthCheckPath` at `/health` (T-0016-2's
+`backend/api/routes/health.py`, which deliberately imports nothing from
+`api.routes.spike`/`api.routes.research`). This ticket only needs to
+delete `backend/api/routes/spike.py`, `backend/api/schemas/spike.py`, and
+`backend/tests/functional/test_spike_ping.py`, and confirm nothing else
+still references them (AC5 is satisfied by verification, not by moving
+the health check). `backend/infra/expression.py` is kept — it is imported
+by `backend/infra/similarity_features.py` (EPIC-1012, live), so retiring
+it would break the similarity engine; this resolves the epic's Open
+Question 2 concretely. `backend/domain/panel_disclosure.py` and
+`test_panel_disclosure.py`'s final disposition, and the three
+`test_health.py` classes that use `/api/spike/ping` or `/api/research/
+panel` as their exercise vehicle, are decided in this ticket, not
+carried over unresolved. After deletions, confirm `CORS_ALLOWED_ORIGINS`
+handling in `backend/main.py` still admits the deployed frontend origin
+and local dev origin (AC6), drop the `research_router`/`spike_router`
+registrations and the legacy engine construction from `backend/main.py`
+while leaving shared panel-loading and the similarity/backtest wiring
+untouched, and confirm the domain layer still imports nothing from infra
+after the cleanup (AC7, `arch-check`).
+
+**Contracts to introduce**: none — existing Protocols/models are deleted
+or left as-is; no re-expression in new vocabulary happens within this
+ticket's scope.
+
+**Config vars introduced**: none.
+
+**References**: `docs/plan/EPIC-1015/retirement-inventory.md` §6 (the
+backend classification table this ticket executes), `capability-parity-
+matrix.md`, `docs/design/pattern-research-workbench/technical.md`,
+`docs/reference/deployment.md`, `docs/reference/data-provider.md`,
+`render.yaml`.
+
 ## Out of Scope
 
 Frontend changes (T-1015-3, T-1015-5, T-1015-6). Building new backend
