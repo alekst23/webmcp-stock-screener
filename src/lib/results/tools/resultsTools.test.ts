@@ -231,7 +231,7 @@ describe('available()', () => {
 		const deps = createHarness(testPinnedRunStore());
 		createPanel(deps, { context: ctx(), kind: 'results_table' });
 		const [getScreenerResultsSpec] = buildResultsTools(deps);
-		expect(getScreenerResultsSpec!.available({} as never)).toBe(false);
+		expect(getScreenerResultsSpec!.available()).toBe(false);
 	});
 
 	it('is true once a panel is bound to an available run', () => {
@@ -243,8 +243,8 @@ describe('available()', () => {
 			source: { type: 'screener_results', ref: { run_id: 'run_1' } }
 		});
 		const [getScreenerResultsSpec, explainResultSpec] = buildResultsTools(deps);
-		expect(getScreenerResultsSpec!.available({} as never)).toBe(true);
-		expect(explainResultSpec!.available({} as never)).toBe(true);
+		expect(getScreenerResultsSpec!.available()).toBe(true);
+		expect(explainResultSpec!.available()).toBe(true);
 	});
 
 	it('is false once the bound run is evicted', () => {
@@ -257,7 +257,7 @@ describe('available()', () => {
 			source: { type: 'screener_results', ref: { run_id: 'run_unknown' } }
 		});
 		const [getScreenerResultsSpec] = buildResultsTools(deps);
-		expect(getScreenerResultsSpec!.available({} as never)).toBe(false);
+		expect(getScreenerResultsSpec!.available()).toBe(false);
 	});
 });
 

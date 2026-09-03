@@ -1,5 +1,14 @@
 # Workspace Snapshots — Product Spec
 
+> **Superseded (EPIC-1015, 2026-09-03).** Named, `localStorage`-local
+> snapshots (`src/lib/workspace/snapshots.ts`) have been deleted. Replaced
+> by the new surface's revision model — `save_workspace`,
+> `restore_workspace_revision`, `get_change_history`, and `undo_change`
+> (see `docs/design/workspace-revisions/spec.md`), a superset in intent
+> (full revision history, not just named point-in-time saves). Kept here,
+> unmodified below, as the historical record. Do not build against
+> anything below this banner; it does not describe current behavior.
+
 ## Intent
 
 A researcher iterating across multiple lines of investigation currently

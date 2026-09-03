@@ -290,8 +290,33 @@ class TestNothingLoadable:
         with TestClient(app) as client:
             app.state.engine = None
             app.state.panel_status = None
-            response = client.get("/api/research/panel")
+            response = client.get("/api/panel/status")
 
         assert response.status_code == 503, f"got {response.status_code}"
         detail = response.json()["detail"]
         assert "price panel" in detail, f"the error must name the panel: {detail}"
+
+
+class TestPanelStatusRoute:
+    # Bug fix (see git history): GET /api/panel/status is the new-surface
+    # replacement for the retired GET /api/research/panel; this proves the
+    # happy path returns the disclosed status over real HTTP, not just that
+    # disclose() itself is correct in isolation (TestDisclose above).
+    def test_a_loaded_panel_returns_its_disclosed_status_over_http(self) -> None:
+        app = main_module.app
+        app.state.panel_status = PanelStatus(
+            as_of=date(2024, 6, 1),
+            first_date=date(2024, 1, 1),
+            ticker_count=2,
+            row_count=100,
+            source="mock",
+            is_synthetic=True,
+        )
+
+        with TestClient(app) as client:
+            response = client.get("/api/panel/status")
+
+        assert response.status_code == 200, f"got {response.status_code}: {response.text}"
+        body = response.json()
+        assert body["source"] == "mock", f"got {body}"
+        assert "Synthetic demo data" in body["notices"][0], f"got {body['notices']}"

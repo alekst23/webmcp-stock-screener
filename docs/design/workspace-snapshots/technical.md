@@ -1,5 +1,12 @@
 # Workspace Snapshots — Technical Design
 
+> **Superseded (EPIC-1015, 2026-09-03).** `src/lib/workspace/snapshots.ts`
+> and `snapshotGuard.ts`, the files this doc describes, have been deleted.
+> See `workspace-snapshots/spec.md`'s banner and
+> `docs/design/workspace-revisions/spec.md` for the replacement. Kept as
+> historical record; nothing below this banner names a file that still
+> exists.
+
 ## Contracts
 
 ### `SnapshotSummary` (`src/lib/workspace/snapshots.ts`)

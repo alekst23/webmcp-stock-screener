@@ -654,7 +654,14 @@ function describeBindSource(raw: unknown, doc: WorkspaceDocument): string {
 		: `Cannot bind the source of chart ${input.panelId}: ${result.issues.join(' ')}`;
 }
 
-function applyBindSource(raw: unknown, doc: WorkspaceDocument): MutationDraft {
+// Exported (bug fix, see git history) so chart/registry/chartPanelKind.ts's
+// SourceTypeDefinition.applyBinding can call the exact same apply logic the
+// chart.bind_source *operation* itself uses (createChartBindSourceOperation
+// below), reused verbatim rather than reimplemented, from the entry point
+// (the generic bind_panel_source tool) that actually needed it -- this
+// file's own header already documented that intent, it just had no caller
+// until now.
+export function applyBindSource(raw: unknown, doc: WorkspaceDocument): MutationDraft {
 	const input = parseChartSourceInput(raw);
 	const state = readChartState(doc, input.panelId);
 	const result = buildSourceTransition(state.config, input);

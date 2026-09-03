@@ -7,6 +7,7 @@ import { validatePlacement } from '../domain/layout';
 import { makePanel, type Panel, type PanelSourceRef } from '../domain/panel';
 import type { GridRect } from '../domain/grid';
 import type { MutationContext, MutationEnvelope } from '../../workbench/domain/mutation';
+import type { WorkspaceDocument } from '../../workbench/domain/workspace';
 import { PanelOperationError } from './errors';
 import {
 	commitPanelChange,
@@ -79,7 +80,34 @@ export function createPanel(deps: PanelUseCaseDeps, request: CreatePanelRequest)
 			throwPlacementViolation(placement.violation);
 		}
 
+		// Bug fix (see git history): a source type's own applyBinding hook
+		// (sourceRendererRegistry.ts) folds any effect its binding has beyond
+		// panel.source into this same commit -- mirrors bindPanelSource.ts's
+		// own documentPatch, which is what actually populates a chart's
+		// ChartState.config.instrument. Without this, a panel created with an
+		// initial chart source stored panel.source correctly but left
+		// ChartPanelBody.svelte's readChartData with nothing to read, so the
+		// panel sat refusing "has no instrument" even after a fully
+		// successful create.
+		const sourceType = source ? deps.sourceRenderer.getSourceType(source.type) : undefined;
+
 		const id = deps.ids.next('panel', request.kind);
+		if (state.panels.some((p) => p.id === id)) {
+			// The sequencer is the only thing that mints panel IDs, and its
+			// contract is that it never repeats one for a given (kind,
+			// discriminator) pair -- see workbench/domain/ids.ts. Reaching this
+			// means it was constructed without (or with a stale) seed, so a
+			// prior panel with this exact ID already exists in state. Throwing
+			// here rather than silently accepting a colliding ID keeps this
+			// class of bug loud instead of corrupting the workspace with two
+			// panels sharing one ID.
+			throw new PanelOperationError(
+				'panel_id_collision',
+				`Minted panel ID "${id}" already exists. The ID sequencer was not seeded from ` +
+					`the active workspace -- this is an internal bug, not a caller error.`,
+				{ id }
+			);
+		}
 		const panel: Panel = makePanel({
 			id,
 			kind: request.kind,
@@ -93,7 +121,10 @@ export function createPanel(deps: PanelUseCaseDeps, request: CreatePanelRequest)
 		return {
 			nextState: { ...state, panels: [...state.panels, panel] },
 			affectedIds: [id],
-			diffSummary: `Added ${request.kind} panel "${panel.title}" at column ${rect.col}, row ${rect.row}.`
+			diffSummary: `Added ${request.kind} panel "${panel.title}" at column ${rect.col}, row ${rect.row}.`,
+			...(sourceType?.applyBinding
+				? { documentPatch: (doc: WorkspaceDocument) => sourceType.applyBinding!(doc, id, source!.ref) }
+				: {})
 		};
 	});
 }

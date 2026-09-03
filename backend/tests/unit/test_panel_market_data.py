@@ -97,6 +97,13 @@ class TestPanelPriceSeriesPort:
 
         assert observed == [], f"expected [] for an unrecognized series, got {observed}"
 
+    def test_has_ticker_distinguishes_unknown_ticker_from_empty_window(self) -> None:
+        bars = _daily_bars("AAA", [10.0], date(2024, 1, 1))
+        port = PanelPriceSeriesPort(PanelFrame.from_bars(bars), _status())
+
+        assert port.has_ticker("AAA") is True, "expected the panel's own ticker to be known"
+        assert port.has_ticker("ZZZ") is False, "expected a ticker never in the panel to be unknown"
+
     def test_provenance_reflects_panel_status(self) -> None:
         bars = _daily_bars("AAA", [10.0], date(2024, 1, 1))
         status = _status(as_of=date(2024, 6, 15), source="object-store")

@@ -8,10 +8,11 @@ numbers — they're a provider's published rates, not a contract.
 
 EODHD is an **ingestion-time data source**, not a runtime dependency. It
 feeds a one-time backfill plus a nightly delta into our own panel storage
-(Parquet, in Cloudflare R2 — see "Storage" below). The app never calls EODHD live
-during a user's search — `findInstances`, `measure`, `showGrid`, etc. always
-read our own stored panel via the FastAPI service. See
-[`docs/plan.md`](../plan.md) for the full architecture.
+(Parquet, in Cloudflare R2 — see "Storage" below). The app never calls EODHD
+live during a user's search — the screener, chart, and similarity tools
+(`run_screener`, `get_chart_data`, `find_similar_setups`, etc.) always read
+our own stored panel via the FastAPI service. See
+[`docs/plan/project.md`](../plan/project.md) for the full architecture.
 
 ## Plan
 

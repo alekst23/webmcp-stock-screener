@@ -36,8 +36,18 @@ works afterwards.
 2. **Capability-parity check**: every legacy capability mapped to a
    new-surface equivalent, a stated partial match, or a deliberate drop
    — before anything is deleted.
-3. **Route migration**: every route in the app renders the new
-   panel/workspace model instead of the legacy one.
+3. **Route migration**: the app converges onto one URL running the new
+   panel/workspace model, wrapped in a newly-built shared shell — header,
+   product identity, and WebMCP status — following the app's existing
+   dark, dense visual language rather than reusing the legacy header
+   component outright. The interim second route is removed. The shell
+   also restores two small affordances the legacy page had: a
+   human-clickable close button on each panel, and a compact header icon
+   that expands into the human/agent-attributed action log. A brand-new
+   workspace is seeded with the full intended composition — not just
+   filter/results/chart, but also watchlist, alert-draft, and
+   similar-setups panels — so a fresh workspace looks like the target
+   design rather than a placeholder subset.
 4. **Tool-surface removal**: the 11 legacy tools, their registrations,
    their contracts, and their tests are deleted.
 5. **Workspace-model removal**: the legacy store, engine client, and
@@ -74,9 +84,16 @@ works afterwards.
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
 | Happy path | routes rendering the legacy workspace model | migration completes | every route renders the new panel/workspace model and reads no legacy state |
+| One URL, one surface | the app after migration | any route is visited | the canonical app URL renders the new panel/workspace model; the interim second route no longer exists as a separate surface |
+| Shared shell | the migrated app | it loads | a header shows product identity, data-freshness, and WebMCP status (defined/available tool counts, bridge state) — the same information the legacy header showed, in a newly-built component matching the app's existing visual language |
 | Status header | the WebMCP status header on the migrated page | an agent connects | it reports defined tool count, available tool count, and bridge state for the new surface |
 | Surviving capability | a capability the parity check marked as surviving and UI-observable | the migrated app is used | that capability is reachable from the UI |
+| Panel close | a panel a human wants to remove | they use its close affordance | the panel is removed from the layout, the same effect as the agent-side remove-panel action |
+| Action log access | a workspace with recorded history | a human expands the header's log icon | every recorded action is visible, each attributed to human or agent |
+| Workspace read parity | an agent calls the shared workspace-read tool | any panel kind is present in the workspace, including ones introduced after the read model was first defined | the panel appears in the result — the read path is not silently blind to any panel kind |
+| Rich default layout | a brand-new workspace | it is created | the default layout includes filter, results, and chart panels plus watchlist, alert-draft, and similar-setups panels, matching the intended full composition |
 | Throwaway scaffolding | the spike route left over from the platform spike | migration completes | it is removed and nothing links to it |
+| Manual tool harness | the legacy manual tool-testing route | migration completes | it is removed along with the legacy tool surface it exercised |
 
 ### Tool-surface removal
 
@@ -126,7 +143,18 @@ works afterwards.
 
 - Building any part of the new surface — that belongs to EPIC-1006
   through EPIC-1014. This feature only removes and re-points.
-- Adding capabilities neither surface has.
+- Adding capabilities neither surface has, with the specific confirmed
+  exceptions listed as Features above (shared shell, panel close, action
+  log, rich default layout) — those are wiring/UI work exposing tools and
+  contracts that already exist, not new product capability.
+- Multi-step temporal setup matching with inter-step windows, arbitrary
+  outcome-measurement/splitting (the legacy `measure`/`splitInstances`
+  shape), progressive tool availability, and instance sampling by
+  strategy — all confirmed drops with no new-surface equivalent. Not
+  built as part of this cutover.
+- A full attribution/audit data model beyond what the action log needs —
+  this feature adds actor attribution (human vs. agent) to log entries,
+  not a general-purpose audit system.
 - A dual-surface coexistence mode, a deprecation period, or feature-
   flagged gradual migration. The standing decision is one cutover at
   the end, gated on user approval.
@@ -140,30 +168,34 @@ works afterwards.
 
 ## Open Questions
 
-1. **Does multi-step temporal setup matching survive?** The legacy
-   surface matches sequences of conditions with per-step windows over
-   `(ticker, date)` events. The new surface's nearest analogue combines
-   a typed filter tree's temporal and pattern conditions with a screener
-   run. Whether inter-step windows survive, or only single temporal
-   predicates, is unknown until the sibling epics land. *Assumption*:
-   partial match, to be confirmed and stated during the parity check.
-2. **Do outcome measurement and instance splitting survive?** Their
-   nearest counterparts are backtest tools that the target design lists
-   as follow-ups rather than core. *Assumption*: if those did not ship,
-   this is a deliberate drop requiring explicit user sign-off before the
-   tools are removed.
-3. **Do named snapshots survive as such?** The target design specifies
-   named workspace revisions with change history and restore, which is a
-   superset in intent but a different model. *Assumption*: revisions
-   supersede snapshots; the snapshot module is absorbed, not kept in
-   parallel.
-4. **Does progressive tool availability survive?** The legacy surface
-   registers tools as the workflow unlocks them, which was a deliberate
-   demonstration of the WebMCP tool-change story. The transport that
-   implements it is being kept, so a drop here would be a product
-   decision. *Assumption*: it survives; confirm during the parity check.
-5. **Which sibling epic owns which capability?** Unknown while
-   EPIC-1006 through EPIC-1014 are planned concurrently. *Assumption*:
-   the inventory and parity check are built against merged code and the
-   sibling epics' plan docs, treating the target tool design as intent
-   rather than as a record of what shipped.
+All five original open questions are resolved, against the epic's own
+retirement inventory (T-1015-1) and capability-parity check (T-1015-2),
+confirmed with the user on 2026-09-03:
+
+1. **Multi-step temporal setup matching does not survive.** Confirmed
+   structural gap — the new filter tree's temporal condition is
+   single-predicate only, with no inter-step window chaining anywhere in
+   the new surface. Accepted as a deliberate drop.
+2. **Outcome measurement and instance splitting do not survive.**
+   Confirmed — the backtest tools compute a differently-shaped
+   walk-forward result, not a metric-vs-base-rate comparison or a
+   winner/loser split. Accepted as a deliberate drop.
+3. **Named snapshots do not survive as such.** Confirmed — workspace
+   revisions (with undo/restore/change-history) supersede them; the
+   snapshot module is absorbed, not kept in parallel.
+4. **Progressive tool availability does not survive.** Confirmed — every
+   tool group in the new surface registers statically; no live
+   registration path implements the workflow-gated toolchange
+   demonstration. Accepted as a deliberate drop.
+5. **Sibling-epic ownership is resolved.** EPIC-1006 through EPIC-1014
+   are all merged; the inventory and parity check were built against
+   merged code, not plan docs.
+
+Two further items the parity check surfaced beyond the original five,
+also resolved:
+
+6. **Instance sampling by strategy does not survive.** No equivalent
+   exists, wired or not. `get_screener_results`' bounded, paginated page
+   is the closest available primitive. Accepted as a deliberate drop.
+7. **The manual tool-testing route is retired, not migrated.** Low
+   impact; it existed to exercise the legacy tool surface specifically.

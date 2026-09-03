@@ -16,7 +16,7 @@ no point-in-time fundamentals source and no delisting/event calendar in
 Python (T-1014-5's own note). Reporting that explicitly -- empty
 `field_ids()`, `includes_delisted() is False`, empty event lists -- is this
 program's established "explicit unavailable, never a placeholder" pattern
-(domain/panel_disclosure.py, unavailableMarketData.ts on the TS side), not
+(unavailableMarketData.ts on the TS side), not
 a shortcut: the engine's own survivorship/lookahead logic already turns
 these honest capability flags into an honest reported statement.
 """
@@ -93,6 +93,14 @@ class PanelPriceSeriesPort:
     def get_bars(self, ticker: str, from_date: date, to_date: date) -> list[PriceBar]:
         start, stop = _row_range(self._panel, ticker, from_date, to_date)
         return [self._panel.bar_at(i) for i in range(start, stop)]
+
+    def has_ticker(self, ticker: str) -> bool:
+        """Whether the loaded panel carries any data for `ticker` at all --
+        distinct from `get_bars` returning an empty list, which is also what
+        a *known* ticker with no bars inside the requested window looks
+        like. Callers that need to tell "unknown ticker" apart from "no bars
+        in this window" (api/routes/chart.py's 404) use this first."""
+        return self._panel.bounds(ticker) is not None
 
     def get_series(
         self, ticker: str, series_ref: SeriesRef, from_date: date, to_date: date

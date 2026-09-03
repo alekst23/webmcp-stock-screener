@@ -1,357 +1,155 @@
-<script lang="ts">
-	import { onMount } from 'svelte';
+<script module lang="ts">
+	// T-1015-3: module-scoped, not component-scoped -- originally mirrored
+	// the interim /workbench route's own compositionGuard (T-0020-9);
+	// T-1015-9 retired that route (AC3), so this is now the only guard.
+	// Surviving across remounts of this route module (SPA back/forward
+	// navigation without a full reload, a future in-app link back to '/')
+	// means a second mount reuses the first mount's composition instead of
+	// silently building a second, orphaned one.
 	import { env } from '$env/dynamic/public';
-	import { workspaceStore } from '$lib/workspace/store';
-	import { activityStore, clearActivity } from '$lib/workspace/activity';
-	import { createApiEngine, type InstanceWindowView } from '$lib/workspace/apiEngine';
 	import { resolveApiBaseUrl } from '$lib/workspace/apiConfig';
-	import {
-		fetchPanelStatus,
-		formatFreshness,
-		formatPanelStatus,
-		type PanelStatus
-	} from '$lib/workspace/panelStatus';
-	import { startBridgeSession } from '$lib/webmcp/session';
-	import { buildTools } from '$lib/webmcp/tools';
-	import {
-		buildWebmcpStatus,
-		formatAgentToolsContext,
-		formatAvailableStatus,
-		formatBridgeStatus,
-		formatDefinedStatus,
-		type WebmcpBridgeState,
-		type WebmcpStatus
-	} from '$lib/webmcp/status';
-	import AppShell from '$lib/shell/AppShell.svelte';
-	import GridPanel from '$lib/workspace/GridPanel.svelte';
-	import FocusChart from '$lib/workspace/FocusChart.svelte';
-	import ActivityFeed from '$lib/workspace/ActivityFeed.svelte';
-	import ChartToolbar from '$lib/workspace/ChartToolbar.svelte';
-	import SnapshotPicker from '$lib/workspace/SnapshotPicker.svelte';
+	import { createWorkbenchCompositionGuard } from '$lib/workbench/composition/workbenchCompositionGuard';
+	import { registerWorkbenchComposition } from '$lib/workbench/composition/workbenchCompositionRoot';
 
-	const apiConfig = { baseUrl: resolveApiBaseUrl(env.PUBLIC_API_BASE_URL) };
+	// Resolved once, at module scope, so every mount (and the chart tool
+	// group's own composition below) agrees on which backend the app talks
+	// to -- $env/dynamic/public is populated server-side and does not change
+	// between mounts of this route module.
+	const apiBaseUrl = resolveApiBaseUrl(env.PUBLIC_API_BASE_URL);
 
-	// The real fetch-based ResearchEngine (T-0001-5), the same one an agent's
-	// WebMCP tool calls resolve against -- registered here so a real
-	// WebMCP-capable browser sees the live tool surface on this page.
-	const engine = createApiEngine(workspaceStore, apiConfig);
+	// Bug fix (see git history): registerWorkbenchComposition() used to be
+	// called with no arguments, so the chart tool group's own HTTP bars port
+	// always pointed at DEV_API_BASE_URL regardless of the deployed
+	// PUBLIC_API_BASE_URL -- this closure is what threads the real,
+	// resolved backend address into it, the same address fetchPanelStatus
+	// below already uses.
+	const compositionGuard = createWorkbenchCompositionGuard(() =>
+		registerWorkbenchComposition({ chartBaseUrl: apiBaseUrl })
+	);
+</script>
 
-	// The instance selected from a grid cell (AC2), rendered as the larger
-	// detail chart below. Holds the already-fetched InstanceWindowView, not
-	// just a (ticker, date) -- there's no backend request that fetches a
-	// single named instance's window on its own (see FocusChart.svelte).
-	let focusedView = $state<InstanceWindowView | null>(null);
+<script lang="ts">
+	// T-1015-3: the main route migrated off the legacy workspace model
+	// (workspace/store.ts, workspace/apiEngine.ts, webmcp/tools.ts) onto the
+	// same panel/workspace composition root EPIC-0020 originally wired for
+	// the interim /workbench route -- registerWorkbenchComposition(), reused
+	// here rather than a second composition (AC1, AC8). T-1015-9 retired
+	// /workbench (AC3), so this is now that composition's only call site.
+	//
+	// T-1015-9 AC2: the header markup that used to live inline here moved
+	// into WorkbenchShell.svelte, a genuinely new component (AC1) -- this
+	// route now only owns data fetching/bridge wiring and wraps
+	// PanelContainer in that shell.
+	import { onMount } from 'svelte';
+	import type { PanelShellRuntime } from '$lib/panels/shell/registerPanelTools';
+	import PanelContainer from '$lib/panels/shell/PanelContainer.svelte';
+	import WorkbenchShell from '$lib/panels/shell/WorkbenchShell.svelte';
+	import { fetchPanelStatus, type PanelStatus } from '$lib/workspace/panelStatus';
+	import { connectNewSurfaceBridge } from '$lib/webmcp/newSurfaceSession';
+	import type { WebmcpBridgeState, WebmcpStatus } from '$lib/webmcp/status';
 
-	// Static full tool surface (AC3) -- independent of feature #10's
-	// progressive availability, which only affects what's registered.
+	const apiConfig = { baseUrl: apiBaseUrl };
+
+	// The composed panel/workspace runtime PanelContainer needs. Null until
+	// the composition guard's promise settles (AC1) -- there is no partial
+	// state to render before then.
+	let runtime = $state<PanelShellRuntime | null>(null);
+
+	// AC2: the status header's two counts and bridge state, now fed by the
+	// new tool surface's own document.modelContext.getTools() rather than
+	// the legacy buildTools(engine) list -- see newSurfaceSession.ts for why
+	// session.ts/register.ts (built around per-tool progressive availability,
+	// a confirmed structural drop for this surface) could not be reused
+	// as-is. There is no separate "available" count left to track once
+	// connected: every flag-enabled tool group registers unconditionally in
+	// one pass, so "defined" and "available" agree the moment the bridge
+	// reports connected. WorkbenchShell derives the two counts from these.
 	let webmcpStatus = $state<WebmcpStatus | null>(null);
-
-	// Whether an agent can actually call any of them right now, and how many
-	// are registered at this moment. Kept apart from webmcpStatus so the
-	// defined count never has to stand in for callability.
 	let bridgeState = $state<WebmcpBridgeState>('connecting');
-	let availableNames = $state<string[]>([]);
 
-	// How current the backend's price panel is (T-0001-9 AC4). Null while it
-	// is being fetched, and left null when the backend has no panel at all --
-	// claiming an unknown as-of date would be worse than showing none.
+	// T-0001-9 AC4: how current the backend's price panel is. Independent of
+	// the panel/workspace composition -- a plain backend freshness fetch, not
+	// legacy workspace state (parity matrix: "Backend address resolution...
+	// Match, exact, shared code").
 	let panelStatus = $state<PanelStatus | null>(null);
 
-	// No header search control on this page: ticker/universe selection is a
-	// WebMCP tool-only action here, so an agent can't be bypassed by a human
-	// typing directly into a text box. ChartToolbar's "Show monthly" action
-	// still reads this value; only the control that let a human write to it
-	// is gone.
-	let tickers = $state('MOCK02, MOCK03');
-
-	// Derived rather than computed inline in the template ({@const} may only
-	// sit directly inside a block/snippet, not a plain <div>) -- recomputes
-	// whenever panelStatus changes, same as everything else the header reads
-	// off it.
-	let freshness = $derived(formatFreshness(panelStatus));
+	// Bug fix (see git history): a failed composition used to leave `runtime`
+	// null forever with no visible signal beyond a small header string --
+	// the main viewport just showed "Preparing workspace…" indefinitely.
+	// connectNewSurfaceBridge() never rejects (it swallows a failed compose
+	// into bridgeState: 'failed' + result: null), so connectComposition()
+	// below always settles; the viewport branches on bridgeState instead of
+	// waiting on a runtime that will never arrive.
+	function connectComposition(): void {
+		connectNewSurfaceBridge(
+			() => compositionGuard.ensure(),
+			(state) => (bridgeState = state)
+		).then(({ result, status }) => {
+			runtime = result;
+			webmcpStatus = status;
+		});
+	}
 
 	onMount(() => {
-		webmcpStatus = buildWebmcpStatus(buildTools(engine));
-
 		fetchPanelStatus(apiConfig)
 			.then((status) => (panelStatus = status))
 			.catch(() => (panelStatus = null));
 
-		// The bridge state machine lives in session.ts so it is testable without
-		// mounting this component (hotfix/webmcp-bridge-status).
-		return startBridgeSession(
-			engine,
-			activityStore,
-			(state) => (bridgeState = state),
-			(names) => (availableNames = names)
-		);
+		connectComposition();
 	});
-
-	// The tool lists are overlays (see the .tool-menu styles) and <details>
-	// has no native dismissal, so without this an open list sits over the work
-	// area and swallows the next click on a panel beneath it -- the only way
-	// out would be clicking its own summary again.
-	let statusBar = $state<HTMLElement | null>(null);
-
-	function openToolMenus(): HTMLDetailsElement[] {
-		return [...(statusBar?.querySelectorAll<HTMLDetailsElement>('details[open]') ?? [])];
-	}
-
-	function dismissToolMenus(event: PointerEvent): void {
-		for (const menu of openToolMenus()) {
-			if (event.target instanceof Node && menu.contains(event.target)) {
-				continue;
-			}
-			menu.open = false;
-		}
-	}
-
-	function dismissToolMenusOnEscape(event: KeyboardEvent): void {
-		if (event.key !== 'Escape') {
-			return;
-		}
-		for (const menu of openToolMenus()) {
-			menu.open = false;
-			// Escape must not strand focus inside the list it just hid.
-			menu.querySelector<HTMLElement>('summary')?.focus();
-		}
-	}
 </script>
 
-<svelte:window onpointerdown={dismissToolMenus} onkeydown={dismissToolMenusOnEscape} />
+<svelte:head>
+	<title>MarketPane</title>
+</svelte:head>
 
-<AppShell>
-	{#snippet topBar()}
-		<div class="identity-group">
-			<div class="identity">
-				<span class="mark" aria-hidden="true"></span>
-				<h1>MarketPane</h1>
-				<span class="protocol">WebMCP</span>
+<WorkbenchShell
+	{panelStatus}
+	{webmcpStatus}
+	{bridgeState}
+	historyDeps={runtime
+		? { history: runtime.deps.history, workspaceId: runtime.deps.workspaceId }
+		: null}
+	observer={runtime?.observer ?? null}
+>
+	<div class="panel-viewport">
+		{#if runtime}
+			<PanelContainer deps={runtime.deps} observer={runtime.observer} />
+		{:else if bridgeState === 'failed'}
+			<div class="composition-error" role="alert">
+				<p>The workspace failed to load. Check the console for details.</p>
+				<button type="button" onclick={connectComposition}>Retry</button>
 			</div>
-			<span
-				class="freshness-pill"
-				class:synthetic={freshness.state === 'synthetic'}
-				class:stale={freshness.state === 'stale'}
-				class:unknown={freshness.state === 'unknown'}
-				title={panelStatus ? formatPanelStatus(panelStatus) : undefined}
-			>
-				{freshness.label}
-			</span>
-		</div>
-		{#if webmcpStatus}
-			<div class="webmcp-status" bind:this={statusBar}>
-				<details class="tool-menu" name="tool-menu">
-					<summary>{formatDefinedStatus(webmcpStatus)}</summary>
-					<ul>
-						{#each webmcpStatus.toolNames as name (name)}
-							<li>{name}</li>
-						{/each}
-					</ul>
-				</details>
-				<details class="tool-menu" name="tool-menu">
-					<summary>{formatAvailableStatus(availableNames.length)}</summary>
-					{#if availableNames.length}
-						<ul>
-							{#each availableNames as name (name)}
-								<li>{name}</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="empty">No tools are registered for an agent to call right now.</p>
-					{/if}
-				</details>
-				<span class="bridge" class:degraded={bridgeState === 'failed'}>
-					{formatBridgeStatus(bridgeState)}
-				</span>
-			</div>
-			{@html `<!-- ${formatAgentToolsContext(webmcpStatus, bridgeState)} -->`}
+		{:else}
+			<p class="loading">Preparing workspace…</p>
 		{/if}
-	{/snippet}
-
-	<SnapshotPicker store={workspaceStore} onload={() => (focusedView = null)} />
-
-	<ChartToolbar {engine} activity={activityStore} {tickers} onclear={() => (focusedView = null)} />
-
-	{#each $workspaceStore.panels as panel (panel.id + ':' + panel.instanceSetId)}
-		{#if panel.kind === 'grid'}
-			<GridPanel
-				{panel}
-				{engine}
-				config={apiConfig}
-				store={workspaceStore}
-				onselect={(view) => (focusedView = view)}
-			/>
-		{/if}
-	{/each}
-
-	{#if focusedView && $workspaceStore.focus?.selected.length}
-		<FocusChart view={focusedView} />
-	{/if}
-
-	{#snippet log()}
-		<ActivityFeed events={$activityStore} onclear={() => clearActivity(activityStore)} />
-	{/snippet}
-</AppShell>
+	</div>
+</WorkbenchShell>
 
 <style>
-	.identity-group {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--space-sm) var(--space-md);
-		min-width: 0;
-	}
-
-	.identity {
-		display: flex;
-		align-items: baseline;
-		gap: var(--space-sm);
-		min-width: 0;
-	}
-
-	.mark {
-		align-self: center;
-		width: 0.55rem;
-		height: 0.55rem;
-		border-radius: 1px;
-		background: var(--accent);
-		box-shadow: 0 0 0 3px var(--bg-elevated);
-	}
-
-	h1 {
-		margin: 0;
-		font-size: var(--font-size-lg);
-		white-space: nowrap;
-	}
-
-	.protocol {
-		font-family: var(--font-mono);
-		font-size: var(--font-size-xs);
-		letter-spacing: var(--tracking-label);
-		text-transform: uppercase;
-		color: var(--text-muted);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 0 var(--space-xs);
-	}
-
-	.webmcp-status {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--space-xs) var(--space-md);
-		font-size: var(--font-size-sm);
-		color: var(--text-secondary);
-	}
-
-	/* Anchored so opening a tool list overlays the work area instead of
-	   growing the top bar and shoving the whole page down. Both menus carry
-	   the same `name`, so the browser keeps at most one open and they can
-	   never occlude each other. */
-	.tool-menu {
+	/* `contain: layout` makes this box the containing block for
+	   PanelContainer's own `position: fixed; inset: 0` -- so the panel grid
+	   fills this region below the shell's header instead of the true
+	   viewport, without any change to PanelContainer.svelte itself (AC5). */
+	.panel-viewport {
 		position: relative;
+		flex: 1;
+		min-height: 0;
+		contain: layout;
 	}
 
-	.tool-menu summary {
-		cursor: pointer;
-		padding: var(--space-xs) var(--space-sm);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		background: var(--bg-elevated);
-		white-space: nowrap;
-		user-select: none;
-	}
-
-	.tool-menu[open] summary {
-		border-color: var(--border-strong);
-		color: var(--text-primary);
-	}
-
-	.tool-menu ul,
-	.tool-menu .empty {
-		position: absolute;
-		right: 0;
-		top: calc(100% + var(--space-xs));
-		/* Above AppShell's sticky .top-bar (z-index 10): the list is anchored
-		   inside that header, so anything lower is clipped behind it. */
-		z-index: 20;
-		min-width: 14rem;
-		max-height: 60vh;
-		overflow-y: auto;
-		margin: 0;
-		padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-lg);
-		background: var(--bg-elevated);
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-md);
-		font-family: var(--font-mono);
-		font-size: var(--font-size-xs);
-		color: var(--text-secondary);
-	}
-
-	.tool-menu .empty {
-		padding-left: var(--space-sm);
-		font-family: var(--font-ui);
+	.loading {
+		padding: var(--space-lg);
+		color: var(--text-muted);
 		font-style: italic;
+	}
+
+	.composition-error {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-sm);
+		padding: var(--space-lg);
 		color: var(--text-muted);
-	}
-
-	.bridge {
-		font-family: var(--font-mono);
-		font-size: var(--font-size-xs);
-		letter-spacing: var(--tracking-label);
-		text-transform: uppercase;
-		color: var(--text-muted);
-		white-space: nowrap;
-	}
-
-	/* A degraded bridge must not read like a working one at a glance -- the
-	   whole point of this line is that "defined" never implies "callable". */
-	.bridge.degraded {
-		color: var(--degraded);
-		background: var(--degraded-bg);
-		border: 1px solid var(--degraded);
-		border-radius: var(--radius-sm);
-		padding: 0 var(--space-xs);
-	}
-
-	/* Replaces the permanent synthetic-data warning banner: the header's one
-	   freshness/status indicator (docs/design/terminal-ui-theme/spec.md's
-	   "Data-freshness pill"). Base treatment covers `fresh`; `unknown` and
-	   the two disclosure states below override colour only. */
-	.freshness-pill {
-		display: inline-block;
-		font-family: var(--font-mono);
-		font-size: var(--font-size-xs);
-		letter-spacing: var(--tracking-label);
-		color: var(--text-secondary);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 0 var(--space-xs);
-		white-space: nowrap;
-	}
-
-	.freshness-pill.unknown {
-		color: var(--text-muted);
-	}
-
-	/* A stale pull must not carry the same visual weight as a fresh one. */
-	.freshness-pill.stale {
-		color: var(--warning);
-		border-color: var(--warning);
-	}
-
-	/* Synthetic data must not read like real market data at a glance -- the
-	   disclosure the old permanent banner existed to make, now carried by
-	   the pill instead. */
-	.freshness-pill.synthetic {
-		color: var(--synthetic);
-		background: var(--synthetic-bg);
-		border-color: var(--synthetic);
-	}
-
-	@media (max-width: 680px) {
-		h1 {
-			white-space: normal;
-		}
 	}
 </style>

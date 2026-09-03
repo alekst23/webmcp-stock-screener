@@ -6,7 +6,7 @@
 // the operation's input, turns typed errors into tool failures, and reports
 // how many of the requested instruments were newly added versus already
 // present.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	IdempotencyConflictError,

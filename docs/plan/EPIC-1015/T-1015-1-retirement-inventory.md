@@ -1,7 +1,7 @@
 # T-1015-1: Retirement inventory and audit
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
-**Status**: Open
+**Status**: Done — see `docs/plan/EPIC-1015/retirement-inventory.md`
 **Depends on**: —
 **Blocks**: T-1015-2
 
@@ -118,6 +118,49 @@ engine and a tool-spec list:
   `PriceChart.svelte`, `FocusChart.svelte`, `ChartToolbar.svelte`,
   `ActivityFeed.svelte`, `SnapshotPicker.svelte`.
 - `src/routes/dev/+page.svelte` — the legacy manual tool harness.
+
+## Solution Approach
+
+**Status**: implemented — see `docs/plan/EPIC-1015/retirement-inventory.md`
+for the full deliverable; this section records the approach taken, not a
+plan still to execute.
+
+**Implements**: the "Retirement inventory" scenarios in
+`docs/design/legacy-surface-cutover/spec.md` (happy path, infrastructure
+inside a legacy directory, absorb with no destination).
+
+**Approach**: pure documentation deliverable — no source, test, or config
+file touched. Started from this ticket's own Technical Considerations
+draft above, then verified every classification against real, current
+import graphs on the code that exists on
+`epic/EPIC-1015-legacy-surface-cutover` (forked from `main` @ `c3ed17c`),
+rather than trusting the draft. Corrections that came out of that
+verification: `register.ts`/`session.ts`/`status.ts` moved from a flat
+"keep" to "absorb, contingent on T-1015-2's sign-off" once tracing found
+zero current callers outside the legacy chain; `apiConfig.ts` was added as
+"keep" because three live new-surface tool files import it directly,
+despite living in the legacy `workspace/` directory — the concrete case
+AC5 warns about (never classify by directory alone). Mixed-purpose files
+were split at the symbol level rather than classified whole (`webmcp/
+types.ts` → a keep transport slice and a retire product slice;
+`webmcp/tools.ts`'s `ok`/`fail` helpers flagged as a mandatory extraction
+before the rest of the file can retire, since 19 new-surface files import
+them today). One absorb candidate with no real destination
+(`visualization.ts` — independently reimplemented by
+`workbench/chart/components/chartScales.ts`, nothing left to port) was
+downgraded to retire per AC4. Build/deploy config, CI, and untouched
+scripts are called out in their own "deliberately untouched" section
+(AC7) instead of being silently omitted. Every path was checked with a
+real existence check, not assumed (AC6).
+
+**Contracts to introduce**: none — this ticket produces a markdown
+artifact, not code.
+
+**Config vars introduced**: none.
+
+**References**: `docs/plan/EPIC-1015/retirement-inventory.md` (the
+deliverable itself), `docs/design/pattern-research-workbench/technical.md`,
+`docs/tools.md`.
 
 ## Out of Scope
 

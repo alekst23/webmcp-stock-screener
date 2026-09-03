@@ -26,7 +26,13 @@ frontend's `PUBLIC_API_BASE_URL` must point at the App Runner address.
 
 ## T-0001-8 verification status (2026-08-31)
 
-Checked against `T-0001-8-deployment-runbook.md`'s "Verify" section:
+Checked against `T-0001-8-deployment-runbook.md`'s "Verify" section, back
+when the legacy 11-tool surface was still the deployed product. **EPIC-1015
+has since retired `/api/spike/ping` and every `/api/research/*` route named
+below** — this table is kept as the historical record of that verification
+event, not as a description of current endpoints. See "Post-cutover status"
+below for what exists now; live re-verification against it is T-1015-8, not
+yet run as of this doc.
 
 | Check | AC | Result |
 |---|---|---|
@@ -37,9 +43,24 @@ Checked against `T-0001-8-deployment-runbook.md`'s "Verify" section:
 | Frontend talking to backend (CORS) | AC2 | ✅ `CORS_ALLOWED_ORIGINS` set to the real frontend origin and backend redeployed; `Access-Control-Allow-Origin` now present on responses |
 | Full example research session | AC5 | ✅ (backend path) — `POST /api/research/find-instances` against the live deployed backend, with the frontend's `Origin` header, returns real matched instances from the mock panel (not just the spike endpoint). Not yet driven through the actual frontend UI / a live WebMCP agent — that's a stronger check but wasn't required to confirm the deployed backend is functionally correct end-to-end |
 
-T-0001-8 is functionally verified. Backend and frontend are both live,
-correctly wired to each other, and serving real product functionality
-over the network.
+T-0001-8 is functionally verified as of that date. Backend and frontend
+were both live, correctly wired to each other, and serving real product
+functionality over the network — on the surface that existed then.
+
+## Post-cutover status (EPIC-1015 / T-1015-4)
+
+`backend/api/routes/research.py` (the 5-endpoint legacy surface plus
+`GET /api/research/panel`) and `backend/api/routes/spike.py` are deleted.
+The surviving backend routes are:
+
+| Route | Purpose |
+|---|---|
+| `GET /health` | Liveness only — succeeds whenever the process is up, independent of panel state (`backend/api/routes/health.py`). This is `render.yaml`'s `healthCheckPath`. |
+| `POST /api/similarity/search`, `GET /api/similarity/runs/{run_id}`, `GET /api/similarity/runs/{run_id}/candidates/{candidate_id}/explanation` | The similarity-search tool group's backend (`backend/api/routes/similarity.py`). |
+| `POST /api/backtests`, `GET /api/backtests/{backtest_id}` | The backtest tool group's backend (`backend/api/routes/backtest.py`) — the frontend tools that call it are not yet reachable from the live app; see `docs/tools.md`'s "Not yet part of the live tool surface". |
+
+Live re-verification of these against the actual deployment is T-1015-8's
+job, not this ticket's — the table above is not re-run here.
 
 ## Deploy-path deviations from the original runbook
 

@@ -1,12 +1,12 @@
 """T-0016-2: liveness endpoint for the App Runner health check.
 
-Exercises api/routes/health.py's HTTP wiring against real app instances --
-NOT api/routes/spike.py or api/routes/research.py, which stay the answer for
-"is the panel real and current" (see docs/design/aws-replatform/technical.md's
-"Liveness endpoint" section). AC6 (that surface is unchanged) is covered by
-the existing test_research_routes.py/test_panel_disclosure.py suites; this
-file only adds one reachability check to confirm the health route didn't
-disturb it.
+Exercises api/routes/health.py's HTTP wiring against real app instances.
+api/routes/spike.py and api/routes/research.py (and the mock-panel
+provenance endpoint the latter served) have since been retired as dead
+surface with no new-surface importer; `TestHealthRateLimitExemption` and
+`TestResearchPanelUnaffected` below are repointed off those routes onto
+`api/routes/similarity.py`, the surviving route that best mirrors their
+original vehicle (a GET that depends on the loaded panel).
 """
 
 from __future__ import annotations
@@ -22,7 +22,6 @@ from fastapi.testclient import TestClient
 import main as main_module
 from api.routes.health import HEALTH_PATH
 from api.routes.health import router as health_router
-from api.routes.spike import PANEL_PATH as SPIKE_PANEL_PATH
 from infra.object_store import S3PanelStore
 from scripts.generate_mock_panel import generate_panel, write_panel
 
@@ -36,7 +35,7 @@ def _reload_app() -> None:
 
 class TestHealthLivenessEndpoint:
     def test_health_returns_success_when_the_mock_panel_is_loaded(self) -> None:
-        write_panel(generate_panel(), output_path=SPIKE_PANEL_PATH)
+        write_panel(generate_panel(), output_path=main_module.PANEL_PATH)
         _reload_app()
 
         with TestClient(main_module.app) as client:
@@ -57,9 +56,10 @@ class TestHealthLivenessEndpoint:
         monkeypatch.setattr(main_module, "PANEL_PATH", tmp_path / "absent.parquet")
 
         with TestClient(main_module.app) as client:
-            assert (
-                main_module.app.state.engine is None
-            ), f"expected no engine to have loaded, got {main_module.app.state.engine!r}"
+            assert main_module.app.state.similarity_engine is None, (
+                "expected no similarity engine to have loaded, got "
+                f"{main_module.app.state.similarity_engine!r}"
+            )
             response = client.get(HEALTH_PATH)
 
         assert response.status_code == 200, (
@@ -70,7 +70,7 @@ class TestHealthLivenessEndpoint:
     def test_health_probe_performs_no_file_or_object_store_io(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        write_panel(generate_panel(), output_path=SPIKE_PANEL_PATH)
+        write_panel(generate_panel(), output_path=main_module.PANEL_PATH)
         _reload_app()
 
         with TestClient(main_module.app) as client:
@@ -104,13 +104,17 @@ class TestHealthRateLimitExemption:
     ) -> None:
         # A 1/minute budget makes the boundary deterministic and fast: any
         # exemption failure shows up on the 2nd request, not the 61st.
+        # The vehicle proving the budget is genuinely active used to be
+        # /api/spike/ping, since retired; /api/similarity/runs/{id} is the
+        # surviving route closest in shape -- a real GET that depends on the
+        # loaded panel, unrelated to the health probe's own exemption.
         monkeypatch.setenv("RATE_LIMIT_DEFAULT", "1/minute")
         _reload_app()
-        write_panel(generate_panel(), output_path=SPIKE_PANEL_PATH)
+        write_panel(generate_panel(), output_path=main_module.PANEL_PATH)
 
         with TestClient(main_module.app) as client:
             health_responses = [client.get(HEALTH_PATH) for _ in range(5)]
-            spike_responses = [client.get("/api/spike/ping") for _ in range(2)]
+            other_responses = [client.get("/api/similarity/runs/no-such-run") for _ in range(2)]
 
         for index, response in enumerate(health_responses):
             assert response.status_code == 200, (
@@ -118,14 +122,14 @@ class TestHealthRateLimitExemption:
                 f"(AC4), got {response.status_code}: {response.text}"
             )
 
-        assert spike_responses[0].status_code == 200, (
-            "expected the 1st spike request, within the 1/minute budget, to return 200, got "
-            f"{spike_responses[0].status_code}: {spike_responses[0].text}"
+        assert other_responses[0].status_code != 429, (
+            "expected the 1st non-health request, within the 1/minute budget, to not be "
+            f"throttled, got {other_responses[0].status_code}: {other_responses[0].text}"
         )
-        assert spike_responses[1].status_code == 429, (
-            "expected the 2nd spike request, over the 1/minute budget, to be throttled -- "
+        assert other_responses[1].status_code == 429, (
+            "expected the 2nd non-health request, over the 1/minute budget, to be throttled -- "
             "proving the budget is genuinely active and health's exemption isn't just a high "
-            f"limit, got {spike_responses[1].status_code}: {spike_responses[1].text}"
+            f"limit, got {other_responses[1].status_code}: {other_responses[1].text}"
         )
 
         monkeypatch.delenv("RATE_LIMIT_DEFAULT", raising=False)
@@ -134,11 +138,9 @@ class TestHealthRateLimitExemption:
 
 class TestHealthIndependentOfSpikeStack:
     def test_health_works_when_no_other_router_is_registered(self) -> None:
-        # Deliberately builds a bare app with ONLY health_router -- no
-        # spike_router, no research_router -- to prove AC5 structurally:
-        # deleting every /api/spike route cannot break this endpoint,
-        # because nothing about it depends on spike existing in the first
-        # place.
+        # Deliberately builds a bare app with ONLY health_router -- proves
+        # AC5 structurally: nothing about /health depends on any other
+        # router existing, spike/research (since retired) included.
         app = FastAPI()
         app.include_router(health_router)
 
@@ -152,14 +154,21 @@ class TestHealthIndependentOfSpikeStack:
 
 
 class TestResearchPanelUnaffected:
-    def test_research_panel_endpoint_is_still_reachable(self) -> None:
-        write_panel(generate_panel(), output_path=SPIKE_PANEL_PATH)
+    def test_surviving_panel_backed_route_is_still_reachable(self) -> None:
+        # GET /api/research/panel (the original vehicle here) has since been
+        # retired along with the rest of api/routes/research.py. Repointed
+        # to api/routes/similarity.py -- the surviving route that, like the
+        # old one, answers from the same loaded panel -- to keep covering
+        # "the health route's own changes don't disturb a panel-backed
+        # route" (AC6's underlying concern) without a route that no longer
+        # exists.
+        write_panel(generate_panel(), output_path=main_module.PANEL_PATH)
         _reload_app()
 
         with TestClient(main_module.app) as client:
-            response = client.get("/api/research/panel")
+            response = client.get("/api/similarity/runs/no-such-run")
 
-        assert response.status_code == 200, (
-            "expected GET /api/research/panel to remain the provenance answer, unchanged "
-            f"(AC6), got {response.status_code}: {response.text}"
+        assert response.status_code == 404, (
+            "expected GET /api/similarity/runs/{id} to remain reachable and answer from the "
+            f"loaded panel (AC6), got {response.status_code}: {response.text}"
         )

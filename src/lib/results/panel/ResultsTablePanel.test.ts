@@ -104,7 +104,7 @@ function mountPanel(
 		target,
 		props: {
 			panel,
-			onBroadcast: () => {},
+			onBroadcast: () => false,
 			deps: { useCaseDeps: deps, runs, resolveTicker }
 		}
 	});

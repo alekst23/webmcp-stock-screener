@@ -5,6 +5,12 @@ since `main.py` reads `RATE_LIMIT_DEFAULT`/`CORS_ALLOWED_ORIGINS` once at
 import time (see main.py's `_rate_limit_default`/`_allowed_origins`) --
 a fresh app + limiter is the only way to exercise a specific value from a
 test.
+
+The original vehicle, `/api/spike/ping`, has since been retired along with
+the rest of api/routes/spike.py. Repointed to the health route (CORS -- any
+route works, and health needs no loaded panel) and to
+`/api/similarity/runs/{id}` (rate limiting -- must be a route the health
+probe's own exemption doesn't apply to).
 """
 
 from __future__ import annotations
@@ -15,16 +21,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main as main_module
-from api.routes.spike import PANEL_PATH
+from api.routes.health import HEALTH_PATH
 from scripts.generate_mock_panel import generate_panel, write_panel
 
 
 def _reload_app_with_panel() -> None:
     """Reload `main` so the just-patched env var takes effect, then
-    regenerate the mock panel `/api/spike/ping` reads from (same setup as
-    test_spike_ping.py -- the panel is a gitignored build artifact)."""
+    regenerate the mock panel the reloaded app reads from (the panel is a
+    gitignored build artifact)."""
     importlib.reload(main_module)
-    write_panel(generate_panel(), output_path=PANEL_PATH)
+    write_panel(generate_panel(), output_path=main_module.PANEL_PATH)
 
 
 class TestRateLimiting:
@@ -38,11 +44,11 @@ class TestRateLimiting:
         _reload_app_with_panel()
 
         with TestClient(main_module.app) as client:
-            responses = [client.get("/api/spike/ping") for _ in range(4)]
+            responses = [client.get("/api/similarity/runs/no-such-run") for _ in range(4)]
 
         for index, response in enumerate(responses[:3]):
-            assert response.status_code == 200, (
-                f"expected request {index}, within the 3/minute budget, to return 200, "
+            assert response.status_code != 429, (
+                f"expected request {index}, within the 3/minute budget, to not be throttled, "
                 f"got {response.status_code}: {response.text}"
             )
         over_budget = responses[3]
@@ -63,11 +69,9 @@ class TestCorsConfiguration:
         _reload_app_with_panel()
 
         with TestClient(main_module.app) as client:
-            allowed = client.get(
-                "/api/spike/ping", headers={"Origin": "https://allowed.example.com"}
-            )
+            allowed = client.get(HEALTH_PATH, headers={"Origin": "https://allowed.example.com"})
             disallowed = client.get(
-                "/api/spike/ping", headers={"Origin": "https://not-allowed.example.com"}
+                HEALTH_PATH, headers={"Origin": "https://not-allowed.example.com"}
             )
 
         assert (

@@ -6,6 +6,7 @@ export {
 	readPanelState,
 	writePanelState,
 	emptyPanelState,
+	panelIdSeed,
 	type PanelSystemState
 } from './panelState';
 export { renderedRects } from './maximize';

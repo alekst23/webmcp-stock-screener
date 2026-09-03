@@ -434,7 +434,11 @@ describe('refineSimilaritySearch', () => {
 		});
 		const doc = deps.repository.get(deps.workspaceId)!;
 		deps.repository.put(
-			writePanelState(doc, { panels: [otherPanel], links: { groups: [] }, selections: {} })
+			writePanelState(
+				doc,
+				{ panels: [otherPanel], links: { groups: [] }, selections: {} },
+				deps.kinds
+			)
 		);
 		const api = fakeApi(sourceRun());
 

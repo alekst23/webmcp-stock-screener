@@ -1,8 +1,9 @@
-// In-memory Storage so each test gets an isolated backing store, mirroring
-// src/lib/workspace/testSupport.ts's memoryStorage. Kept as its own copy
-// rather than an import so the new workbench surface stays independent of
-// the shipping workspace module it lives alongside (per this epic's
-// coexistence rule).
+// In-memory Storage so each test gets an isolated backing store instead of
+// depending on (and leaking state through) jsdom's shared global
+// localStorage. Was kept as its own copy of the (now T-1015-6-deleted)
+// src/lib/workspace/testSupport.ts's memoryStorage, rather than an import,
+// so the new workbench surface stayed independent of the legacy workspace
+// module while both shipped side by side.
 export function memoryStorage(): Storage {
 	const data = new Map<string, string>();
 	return {

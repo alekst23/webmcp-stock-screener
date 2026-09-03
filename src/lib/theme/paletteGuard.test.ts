@@ -19,14 +19,11 @@ const HTML_SOURCES = import.meta.glob('/src/*.html', {
 }) as Record<string, string>;
 
 const PAGE = SOURCES['/src/routes/+page.svelte'] ?? '';
-const SHELL = SOURCES['/src/lib/shell/AppShell.svelte'] ?? '';
 const LAYOUT = SOURCES['/src/routes/+layout.svelte'] ?? '';
 const APP_HTML = HTML_SOURCES['/src/app.html'] ?? '';
-
-// The regions the shell renders, in source order, named by the snippet prop
-// each one takes -- read out of the source rather than spelled here so
-// renaming a region stays a refactor rather than a red test.
-const SHELL_REGIONS = [...SHELL.matchAll(/\{@render\s+(\w+)\(\)\}/g)].map((match) => match[1]);
+// T-1015-9: the status header (agent-context comment, tool counts) moved
+// out of +page.svelte and into this new, separately-composed shell.
+const WORKBENCH_SHELL = SOURCES['/src/lib/panels/shell/WorkbenchShell.svelte'] ?? '';
 
 describe('colour literal detection', () => {
 	it('test_finds_a_hex_literal_with_its_line_number', () => {
@@ -138,8 +135,14 @@ describe('colour literal detection', () => {
 	});
 
 	it('test_returns_empty_for_a_fully_tokenised_source', () => {
-		expect(SHELL, 'AppShell.svelte was not resolved').toContain('app-shell');
-		expect(findColourLiterals(SHELL, 'AppShell.svelte'), 'the shell names no colour').toEqual([]);
+		// T-1015-6: the legacy shell (src/lib/shell/AppShell.svelte) this test
+		// exercised was deleted with no reuse -- WorkbenchShell.svelte is the
+		// live shell now and is just as fully tokenised, so it stands in.
+		expect(WORKBENCH_SHELL, 'WorkbenchShell.svelte was not resolved').toContain('status-bar');
+		expect(
+			findColourLiterals(WORKBENCH_SHELL, 'WorkbenchShell.svelte'),
+			'the shell names no colour'
+		).toEqual([]);
 	});
 });
 
@@ -190,50 +193,30 @@ describe('the theme reaches the document', () => {
 	});
 });
 
-// Structural guarantees a restyle is uniquely likely to disturb, and that no
-// other test covers -- see technical.md, "Testing", for why a source
-// assertion was chosen over adding a component-mounting dependency.
-describe('restyle-sensitive shell invariants', () => {
-	it('test_the_log_region_renders_last_of_the_three', () => {
-		// The log's position is the shell's, not the page's: snippet
-		// declarations are order-independent, so this is the only file where
-		// "the activity log stays at the bottom" can actually be broken.
-		expect(SHELL_REGIONS.length, 'the shell no longer renders three regions').toBe(3);
-		const header = SHELL.indexOf('<header');
-		const main = SHELL.indexOf('<main');
-		const footer = SHELL.indexOf('<footer');
-		expect(header, 'the shell has no top bar landmark').toBeGreaterThan(-1);
-		expect(main, 'the work area must follow the top bar').toBeGreaterThan(header);
-		expect(footer, 'the log region must stay below the work area').toBeGreaterThan(main);
-		expect(
-			SHELL.indexOf(`{@render ${SHELL_REGIONS[2]}()}`),
-			'the last region is rendered outside the footer'
-		).toBeGreaterThan(footer);
-	});
-
-	it('test_the_grid_orders_the_three_regions_top_to_bottom', () => {
-		// DOM order alone is not the guarantee: a grid can reorder its rows.
-		expect(SHELL, 'the shell no longer lays its regions out as three rows').toMatch(
-			/grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+auto/
-		);
-		expect(SHELL, 'a region is reordering itself out of source order').not.toMatch(/\n\s*order:\s/);
-	});
-});
-
-describe('restyle-sensitive page invariants', () => {
+// T-1015-3: the main route no longer composes through AppShell (retired in
+// the retirement inventory with no new-surface consumer -- PanelContainer's
+// own `position: fixed; inset: 0` is a full-page escape hatch AppShell's
+// three-region grid cannot host without a CSS trick this ticket's page
+// applies locally instead, see +page.svelte's own `.panel-viewport`
+// comment). The action log is a confirmed, signed-off drop for this route
+// (capability-parity-matrix.md: "no replacement in progress under any
+// current epic") -- T-1015-10 owns building its new-surface affordance, not
+// this ticket, so there is no shell/snippet indirection left to assert here.
+describe('restyle-sensitive page invariants (post-T-1015-3 migration)', () => {
 	const page = PAGE;
 
-	it('test_the_activity_feed_is_the_shell_log_region', () => {
-		// Which region it is passed as, not where it sits in this file: the
-		// shell decides the order, so that is where the invariant is asserted.
-		const logRegion = SHELL_REGIONS[SHELL_REGIONS.length - 1];
-		const snippet = page.match(
-			new RegExp(`\\{#snippet ${logRegion}\\(\\)\\}([\\s\\S]*?)\\{/snippet\\}`)
-		);
-		expect(snippet, `the page no longer supplies the shell a ${logRegion} region`).not.toBeNull();
-		expect(snippet![1], 'the activity log is no longer the shell log region').toContain(
-			'<ActivityFeed'
-		);
+	it('test_the_page_no_longer_composes_through_the_shells_snippet_regions', () => {
+		expect(
+			page,
+			'the migrated page must not still route content through AppShell snippet regions'
+		).not.toMatch(/\{#snippet\s+\w+\(\)\}/);
+	});
+
+	it('test_the_action_log_is_not_rendered_a_confirmed_drop_for_this_route', () => {
+		expect(
+			page,
+			'ActivityFeed is a confirmed drop for the migrated route (T-1015-3)'
+		).not.toContain('<ActivityFeed');
 	});
 
 	it('test_agent_context_comment_is_still_emitted', () => {
@@ -241,25 +224,27 @@ describe('restyle-sensitive page invariants', () => {
 		// actual emitted comment -- not a rendered element, and not dropped.
 		// Asserted as three independent facts rather than one exact spelling,
 		// so extracting the template into a const stays a refactor.
-		expect(page, 'the agent context must still be raw-injected').toContain('{@html');
-		expect(page, 'formatAgentToolsContext must still be called').toContain(
+		// T-1015-9: this markup moved from +page.svelte into WorkbenchShell.svelte
+		// (a genuinely new component, AC1) -- the page still renders it, just
+		// through that component now, so the source-text check moves with it.
+		expect(WORKBENCH_SHELL, 'the agent context must still be raw-injected').toContain('{@html');
+		expect(WORKBENCH_SHELL, 'formatAgentToolsContext must still be called').toContain(
 			'formatAgentToolsContext('
 		);
-		expect(page, 'the context must still be emitted as an HTML comment').toContain('<!--');
+		expect(WORKBENCH_SHELL, 'the context must still be emitted as an HTML comment').toContain(
+			'<!--'
+		);
 	});
 
-	it('test_both_tool_counts_are_still_rendered_in_the_top_bar', () => {
-		const snippets = [...page.matchAll(/\{#snippet\s+(\w+)\(\)\}([\s\S]*?)\{\/snippet\}/g)].map(
-			(match) => ({ region: match[1] ?? '', body: match[2] ?? '' })
+	it('test_both_tool_counts_are_still_rendered_in_the_status_bar', () => {
+		// T-1015-9: the status-bar header itself moved into WorkbenchShell.svelte.
+		const statusBar = WORKBENCH_SHELL.match(/<header class="status-bar">([\s\S]*?)<\/header>/);
+		expect(statusBar, 'the shell no longer renders a status-bar header').not.toBeNull();
+		expect(statusBar![1], 'the defined-tool count left the status bar').toContain(
+			'formatDefinedStatus('
 		);
-		expect(snippets.length, 'the page composes nothing through the shell').toBeGreaterThan(0);
-		const topBar = snippets.find((snippet) => snippet.body.includes('formatDefinedStatus('));
-		expect(topBar, 'the defined-tool count is not rendered in any shell region').toBeDefined();
-		expect(topBar!.body, 'the callable-tool count left the top bar').toContain(
+		expect(statusBar![1], 'the callable-tool count left the status bar').toContain(
 			'formatAvailableStatus('
-		);
-		expect(SHELL, `the shell has no ${topBar!.region} region to render it in`).toContain(
-			topBar!.region
 		);
 	});
 });

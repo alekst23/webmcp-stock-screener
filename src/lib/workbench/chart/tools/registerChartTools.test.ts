@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { emptyWorkspace } from '../../domain/workspace';
 import type { WorkspaceDocument } from '../../domain/workspace';
+import {
+	createPanelShellRuntime,
+	createWorkbenchSharedInfra
+} from '../../../panels/shell/registerPanelTools';
 import { writeCapturedSetup } from '../domain/capturedSetup';
 import type { CapturedChartSetup } from '../domain/capturedSetup';
 import { createChartState, writeChartState } from '../domain/chartState';
-import { chartIdSeed, createChartIdSequencer } from './registerChartTools';
+import { chartIdSeed, createChartDeps, createChartIdSequencer } from './registerChartTools';
 
 const NOW = '2026-09-02T20:00:00.000Z';
 const PANEL_ID = 'panel_chart_1';
@@ -34,17 +38,22 @@ function seededDocument(): WorkspaceDocument {
 }
 
 describe('registerChartTools', () => {
-	it('defaults CHART_TOOLS_ENABLED to off, so the shipping surface is untouched', async () => {
+	// T-1015-3: flipped true -- the main route's composition root now wires
+	// this group's tools in (see workbenchCompositionRoot.ts). This is a
+	// genuine global constant (not per-route config), so this test asserts
+	// the new behavior directly, matching registerWorkbenchTools.test.ts's
+	// own T-0020-1 precedent.
+	it('CHART_TOOLS_ENABLED is true now that the composition root wires this group in (T-1015-3)', async () => {
 		const { CHART_TOOLS_ENABLED } = await import('./registerChartTools');
-		expect(CHART_TOOLS_ENABLED).toBe(false);
+		expect(CHART_TOOLS_ENABLED).toBe(true);
 	});
 
-	it('registers nothing against document.modelContext while the flag is off', async () => {
+	it('registers tools against document.modelContext now that the flag is on', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		const { registerChartTools, createDefaultChartDeps } = await import('./registerChartTools');
 		await registerChartTools(createDefaultChartDeps());
-		expect(registerTool).not.toHaveBeenCalled();
+		expect(registerTool).toHaveBeenCalled();
 		vi.unstubAllGlobals();
 	});
 
@@ -56,18 +65,77 @@ describe('registerChartTools', () => {
 		expect(deps.clock.now().length).toBeGreaterThan(0);
 	});
 
-	it('answers honestly rather than with fixtures when no market-data feed is wired', async () => {
+	// The real HTTP port (bug fix, see git history) resolves an instrument ID
+	// through the surface's own default `inst:<MIC>:<SYMBOL>` construction
+	// before ever touching the network; anything else is refused honestly as
+	// "no data for this instrument" rather than guessed at.
+	it('refuses an instrument ID outside the surface default construction, without touching the network', async () => {
 		const { createDefaultChartDeps } = await import('./registerChartTools');
 		const deps = createDefaultChartDeps();
 		await expect(
 			deps.series.fetchSeries({
-				instrumentId: 'inst:XNAS:NVDA',
+				instrumentId: 'AAPL',
 				timeframe: '1d',
 				window: { start: '2026-01-01', end: '2026-02-01' },
 				priceAdjustment: 'adjusted',
 				session: 'regular'
 			})
-		).rejects.toThrow(/No series is loaded/);
+		).rejects.toThrow(/carries no data for instrument/);
+	});
+});
+
+describe('createChartDeps', () => {
+	// Bug fix (see git history): this composition root used to build its own,
+	// separate WorkspaceRepository rather than sharing the one instance
+	// registerPanelTools.ts's createWorkbenchSharedInfra() builds, so a write
+	// through the panel tool group (e.g. bind_panel_source) was never visible
+	// through this group's own reads without a full reload.
+	it('shares the repository/revisions/history instances from the given shared infra bag', () => {
+		const shared = createWorkbenchSharedInfra();
+		const deps = createChartDeps(shared);
+
+		expect(
+			deps.repository,
+			"chart tools must share the composition root's WorkspaceRepository, not build their own"
+		).toBe(shared.repository);
+		expect(
+			deps.revisions,
+			"chart tools must share the composition root's RevisionService, not build their own"
+		).toBe(shared.revisions);
+		expect(
+			deps.history,
+			"chart tools must share the composition root's ChangeHistory, not build their own"
+		).toBe(shared.history);
+		expect(
+			deps.clock,
+			"chart tools must share the composition root's Clock, not build their own"
+		).toBe(shared.clock);
+	});
+
+	// `ids` deliberately stays its own, chart-seeded sequencer (see
+	// registerChartTools.ts's header) rather than reusing `shared.ids` --
+	// this proves it is still correctly seeded from the shared repository's
+	// active document, not merely a fresh, unseeded one.
+	it("seeds its own ids sequencer from the shared repository's active document", () => {
+		const shared = createWorkbenchSharedInfra();
+		createPanelShellRuntime(shared); // seeds the active workspace document
+		const activeId = shared.repository.getActiveId()!;
+		const doc = shared.repository.get(activeId)!;
+		const state = createChartState('panel_chart_1');
+		state.studies = [
+			{
+				id: 'study_4',
+				catalogItemId: 'study.sma',
+				params: { length: 20 },
+				pane: 'price_overlay',
+				order: 0,
+				enabled: true
+			}
+		];
+		shared.repository.put(writeChartState(doc, state));
+
+		const deps = createChartDeps(shared);
+		expect(deps.ids.next('study')).toBe('study_5');
 	});
 });
 

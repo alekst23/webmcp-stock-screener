@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 // beyond what a caller registers (AC4/AC8: schema and description must come
 // from the live registry, never a hardcoded list).
 import safetyToolsSource from './safetyTools.ts?raw';
-import { buildTools } from '../../webmcp/tools';
-import type { ResearchEngine } from '../../webmcp/types';
 import type { Clock, WorkspaceRepository } from '../domain/ports';
 import { createIdSequencer } from '../domain/ids';
 import type { ResourceId } from '../domain/ids';
@@ -178,7 +176,7 @@ describe('buildSafetyTools: registration (AC1)', () => {
 	it('both tools are unconditionally available', () => {
 		const deps = buildDeps();
 		for (const spec of buildSafetyTools(deps)) {
-			expect(spec.available({} as never), `${spec.name} must always be available`).toBe(true);
+			expect(spec.available(), `${spec.name} must always be available`).toBe(true);
 		}
 	});
 });
@@ -521,32 +519,10 @@ describe('no free-form mutating input (AC9)', () => {
 	});
 });
 
-describe('the existing pattern-research surface is unaffected (AC10)', () => {
-	it('buildTools from webmcp/tools.ts still returns its existing eleven tools', () => {
-		const stubEngine = new Proxy(
-			{},
-			{ get: () => async () => undefined }
-		) as unknown as ResearchEngine;
-
-		const names = buildTools(stubEngine)
-			.map((t) => t.name)
-			.sort();
-
-		expect(
-			names,
-			'the legacy eleven-tool surface must be byte-for-byte unchanged by this ticket'
-		).toEqual([
-			'clearPanels',
-			'defineSetup',
-			'defineStudy',
-			'findInstances',
-			'focusInstance',
-			'getWorkspace',
-			'measure',
-			'sampleInstances',
-			'showGrid',
-			'showTickerCharts',
-			'splitInstances'
-		]);
-	});
-});
+// T-1015-5: this file used to also carry an "AC10: the existing
+// pattern-research surface is unaffected" describe block, proving
+// buildTools() from the legacy webmcp/tools.ts still returned its eleven
+// tool names byte-for-byte. That regression guard existed only to protect
+// the legacy surface while it coexisted with this one; deleted along with
+// webmcp/tools.ts rather than left asserting on tool names that no longer
+// exist anywhere in the codebase.

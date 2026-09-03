@@ -1,5 +1,20 @@
 # Pattern Research Workbench — Product Spec
 
+> **Superseded (EPIC-1015, 2026-09-03).** The 11-tool surface this spec
+> describes (`defineStudy`, `defineSetup`, `findInstances`,
+> `sampleInstances`, `measure`, `splitInstances`, `showGrid`,
+> `showTickerCharts`, `clearPanels`, `focusInstance`, `getWorkspace`) has
+> been deleted from the codebase and is no longer reachable at any route.
+> It is replaced by the Screener Core, Panel System, and Chart Tools specs
+> (see `docs/design/README.md`). Most of this spec's capability list
+> carried over in reduced or absorbed form; a few were accepted as
+> deliberate drops. See `docs/tools.md`'s "Capability changes" section and
+> `docs/plan/EPIC-1015/capability-parity-matrix.md` for the full mapping.
+> Kept here, unmodified below, as the historical record of what the
+> original surface did — per project convention, amended/marked rather
+> than deleted, since the concept partially survives. Do not build against
+> anything below this banner; it does not describe current behavior.
+
 ## Intent
 
 A trader or researcher, working alongside an AI agent in the same browser

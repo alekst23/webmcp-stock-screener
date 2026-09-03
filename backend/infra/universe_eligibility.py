@@ -66,10 +66,10 @@ def recent_window_dollar_volume(frame: pd.DataFrame, window_sessions: int) -> pd
     ticker with no rows in the window correctly reports no volume there
     rather than a median computed from years-old activity).
 
-    Canonical copy, imported by `scripts/analyze_universe_scope.py` rather
-    than reimplemented there, so the analysis and the enforced floor always
-    agree on what "eligible" means -- the script exists to report on
-    candidate floors, this module exists to apply the chosen one.
+    The single canonical implementation `compute_eligible_universe` applies
+    against the enforced floor -- kept as its own function so the dollar-
+    volume computation can be reasoned about (and tested) independently of
+    the floor comparison built on top of it.
     """
     recent_dates = np.sort(frame["date"].unique())[-window_sessions:]
     windowed = frame[frame["date"].isin(recent_dates)]

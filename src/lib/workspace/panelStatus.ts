@@ -3,8 +3,19 @@
 // A dedicated GET rather than a field on getWorkspace: getWorkspace runs
 // purely client-side and never touches the network (docs/plan.md's
 // "Sessions" section), so it has nothing to say about server-side data.
-// backend/api/routes/research.py serves this.
-import type { ApiClientConfig } from '../webmcp/types';
+// backend/api/routes/panel.py serves this (bug fix, see git history:
+// T-1015-4 deleted the original backend/api/routes/research.py's
+// GET /api/research/panel without noticing this live new-surface caller;
+// panel.py is the new-surface replacement).
+
+// T-1015-5: used to be shared with apiEngine.ts's networked tool calls via
+// webmcp/types.ts's ApiClientConfig, which also carried an
+// instanceSetStorage hook that module never used. Now that apiEngine.ts is
+// gone, this is the only remaining consumer -- defined locally, narrowed to
+// the one field this module reads.
+export interface ApiClientConfig {
+	baseUrl: string;
+}
 
 // backend/domain/models/panel.py's PanelStatus (snake_case on the wire,
 // matching the Pydantic model directly -- same convention as apiEngine.ts's

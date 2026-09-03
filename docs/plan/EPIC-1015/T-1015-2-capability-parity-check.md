@@ -1,7 +1,9 @@
 # T-1015-2: Capability-parity check (deletion gate)
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
-**Status**: Open
+**Status**: Done — verdict is **NO-GO**; see
+`docs/plan/EPIC-1015/capability-parity-matrix.md`. Per this epic's own gate,
+T-1015-3/T-1015-4 must not start until the user has reviewed that verdict.
 **Depends on**: T-1015-1
 **Blocks**: T-1015-3, T-1015-4
 
@@ -92,6 +94,50 @@ Also check the non-tool capabilities, which are easy to miss because no
 tool name points at them: human-side grid selection, single-panel close,
 the activity/action log with its human-vs-agent attribution, the manual
 tool harness route, and the workspace-status header.
+
+## Solution Approach
+
+**Status**: implemented — see
+`docs/plan/EPIC-1015/capability-parity-matrix.md` for the full deliverable.
+Verdict at time of writing was **NO-GO**; this was superseded by an
+explicit user decision on 2026-09-03 (recorded in `_epic.md`'s
+Superseded note) that accepted most flagged drops and turned the rest into
+new ticket scope (T-1015-9 through T-1015-12). This section records the
+approach taken.
+
+**Implements**: the "Capability-parity check" scenarios in spec.md (exact
+match, partial match, deliberate drop, doc-only tool, no-go).
+
+**Approach**: documentation deliverable, gated on T-1015-1's inventory; no
+code touched. Enumerated every capability from
+`docs/design/pattern-research-workbench/spec.md`'s Behavioral
+Specifications plus the non-tool capabilities T-1015-1 flagged (workspace-
+status header, human/agent-attributed action log, human-side grid
+selection and panel close). Checked each against merged code, not design
+intent, and extended the spec's "doc-only tool counts as a drop" rule to
+code that exists but is unreachable: nine new-surface tool groups were
+found real, tested, and merged but gated behind a build-time flag with no
+external caller at the time of the check — recorded as "reachability
+gaps," distinct from confirmed "structural gaps" that flag-flipping alone
+cannot close (multi-step temporal sequencing, `measure`/`splitInstances`,
+instance focus as a distinct concept, progressive tool availability, the
+manual tool-harness route). All drops and partial matches were collected
+into one sign-off section (AC5), and the ticket produced an explicit
+go/no-go verdict plus what would change it (AC6). No file was deleted or
+modified (AC7). The three hard cases named in advance in the epic's Open
+Questions (temporal matching, measure/split, progressive availability)
+were each resolved with a concrete, code-verified answer rather than left
+as assumptions.
+
+**Contracts to introduce**: none.
+
+**Config vars introduced**: none — this ticket reads the state of
+existing `*_TOOLS_ENABLED` flags, it does not define any.
+
+**References**: `docs/plan/EPIC-1015/capability-parity-matrix.md` (the
+deliverable), `docs/plan/EPIC-1015/retirement-inventory.md`,
+`docs/design/pattern-research-workbench/spec.md`,
+`docs/design/workspace-snapshots/spec.md`.
 
 ## Out of Scope
 

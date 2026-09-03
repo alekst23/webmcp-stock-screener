@@ -111,7 +111,14 @@ async function registerSpecs(): Promise<Map<string, ToolSpec>> {
 	);
 }
 
-describe('T-0020-3: create_screener -> set_screener_universe -> edit_filter_tree -> run_screener -> panel read', () => {
+// Chart-demo trim (see plan: "Trim the WebMCP tool surface to a chart-only
+// demo set"): registerWorkbenchComposition() no longer registers the
+// screener or workbench-core tool groups this whole flow depends on
+// (create_screener, set_screener_universe, edit_filter_tree, run_screener,
+// get_canvas_state) -- see workbenchCompositionRoot.ts. Skipped rather than
+// deleted or hand-edited, so un-skipping is the exact counterpart to
+// uncommenting those groups' call sites back in.
+describe.skip('T-0020-3: create_screener -> set_screener_universe -> edit_filter_tree -> run_screener -> panel read', () => {
 	it('the run_screener call succeeds and its matches are readable through the bound results_table panel', async () => {
 		const specs = await registerSpecs();
 		try {

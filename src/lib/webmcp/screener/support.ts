@@ -17,7 +17,7 @@ import {
 	UndoTokenError
 } from '../../workbench/domain/errors';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
-import { fail } from '../tools';
+import { fail } from '../toolResult';
 import type { ToolResult } from '../types';
 
 // Maps a typed T-1006-2 error to the tool failure shape; anything else

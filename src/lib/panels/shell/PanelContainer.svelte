@@ -11,6 +11,7 @@
 	import {
 		propagateLinkedValue,
 		readSnapshot,
+		removePanelByHuman,
 		togglePanelCollapsed,
 		type LinkedValues,
 		type PanelSnapshot,
@@ -47,9 +48,18 @@
 		refresh();
 	}
 
+	function handleRemove(panelId: string): void {
+		removePanelByHuman(deps, panelId);
+		refresh();
+	}
+
+	// Returns whether the broadcast actually reached anyone (bug fix, see git
+	// history): propagateLinkedValue's `targets` used to be discarded here, so
+	// a placeholder body broadcasting on a channel with zero linked panels
+	// looked identical to a successful send -- the input cleared either way.
 	function handleBroadcast(sourcePanelId: string) {
-		return (channel: PanelLinkChannel, value: string): void => {
-			const { next } = propagateLinkedValue(
+		return (channel: PanelLinkChannel, value: string): boolean => {
+			const { next, targets } = propagateLinkedValue(
 				snapshot.state.links,
 				channel,
 				sourcePanelId,
@@ -57,6 +67,7 @@
 				linkedValues
 			);
 			linkedValues = next;
+			return targets.length > 0;
 		};
 	}
 </script>
@@ -71,6 +82,7 @@
 				kindDefinition={deps.kinds.get(panel.kind)}
 				linkedValue={linkedValues[panel.id]}
 				onToggleCollapse={handleToggleCollapse}
+				onRemove={handleRemove}
 				onBroadcast={handleBroadcast(panel.id)}
 			/>
 		{/if}

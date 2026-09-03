@@ -2,12 +2,47 @@ import { describe, expect, it } from 'vitest';
 import { emptyWorkspace } from '../../workbench/domain/workspace';
 import { makePanel } from '../domain/panel';
 import { linkPanels, type LinkContext } from '../domain/links';
+import { createPanelRegistry, type PanelRegistry } from '../registry/panelKindRegistry';
+import { createIdSequencer } from '../../workbench/domain/ids';
 import {
 	emptyPanelState,
+	panelIdSeed,
 	readPanelState,
 	writePanelState,
 	type PanelSystemState
 } from './panelState';
+
+// The eight kinds the pre-T-1015-11 PROJECTABLE_KINDS set hardcoded --
+// registered here so these tests exercise the same "known kind" behavior
+// against a real PanelRegistry instead of a closed set.
+function registryWithOriginalEightKinds(): PanelRegistry {
+	const registry = createPanelRegistry();
+	for (const kind of [
+		'filter_builder',
+		'chart',
+		'study_library',
+		'results_table',
+		'similar_opportunities',
+		'watchlist',
+		'alerts',
+		'symbol_details'
+	]) {
+		registry.register({
+			kind,
+			defaultTitle: kind,
+			defaultSize: { colSpan: 1, rowSpan: 1 },
+			minSize: { colSpan: 1, rowSpan: 1 },
+			defaultConfig: () => ({}),
+			validateConfig: () => ({ ok: true, value: {} }),
+			configSchema: { type: 'object', properties: {} },
+			linkChannels: [],
+			bindingTypes: [],
+			defaultRenderer: null,
+			component: async () => ({})
+		});
+	}
+	return registry;
+}
 
 describe('readPanelState', () => {
 	it('returns an empty state for a workspace with no panel_system extension', () => {
@@ -54,6 +89,41 @@ describe('readPanelState', () => {
 		expect(() => readPanelState(doc)).not.toThrow();
 		expect(readPanelState(doc)).toEqual(emptyPanelState());
 	});
+
+	// Bug fix (see git history): a persisted document written before
+	// panelIdSeed existed can hold two panels sharing one id (an unseeded
+	// sequencer re-minting an already-used id). PanelContainer.svelte's keyed
+	// `{#each ... (occupied.panelId)}` throws Svelte's own fatal
+	// each_key_duplicate error on a raw duplicate, so this must be repaired
+	// on read rather than left to crash the whole panel grid.
+	it('drops a later panel sharing an id an earlier one already used, keeping the first', () => {
+		const doc = emptyWorkspace('workspace_1', 'Test', '2026-01-01T00:00:00.000Z');
+		doc.extensions['panel_system'] = {
+			panels: [
+				{
+					id: 'panel_chart_1',
+					kind: 'chart',
+					title: 'First',
+					config: {},
+					rect: { col: 0, row: 0, colSpan: 2, rowSpan: 2 }
+				},
+				{
+					id: 'panel_chart_1',
+					kind: 'chart',
+					title: 'Second (corrupted duplicate)',
+					config: {},
+					rect: { col: 2, row: 0, colSpan: 2, rowSpan: 2 }
+				}
+			]
+		};
+
+		const state = readPanelState(doc);
+
+		expect(state.panels.length, `expected the duplicate dropped, got ${state.panels.length}`).toBe(
+			1
+		);
+		expect(state.panels[0]?.title, 'the first occurrence must win, not the last').toBe('First');
+	});
 });
 
 describe('writePanelState', () => {
@@ -69,7 +139,7 @@ describe('writePanelState', () => {
 		});
 		const state: PanelSystemState = { panels: [panel], links: { groups: [] }, selections: {} };
 
-		const next = writePanelState(doc, state);
+		const next = writePanelState(doc, state, registryWithOriginalEightKinds());
 
 		expect(
 			next.panels.length,
@@ -82,22 +152,23 @@ describe('writePanelState', () => {
 		expect(next.extensions['panel_system']).toEqual(state);
 	});
 
-	it('skips a panel whose kind is outside the eight-kind union rather than corrupting the document', () => {
+	it('skips a panel whose kind is not registered in the PanelRegistry rather than corrupting the document', () => {
 		const doc = emptyWorkspace('workspace_1', 'Test', '2026-01-01T00:00:00.000Z');
 		const panel = makePanel({
 			id: 'panel_custom_1',
-			kind: 'a_future_sibling_epic_kind',
+			kind: 'an_unregistered_kind',
 			title: 'Custom',
 			config: {},
 			rect: { col: 0, row: 0, colSpan: 1, rowSpan: 1 }
 		});
 		const state: PanelSystemState = { panels: [panel], links: { groups: [] }, selections: {} };
 
-		const next = writePanelState(doc, state);
+		const next = writePanelState(doc, state, createPanelRegistry());
 
-		expect(next.panels, 'expected the unknown-kind panel to be skipped from projection').toEqual(
-			[]
-		);
+		expect(
+			next.panels,
+			'expected the unregistered-kind panel to be skipped from projection'
+		).toEqual([]);
 		expect(next.layout).toEqual([]);
 		// but it survives in the actual source of truth
 		expect((next.extensions['panel_system'] as PanelSystemState).panels).toEqual([panel]);
@@ -153,7 +224,7 @@ describe('writePanelState', () => {
 		const graph = symbolLink.ok ? symbolLink.graph : { groups: [] };
 
 		const state: PanelSystemState = { panels: [a, b, c], links: graph, selections: {} };
-		const next = writePanelState(doc, state);
+		const next = writePanelState(doc, state, registryWithOriginalEightKinds());
 
 		const channels = new Set<string>(next.links.map((l) => l.channel));
 		expect(
@@ -165,5 +236,80 @@ describe('writePanelState', () => {
 			'the wire name result_selection must never appear in the projection'
 		).toBe(false);
 		expect(channels.has('symbol')).toBe(true);
+	});
+});
+
+describe('panelIdSeed', () => {
+	it('is empty when there is no workspace to seed from', () => {
+		expect(panelIdSeed(null)).toEqual({});
+	});
+
+	it('is empty for a workspace with no panels yet', () => {
+		expect(panelIdSeed(emptyWorkspace('workspace_1', 'Fresh', '2026-01-01T00:00:00.000Z'))).toEqual(
+			{}
+		);
+	});
+
+	// The regression this exists to prevent: a workspace document reloaded
+	// from storage (or a remount reusing the active document) must not let a
+	// fresh, unseeded IdSequencer re-mint an ID that already exists.
+	it('reports the highest sequence per kind, keyed the same way ids.next("panel", kind) is called', () => {
+		const registry = registryWithOriginalEightKinds();
+		const panels = [
+			makePanel({
+				id: 'panel_chart_1',
+				kind: 'chart',
+				title: 'Chart',
+				config: {},
+				rect: { col: 0, row: 0, colSpan: 1, rowSpan: 1 }
+			}),
+			makePanel({
+				id: 'panel_chart_3',
+				kind: 'chart',
+				title: 'Chart 2',
+				config: {},
+				rect: { col: 1, row: 0, colSpan: 1, rowSpan: 1 }
+			}),
+			makePanel({
+				id: 'panel_watchlist_1',
+				kind: 'watchlist',
+				title: 'Watchlist',
+				config: {},
+				rect: { col: 2, row: 0, colSpan: 1, rowSpan: 1 }
+			})
+		];
+		const state: PanelSystemState = { panels, links: { groups: [] }, selections: {} };
+		const doc = writePanelState(
+			emptyWorkspace('workspace_1', 'Research', '2026-01-01T00:00:00.000Z'),
+			state,
+			registry
+		);
+
+		expect(panelIdSeed(doc)).toEqual({ 'panel:chart': 3, 'panel:watchlist': 1 });
+	});
+
+	it('never re-mints an ID a reloaded document already holds', () => {
+		const registry = registryWithOriginalEightKinds();
+		const state: PanelSystemState = {
+			panels: [
+				makePanel({
+					id: 'panel_chart_1',
+					kind: 'chart',
+					title: 'Chart',
+					config: {},
+					rect: { col: 0, row: 0, colSpan: 1, rowSpan: 1 }
+				})
+			],
+			links: { groups: [] },
+			selections: {}
+		};
+		const doc = writePanelState(
+			emptyWorkspace('workspace_1', 'Research', '2026-01-01T00:00:00.000Z'),
+			state,
+			registry
+		);
+
+		const ids = createIdSequencer(panelIdSeed(doc));
+		expect(ids.next('panel', 'chart')).toBe('panel_chart_2');
 	});
 });

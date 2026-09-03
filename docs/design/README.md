@@ -5,20 +5,9 @@ feature spec may be touched by multiple epics as it evolves.
 
 ## Core Product
 
-- [Pattern Research Workbench](pattern-research-workbench/spec.md) — the
-  shared human-agent research session: define studies and temporal setups,
-  search history for matches, measure and visualize outcomes.
-- [Workspace Snapshots](workspace-snapshots/spec.md) — save the current
-  workspace under a name and recall/switch between saved snapshots,
-  local to one browser.
-- [Market Data Storage](market-data-storage/spec.md) — how the historical
-  price panel is stored, loaded, and queried so memory is bounded by the
-  query rather than the size of the dataset.
-
-## New WebMCP Surface (full replacement, in progress)
-
-Specs for the tool surface described in `docs/reference/tool-spec.md`, built
-alongside the Core Product surface above and cut over at the end.
+EPIC-1015 cut the app over from the original 11-tool event-atom workbench
+to this surface; it is what `/` runs today. Specs for the retired surface
+live under "Superseded", below, not deleted outright.
 
 - [Workspace & Revisions](workspace-revisions/spec.md) — the workspace
   document, stable IDs, revisions, the mutation envelope, idempotency,
@@ -48,18 +37,40 @@ alongside the Core Product surface above and cut over at the end.
 - [Screener Follow-up Tools](screener-followup-tools/spec.md) — computed
   fields, custom studies, derived filters, similarity refinement,
   backtesting, watchlists, the alert draft/review/enable gate, and export.
-- [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — retire the
-  original 11-tool surface once the above reaches capability parity,
-  keeping the WebMCP transport layer.
+  Only `create_computed_field`/`create_custom_study` are live; the rest of
+  this group is merged but not yet wired into the app — see
+  `docs/tools.md`'s "Not yet part of the live tool surface".
+- [Legacy Surface Cutover](legacy-surface-cutover/spec.md) — the cutover
+  itself: route migration onto this surface, the shared shell, the
+  11-tool removal, backend reconciliation, and this documentation pass.
 - [Workbench Composition Root](workbench-composition-root/spec.md) — the
-  shared runtime that lets `/workbench`'s tool groups actually talk to each
-  other (one `WorkspaceRepository`/`PinnedRunStore` instead of each tool
-  group building its own), plus auto-binding a completed screener run to
-  the results panel — the first live, end-to-end demonstration of the new
-  surface.
+  shared runtime that lets `/`'s tool groups actually talk to each other
+  (one `WorkspaceRepository`/`PinnedRunStore` instead of each tool group
+  building its own), plus auto-binding a completed screener run to the
+  results panel.
+- [Market Data Storage](market-data-storage/spec.md) — how the historical
+  price panel is stored, loaded, and queried so memory is bounded by the
+  query rather than the size of the dataset.
 
 ## Presentation
 
 - [Terminal UI Theme](terminal-ui-theme/spec.md) — the single dark,
   high-density visual treatment shared by every route: the named palette,
   the measured contrast floor, and the shell the workbench lays out in.
+
+## Superseded
+
+Retired concepts, kept rather than deleted per project convention (specs
+are amended or marked superseded, not stripped out — see each file's own
+banner for what replaced it and why). Not current behavior; do not build
+against these.
+
+- [Pattern Research Workbench](pattern-research-workbench/spec.md) — the
+  original event-atom research session (studies, temporal setups, instance
+  search/measurement). Superseded by Screener Core, Panel System, and
+  Chart Tools above; see `docs/tools.md`'s "Capability changes" for what
+  did and did not carry over.
+- [Workspace Snapshots](workspace-snapshots/spec.md) — named,
+  `localStorage`-local point-in-time snapshots. Superseded by Workspace &
+  Revisions' `save_workspace`/`restore_workspace_revision`/
+  `get_change_history`/`undo_change`.

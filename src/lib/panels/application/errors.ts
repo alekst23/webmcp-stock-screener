@@ -9,6 +9,7 @@ import type { WireError } from '../../workbench/domain/errors';
 export type PanelOperationErrorCode =
 	| 'unknown_panel_kind'
 	| 'unknown_panel'
+	| 'panel_id_collision'
 	| 'unknown_layout_template'
 	| 'unknown_renderer_type'
 	| 'invalid_config'

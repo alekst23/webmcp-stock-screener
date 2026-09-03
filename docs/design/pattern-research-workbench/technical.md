@@ -1,5 +1,16 @@
 # Pattern Research Workbench — Technical Design
 
+> **Superseded (EPIC-1015, 2026-09-03).** Describes contracts on
+> `src/lib/webmcp/types.ts`, `webmcp/tools.ts`, and the `ResearchEngine`
+> interface — all deleted. The WebMCP transport pieces this doc also
+> covers (`WebmcpStatus`, `WebmcpConnection` lifecycle,
+> `startBridgeSession`) were superseded in turn by
+> `src/lib/webmcp/newSurfaceSession.ts` (T-1015-3) and `webmcp/status.ts`,
+> wired into `WorkbenchShell.svelte` (T-1015-9). See
+> `pattern-research-workbench/spec.md`'s banner and `docs/tools.md` for
+> what replaced the product surface. Kept as historical record; nothing
+> below this banner names a file that still exists.
+
 ## Contracts
 
 The design interview surfaced three gaps against the currently implemented

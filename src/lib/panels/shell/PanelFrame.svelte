@@ -22,6 +22,7 @@
 		kindDefinition,
 		linkedValue,
 		onToggleCollapse,
+		onRemove,
 		onBroadcast
 	}: {
 		panel: Panel;
@@ -29,7 +30,8 @@
 		kindDefinition: PanelKindDefinition | undefined;
 		linkedValue?: LinkedValueEntry;
 		onToggleCollapse: (panelId: string, collapsed: boolean) => void;
-		onBroadcast: (channel: PanelLinkChannel, value: string) => void;
+		onRemove: (panelId: string) => void;
+		onBroadcast: (channel: PanelLinkChannel, value: string) => boolean;
 	} = $props();
 
 	type BodyLoadState = ResolvedPanelBody | { kind: 'loading' };
@@ -63,15 +65,25 @@
 <section class="panel-frame panel-card" style={panelFrameStyle(rect)}>
 	<header class="panel-header">
 		<h3>{panel.title}</h3>
-		<button
-			type="button"
-			class="control collapse"
-			aria-expanded={!panel.collapsed}
-			aria-label={panel.collapsed ? `Expand ${panel.title}` : `Collapse ${panel.title}`}
-			onclick={() => onToggleCollapse(panel.id, !panel.collapsed)}
-		>
-			{panel.collapsed ? '▸' : '▾'}
-		</button>
+		<div class="controls">
+			<button
+				type="button"
+				class="control collapse"
+				aria-expanded={!panel.collapsed}
+				aria-label={panel.collapsed ? `Expand ${panel.title}` : `Collapse ${panel.title}`}
+				onclick={() => onToggleCollapse(panel.id, !panel.collapsed)}
+			>
+				{panel.collapsed ? '▸' : '▾'}
+			</button>
+			<button
+				type="button"
+				class="control remove"
+				aria-label={`Close ${panel.title}`}
+				onclick={() => onRemove(panel.id)}
+			>
+				✕
+			</button>
+		</div>
 	</header>
 
 	{#if !panel.collapsed}
@@ -130,7 +142,15 @@
 		white-space: nowrap;
 	}
 
-	.collapse {
+	.controls {
+		display: flex;
+		align-items: center;
+		gap: var(--space-xs);
+		flex: 0 0 auto;
+	}
+
+	.collapse,
+	.remove {
 		flex: 0 0 auto;
 		line-height: 1;
 		padding: 0 var(--space-xs);

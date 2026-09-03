@@ -5,8 +5,7 @@ median 60-session dollar volume >= $25,000,000, last close >= $1, >= 252
 sessions (1 year) of history. This module holds only the rule -- thresholds
 and a pure eligibility predicate, no pandas, no I/O -- so the rule itself is
 unit-testable in isolation from how its inputs are computed from a panel
-frame (`infra/universe_eligibility.py`). Mirrors `domain/panel_disclosure.py`'s
-split between policy and the infra that feeds it.
+frame (`infra/universe_eligibility.py`).
 """
 
 from __future__ import annotations

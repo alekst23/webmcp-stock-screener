@@ -1,7 +1,12 @@
 // End-to-end coverage of the screener group (T-1009-10 AC1): the six tools
 // are built from one builder, exercised through the built specs, and
-// asserted not to collide with any of the surfaces they must coexist with.
-// Follows webmcp/discovery/group.test.ts's pattern.
+// asserted not to collide with any of the new-surface tool groups they
+// coexist with. Follows webmcp/discovery/group.test.ts's pattern.
+//
+// T-1015-5: this used to also assert no collision with the legacy 11-tool
+// surface, built via `buildTools({} as ResearchEngine)`. That coexistence
+// constraint no longer applies now that the legacy surface is gone, so that
+// specific collision test retired with it.
 
 import { describe, expect, it } from 'vitest';
 import { createChangeHistory } from '../../workbench/application/changeHistory';
@@ -18,8 +23,7 @@ import { buildPanelTools, createMaximizedPanelState } from '../../panels/tools/p
 import { createPanelRegistry } from '../../panels/registry/panelKindRegistry';
 import { createSourceRendererRegistry } from '../../panels/registry/sourceRendererRegistry';
 import { createLayoutTemplateRegistry } from '../../panels/domain/layoutTemplates';
-import { buildTools } from '../tools';
-import type { ResearchEngine, ToolSpec, WorkspaceState } from '../types';
+import type { ToolSpec } from '../types';
 import { buildDiscoveryTools } from '../discovery/group';
 import { createUnavailableInstrumentDirectory } from '../../discovery/unavailableDirectory';
 import { buildWorkbenchTools } from '../../workbench/tools/index';
@@ -60,14 +64,6 @@ function group(): ToolSpec[] {
 	return buildScreenerTools(testDeps());
 }
 
-const EMPTY_WORKSPACE: WorkspaceState = {
-	studies: [],
-	setups: [],
-	instanceSets: [],
-	panels: [],
-	focus: null
-};
-
 describe('buildScreenerTools', () => {
 	it('test_the_builder_exposes_exactly_the_six_canonical_tool_names', () => {
 		const names = group()
@@ -101,21 +97,8 @@ describe('buildScreenerTools', () => {
 	it('test_every_tool_is_callable_with_typeof_execute_function', () => {
 		for (const spec of group()) {
 			expect(typeof spec.execute, `"${spec.name}" must be callable`).toBe('function');
-			expect(spec.available(EMPTY_WORKSPACE), `"${spec.name}" should always be available`).toBe(
-				true
-			);
+			expect(spec.available(), `"${spec.name}" should always be available`).toBe(true);
 		}
-	});
-
-	it('test_no_screener_name_collides_with_the_existing_eleven_tool_surface', () => {
-		const existing = buildTools({} as ResearchEngine).map((t) => t.name);
-		const collisions = group()
-			.map((t) => t.name)
-			.filter((name) => existing.includes(name));
-		expect(
-			collisions,
-			`the two surfaces must coexist until EPIC-1015 retires the old one: ${JSON.stringify(collisions)}`
-		).toEqual([]);
 	});
 
 	it('test_no_screener_name_collides_with_the_workbench_or_safety_tools', () => {

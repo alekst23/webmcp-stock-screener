@@ -7,26 +7,15 @@ import type { ResourceId } from './ids';
 
 export type Revision = number;
 
-export type PanelKind =
-	| 'filter_builder'
-	| 'chart'
-	| 'study_library'
-	| 'results_table'
-	| 'similar_opportunities'
-	| 'watchlist'
-	| 'alerts'
-	| 'symbol_details';
-
-const PANEL_KINDS: ReadonlySet<string> = new Set<PanelKind>([
-	'filter_builder',
-	'chart',
-	'study_library',
-	'results_table',
-	'similar_opportunities',
-	'watchlist',
-	'alerts',
-	'symbol_details'
-]);
+// T-1015-11: widened from a closed 8-member string-literal union to
+// `string`. The original union hardcoded every panel kind known when this
+// read model was first defined, and normalizePanel's `PANEL_KINDS.has(kind)`
+// check silently dropped any panel record whose kind fell outside it -- a
+// real correctness gap for any panel kind a later epic registers. The panel
+// registry (panels/registry/panelKindRegistry.ts) is the actual source of
+// truth for which kinds exist; this module no longer maintains its own
+// closed copy of that set.
+export type PanelKind = string;
 
 export type PanelLinkChannel = 'symbol' | 'timeframe' | 'selection' | 'crosshair' | 'filters';
 
@@ -107,12 +96,12 @@ function normalizePanel(value: unknown): PanelRecord | null {
 		return null;
 	}
 	const { id, kind, title, collapsed, visible, boundResourceId, config } = value;
-	if (typeof id !== 'string' || typeof kind !== 'string' || !PANEL_KINDS.has(kind)) {
+	if (typeof id !== 'string' || typeof kind !== 'string' || kind.length === 0) {
 		return null;
 	}
 	return {
 		id,
-		kind: kind as PanelKind,
+		kind,
 		title: typeof title === 'string' ? title : '',
 		collapsed: collapsed === true,
 		visible: visible !== false,

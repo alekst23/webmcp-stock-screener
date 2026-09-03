@@ -42,7 +42,7 @@ describe('buildPanelTools', () => {
 		const tools = buildPanelTools(deps);
 		expect(tools.map((t) => t.name).sort()).toEqual([...TOOL_NAMES].sort());
 		for (const spec of tools) {
-			expect(spec.available({} as never), `${spec.name} must always be available`).toBe(true);
+			expect(spec.available(), `${spec.name} must always be available`).toBe(true);
 			expect(spec.description.length, `${spec.name} needs a real description`).toBeGreaterThan(20);
 		}
 	});

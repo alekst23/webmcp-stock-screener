@@ -3,7 +3,7 @@
 // This tool NEVER arms an alert -- see application/enableAlert.ts's header
 // comment -- and the response says so explicitly on every call (AC1),
 // whether it is the first request or a re-request after expiry.
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	IdempotencyConflictError,
@@ -44,7 +44,7 @@ interface WireInput {
 }
 
 const NOT_ARMED_MESSAGE =
-	"Not armed. This only records a pending activation request; a human must confirm it in the " +
+	'Not armed. This only records a pending activation request; a human must confirm it in the ' +
 	"app's alerts surface -- an explicit confirm or decline gesture the app performs, never a tool " +
 	'call -- before the alert can arm and fire.';
 

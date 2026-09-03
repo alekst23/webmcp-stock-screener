@@ -1,24 +1,20 @@
 // End-to-end coverage of the discovery group: the three tools are built from
-// one builder, exercised through the built specs against the reference-data
-// test double, and asserted not to collide with the surface they will
-// eventually replace. Follows integration.test.ts's pattern.
+// one builder and exercised through the built specs against the
+// reference-data test double.
+//
+// T-1015-5: this used to also assert the group's names did not collide with
+// the legacy 11-tool surface, built via `buildTools({} as ResearchEngine)`.
+// That coexistence constraint no longer applies now that the legacy surface
+// is gone, so the collision test retired with it rather than being kept
+// with nothing left to collide against.
 
 import { describe, expect, it } from 'vitest';
 import { builtinCatalogRegistry } from '../../catalog/registry';
 import { createFakeInstrumentDirectory, fakeInstrument } from '../../discovery/testSupport';
 import { createUnavailableInstrumentDirectory } from '../../discovery/unavailableDirectory';
-import { buildTools } from '../tools';
-import type { ResearchEngine, ToolSpec, WorkspaceState } from '../types';
+import type { ToolSpec } from '../types';
 import { buildDiscoveryTools, DISCOVERY_TOOL_NAMES } from './group';
 import { payload } from './testSupport';
-
-const EMPTY_WORKSPACE: WorkspaceState = {
-	studies: [],
-	setups: [],
-	instanceSets: [],
-	panels: [],
-	focus: null
-};
 
 function group(): ToolSpec[] {
 	return buildDiscoveryTools({
@@ -42,18 +38,6 @@ describe('buildDiscoveryTools', () => {
 		expect(names, `unexpected discovery tool set: ${JSON.stringify(names)}`).toEqual(
 			[...DISCOVERY_TOOL_NAMES].sort()
 		);
-	});
-
-	it('test_no_discovery_name_collides_with_the_existing_eleven_tool_surface', () => {
-		// A stub engine is enough: only the declared names are read, never called.
-		const existing = buildTools({} as ResearchEngine).map((t) => t.name);
-		const collisions = group()
-			.map((t) => t.name)
-			.filter((name) => existing.includes(name));
-		expect(
-			collisions,
-			`the two surfaces cannot coexist until EPIC-1015 retires the old one: ${JSON.stringify(collisions)}`
-		).toEqual([]);
 	});
 
 	it('test_dependencies_are_parameters_so_a_real_adapter_drops_in_unedited', async () => {
@@ -89,11 +73,11 @@ describe('buildDiscoveryTools', () => {
 		).toBeGreaterThan(0);
 	});
 
-	it('test_all_three_tools_are_always_available_with_no_workspace_state', () => {
+	it('test_all_three_tools_are_always_available', () => {
 		for (const spec of group()) {
 			expect(
-				spec.available(EMPTY_WORKSPACE),
-				`"${spec.name}" gated itself behind workspace state; discovery precedes state`
+				spec.available(),
+				`"${spec.name}" is not unconditionally available; every tool group registers in one pass`
 			).toBe(true);
 		}
 	});

@@ -1,13 +1,11 @@
-// ChartSeriesPort over the existing backend price API.
-//
-// The backend has one bar-bearing route, POST /api/research/instance-windows,
-// which returns PriceBar rows for the instances of a set. Rather than importing
-// or changing src/lib/workspace/apiEngine.ts, this duplicates the technique its
-// showTickerCharts already uses: synthesize an instance set to get bars for a
-// ticker. One synthetic instance per calendar day in the requested window, with
-// a bar offset of [0, 0], makes the response exactly the bars inside the window
-// -- no bar-count estimate, no anchor that has to land on a trading day, and no
-// way for the request to reach past its own bounds.
+// ChartSeriesPort over the backend's own bar-serving endpoint,
+// GET /api/chart/bars (bug fix, see git history). Previously this adapter
+// called POST /api/research/instance-windows -- an instance-oriented route
+// from the retired legacy surface -- and had to synthesize a fake "one
+// synthetic instance per calendar day in the window" instance set just to
+// coax whole-window bars out of it. api/chart.py (backend) now serves bars
+// directly for a ticker and date range, so that synthesis is gone: this is
+// a plain GET with the request's own shape.
 import type { Clock } from '../../domain/ports';
 import type { MarketDataProvenance } from '../../domain/provenance';
 import {
@@ -22,18 +20,16 @@ import {
 	type ChartSeriesPort,
 	type ChartSeriesRequest,
 	type ChartSeriesResult,
-	type ChartSeriesWindow,
 	type ChartSourceAdjustment,
 	type ChartTimeframe,
 	type OhlcvBar
 } from '../domain/seriesPort';
 
-const SERIES_PATH = '/api/research/instance-windows';
-const SYNTHETIC_SETUP_ID = 'chart_series';
+const SERIES_PATH = '/api/chart/bars';
 
-// A transport guard, not the epic's agent-facing per-call bar cap: the request
-// body carries one entry per calendar day, so a decade-wide window is refused
-// before it is serialized rather than after.
+// A transport guard, not the epic's agent-facing per-call bar cap: the
+// backend reads one row per calendar day in [start, end], so a decade-wide
+// window is refused before the request is sent rather than after.
 const DEFAULT_MAX_WINDOW_DAYS = 3660;
 
 const MS_PER_DAY = 86_400_000;
@@ -48,8 +44,10 @@ export interface BackendPriceBarRow {
 	volume: number;
 }
 
-interface BackendInstanceWindowRow {
+interface BackendBarsResponse {
 	ticker: string;
+	start: string;
+	end: string;
 	bars: BackendPriceBarRow[];
 }
 
@@ -83,9 +81,9 @@ function toIsoDate(epochMs: number): string {
 	return new Date(epochMs).toISOString().slice(0, 10);
 }
 
-// UTC-based so the same window always produces the same anchor list, whatever
-// the machine's local zone is.
-function calendarDaysInWindow(window: ChartSeriesWindow, maxDays: number, instrumentId: string) {
+// UTC-based so the same window always produces the same [start, end] pair,
+// whatever the machine's local zone is.
+function dateBounds(window: { start: string; end: string }, maxDays: number, instrumentId: string) {
 	const start = parseWindowBound(window.start) as number;
 	const end = parseWindowBound(window.end) as number;
 	const firstDay = Date.parse(toIsoDate(start));
@@ -98,11 +96,7 @@ function calendarDaysInWindow(window: ChartSeriesWindow, maxDays: number, instru
 			{ instrumentId }
 		);
 	}
-	const days: string[] = [];
-	for (let day = firstDay; day <= lastDay; day += MS_PER_DAY) {
-		days.push(toIsoDate(day));
-	}
-	return days;
+	return { start: toIsoDate(start), end: toIsoDate(end) };
 }
 
 function toOhlcvBar(row: BackendPriceBarRow): OhlcvBar {
@@ -116,25 +110,19 @@ function toOhlcvBar(row: BackendPriceBarRow): OhlcvBar {
 	};
 }
 
-// The backend returns one window per anchor, so a bar that is both an anchor's
-// own day and inside another window would otherwise appear twice.
-function dedupeByTime(bars: OhlcvBar[]): OhlcvBar[] {
-	const byTime = new Map<string, OhlcvBar>();
-	for (const bar of bars) {
-		byTime.set(bar.time, bar);
-	}
-	return [...byTime.values()];
-}
-
-function readWindowRows(payload: unknown, instrumentId: string): BackendInstanceWindowRow[] {
-	if (!Array.isArray(payload)) {
+function readBarsResponse(payload: unknown, instrumentId: string): BackendBarsResponse {
+	if (
+		typeof payload !== 'object' ||
+		payload === null ||
+		!Array.isArray((payload as { bars?: unknown }).bars)
+	) {
 		throw new ChartSeriesError(
 			'malformed_response',
-			'The price source returned a payload that is not a list of instance windows.',
+			'The price source returned a payload that is not a bars response.',
 			{ instrumentId }
 		);
 	}
-	return payload as BackendInstanceWindowRow[];
+	return payload as BackendBarsResponse;
 }
 
 async function toTransportError(response: Response): Promise<Error> {
@@ -171,37 +159,31 @@ export function createHttpChartSeries(config: HttpChartSeriesConfig): ChartSerie
 		}
 	}
 
-	async function postWindows(
+	async function getBars(
 		symbol: string,
-		days: string[],
+		bounds: { start: string; end: string },
 		instrumentId: string
-	): Promise<BackendInstanceWindowRow[]> {
-		const body = {
-			instance_set: {
-				id: `${SYNTHETIC_SETUP_ID}_${symbol}_${days[0]}_${days[days.length - 1]}`,
-				setup_id: SYNTHETIC_SETUP_ID,
-				instances: days.map((date) => ({ ticker: symbol, date, completeness: 1 })),
-				complete_count: days.length,
-				partial_count: 0,
-				from_date: days[0],
-				to_date: days[days.length - 1]
-			},
-			n: days.length,
-			strategy: 'recent',
-			window: [0, 0]
-		};
+	): Promise<BackendBarsResponse> {
+		const url = new URL(`${config.baseUrl}${SERIES_PATH}`);
+		url.searchParams.set('ticker', symbol);
+		url.searchParams.set('start', bounds.start);
+		url.searchParams.set('end', bounds.end);
+
 		let response: Response;
 		try {
-			response = await doFetch(`${config.baseUrl}${SERIES_PATH}`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
+			response = await doFetch(url.toString());
 		} catch (err) {
 			throw new ChartSeriesError(
 				'source_unavailable',
 				`The price source could not be reached for instrument "${instrumentId}".`,
 				{ cause: err, instrumentId }
+			);
+		}
+		if (response.status === 404) {
+			throw new ChartSeriesError(
+				'unknown_instrument',
+				`This price source carries no data for instrument "${instrumentId}".`,
+				{ cause: await toTransportError(response), instrumentId }
 			);
 		}
 		if (!response.ok) {
@@ -212,7 +194,7 @@ export function createHttpChartSeries(config: HttpChartSeriesConfig): ChartSerie
 			);
 		}
 		try {
-			return readWindowRows(await response.json(), instrumentId);
+			return readBarsResponse(await response.json(), instrumentId);
 		} catch (err) {
 			if (err instanceof ChartSeriesError) {
 				throw err;
@@ -254,12 +236,9 @@ export function createHttpChartSeries(config: HttpChartSeriesConfig): ChartSerie
 			assertBoundedWindow(request.window, request.instrumentId);
 			requireTimeframe(request.timeframe, request.instrumentId);
 			const symbol = requireSymbol(request.instrumentId);
-			const days = calendarDaysInWindow(request.window, maxWindowDays, request.instrumentId);
-			const rows = await postWindows(symbol, days, request.instrumentId);
-			const bars = barsWithinWindow(
-				dedupeByTime(rows.flatMap((row) => (row.bars ?? []).map(toOhlcvBar))),
-				request.window
-			);
+			const bounds = dateBounds(request.window, maxWindowDays, request.instrumentId);
+			const response = await getBars(symbol, bounds, request.instrumentId);
+			const bars = barsWithinWindow(response.bars.map(toOhlcvBar), request.window);
 
 			return {
 				instrumentId: request.instrumentId,

@@ -1,7 +1,7 @@
 // The `create_custom_study` tool (T-1014-2, AC3, AC4, AC5-AC11). Wire
 // parsing and result shaping only, mirroring tools/createComputedField.ts.
 import type { CatalogRegistry } from '../../../catalog/registry';
-import { fail, ok } from '../../../webmcp/tools';
+import { fail, ok } from '../../../webmcp/toolResult';
 import type { ToolResult, ToolSpec } from '../../../webmcp/types';
 import {
 	IdempotencyConflictError,

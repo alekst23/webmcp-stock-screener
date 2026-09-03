@@ -7,14 +7,11 @@
 // get_canvas_state) against the live, registered tool surface, not
 // hand-built fixtures.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ToolResult, ToolSpec } from '../../webmcp/types';
+import type { ToolSpec } from '../../webmcp/types';
 import { createPanelShellRuntime } from '../../panels/shell/registerPanelTools';
-import { ADD_CHART_ANNOTATION_TOOL_NAME } from '../../workbench/chart/tools/addChartAnnotation';
-import { CAPTURE_CHART_SETUP_TOOL_NAME } from '../../workbench/chart/tools/captureChartSetup';
+import { RESOLVE_TICKER_TOOL_NAME } from '../../workbench/chart/tools/resolveTicker';
 import { GET_CHART_DATA_TOOL_NAME } from '../../workbench/chart/tools/getChartData';
 import { FIND_SIMILAR_SETUPS_TOOL_NAME } from '../../workbench/similarity/tools/findSimilarSetups';
-import { EXPLAIN_SIMILARITY_TOOL_NAME } from '../../workbench/similarity/tools/explainSimilarity';
-import { COMPARE_SETUPS_TOOL_NAME } from '../../workbench/similarity/comparison/tools/compareSetups';
 import { BACKTEST_SCREENER_TOOL_NAME } from '../../workbench/backtest/tools/backtestScreener';
 import { GET_BACKTEST_RESULTS_TOOL_NAME } from '../../workbench/backtest/tools/getBacktestResults';
 import { PREVIEW_ALERT_TOOL_NAME } from '../../workbench/alerts/tools/previewAlert';
@@ -33,18 +30,32 @@ import {
 	registerWorkbenchComposition
 } from './workbenchCompositionRoot';
 
-// T-0020-5: every tool name gated behind a flag this epic's AC2 says must
-// stay false (chart, similarity, backtest, alert, watchlist, followup) --
-// imported as each tool's own exported *_TOOL_NAME constant, not a hand-typed
-// string, so a future rename of one of these tools cannot silently make this
-// negative test pass for the wrong reason.
-const OUT_OF_SCOPE_TOOL_NAMES = [
-	ADD_CHART_ANNOTATION_TOOL_NAME,
-	CAPTURE_CHART_SETUP_TOOL_NAME,
+// Chart-demo trim (see plan: "Trim the WebMCP tool surface to a chart-only
+// demo set"): registerWorkbenchComposition() now registers only the panel
+// tool group plus resolve_ticker -- workbench-core, screener,
+// chart-authoring, similarity, and follow-up-authoring are commented out at
+// their call sites (workbenchCompositionRoot.ts) rather than deleted, so this
+// list moved from IN_SCOPE to OUT_OF_SCOPE below rather than being deleted
+// itself; restoring the full surface there is the counterpart to reverting
+// this file.
+const OUT_OF_SCOPE_TOOL_NAMES_TRIMMED_FOR_DEMO = [
+	'get_app_context',
+	'run_screener',
+	'create_screener',
 	GET_CHART_DATA_TOOL_NAME,
 	FIND_SIMILAR_SETUPS_TOOL_NAME,
-	EXPLAIN_SIMILARITY_TOOL_NAME,
-	COMPARE_SETUPS_TOOL_NAME,
+	CREATE_CUSTOM_STUDY_TOOL_NAME,
+	CREATE_COMPUTED_FIELD_TOOL_NAME
+] as const;
+
+// T-0020-5, narrowed by T-1015-3: backtest/alert/watchlist stay behind a
+// flag with no caller -- `measure`/`splitInstances` (backtest) was an
+// accepted drop, and the other two have no reason to enable independent of
+// this cutover (see T-1015-3's Solution Approach). Imported as each tool's
+// own exported *_TOOL_NAME constant, not a hand-typed string, so a future
+// rename of one of these tools cannot silently make this negative test pass
+// for the wrong reason.
+const OUT_OF_SCOPE_TOOL_NAMES = [
 	BACKTEST_SCREENER_TOOL_NAME,
 	GET_BACKTEST_RESULTS_TOOL_NAME,
 	PREVIEW_ALERT_TOOL_NAME,
@@ -53,18 +64,18 @@ const OUT_OF_SCOPE_TOOL_NAMES = [
 	ENABLE_ALERT_TOOL_NAME,
 	DISABLE_ALERT_TOOL_NAME,
 	UPSERT_WATCHLIST_TOOL_NAME,
-	SAVE_RESULTS_TO_WATCHLIST_TOOL_NAME,
-	CREATE_CUSTOM_STUDY_TOOL_NAME,
-	CREATE_COMPUTED_FIELD_TOOL_NAME
+	SAVE_RESULTS_TO_WATCHLIST_TOOL_NAME
 ] as const;
 
 beforeEach(() => {
 	localStorage.clear();
 });
 
-async function textOf(result: ToolResult): Promise<unknown> {
-	return JSON.parse(result.content[0]!.text);
-}
+// Only used by the workbench-core round-trip test above, currently
+// commented out alongside the composition calls it exercised.
+// async function textOf(result: ToolResult): Promise<unknown> {
+// 	return JSON.parse(result.content[0]!.text);
+// }
 
 describe('createWorkbenchSharedInfra + per-group deps builders', () => {
 	it('threads the exact same repository/revisions/idempotency/runs instances into every group', () => {
@@ -148,78 +159,120 @@ describe('createWorkbenchSharedInfra + per-group deps builders', () => {
 });
 
 describe('registerWorkbenchComposition', () => {
-	it('a panel created through the panel tool group is visible through the workbench-core get_canvas_state read', async () => {
-		const registerTool = vi.fn();
-		vi.stubGlobal('document', { modelContext: { registerTool } });
-		try {
-			await registerWorkbenchComposition();
-			const specs = new Map<string, ToolSpec>(
-				registerTool.mock.calls.map((args: unknown[]) => {
-					const tool = args[0] as ToolSpec;
-					return [tool.name, tool];
-				})
-			);
+	// Chart-demo trim: workbench-core/screener/chart-authoring/similarity/
+	// follow-up-authoring are commented out at their call sites
+	// (workbenchCompositionRoot.ts), so the three tests below that exercised
+	// them are commented out too rather than deleted -- both sides restore
+	// together. See 'registers only the trimmed-down chart-demo tool set'
+	// further down for what registerWorkbenchComposition() actually does now.
+	//
+	// it('a panel created through the panel tool group is visible through the workbench-core get_canvas_state read', async () => {
+	// 	const registerTool = vi.fn();
+	// 	vi.stubGlobal('document', { modelContext: { registerTool } });
+	// 	try {
+	// 		await registerWorkbenchComposition();
+	// 		const specs = new Map<string, ToolSpec>(
+	// 			registerTool.mock.calls.map((args: unknown[]) => {
+	// 				const tool = args[0] as ToolSpec;
+	// 				return [tool.name, tool];
+	// 			})
+	// 		);
+	//
+	// 		// The seeded default layout already fills the grid (T-1007-9), so a
+	// 		// free rect must be made first -- remove one seeded panel through the
+	// 		// same panel tool group before creating a new one.
+	// 		const initialCanvas = (await textOf(await specs.get('get_canvas_state')!.execute({}))) as {
+	// 			panels: { id: string }[];
+	// 		};
+	// 		const removed = await specs
+	// 			.get('remove_panel')!
+	// 			.execute({ panel_id: initialCanvas.panels[0]!.id });
+	// 		expect(
+	// 			removed.isError,
+	// 			'removing the seeded panel to make room for the new one must succeed'
+	// 		).toBeFalsy();
+	//
+	// 		const createPanelSpec = specs.get('create_panel')!;
+	// 		const created = await createPanelSpec.execute({
+	// 			kind: 'chart',
+	// 			rect: { col: 0, row: 0, col_span: 2, row_span: 4 }
+	// 		});
+	// 		expect(
+	// 			created.isError,
+	// 			'creating a chart panel through the panel tool group must succeed'
+	// 		).toBeFalsy();
+	// 		const envelope = (await textOf(created)) as { affected_ids: string[] };
+	// 		const newPanelId = envelope.affected_ids[0]!;
+	//
+	// 		const getCanvasStateSpec = specs.get('get_canvas_state')!;
+	// 		const canvasResult = await getCanvasStateSpec.execute({});
+	// 		expect(
+	// 			canvasResult.isError,
+	// 			'reading canvas state back through the workbench-core tool group must succeed'
+	// 		).toBeFalsy();
+	// 		const canvas = (await textOf(canvasResult)) as { panels: { id: string }[] };
+	// 		expect(canvas.panels.map((p) => p.id)).toContain(newPanelId);
+	// 	} finally {
+	// 		vi.unstubAllGlobals();
+	// 	}
+	// });
+	//
+	// it('registers the panel, workbench-core, and screener tool groups together', async () => {
+	// 	const registerTool = vi.fn();
+	// 	vi.stubGlobal('document', { modelContext: { registerTool } });
+	// 	try {
+	// 		await registerWorkbenchComposition();
+	// 		const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
+	// 		expect(names).toContain('create_panel');
+	// 		expect(names).toContain('get_canvas_state');
+	// 		expect(names).toContain('run_screener');
+	// 		expect(names).toContain('create_screener');
+	// 	} finally {
+	// 		vi.unstubAllGlobals();
+	// 	}
+	// });
+	//
+	// it('registers the chart, similarity, and follow-up-authoring tool groups too (T-1015-3)', async () => {
+	// 	const registerTool = vi.fn();
+	// 	vi.stubGlobal('document', { modelContext: { registerTool } });
+	// 	try {
+	// 		await registerWorkbenchComposition();
+	// 		const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
+	// 		for (const inScopeName of IN_SCOPE_TOOL_NAMES) {
+	// 			expect(names).toContain(inScopeName);
+	// 		}
+	// 	} finally {
+	// 		vi.unstubAllGlobals();
+	// 	}
+	// });
 
-			// The seeded default layout already fills the grid (T-1007-9), so a
-			// free rect must be made first -- remove one seeded panel through the
-			// same panel tool group before creating a new one.
-			const initialCanvas = (await textOf(await specs.get('get_canvas_state')!.execute({}))) as {
-				panels: { id: string }[];
-			};
-			const removed = await specs
-				.get('remove_panel')!
-				.execute({ panel_id: initialCanvas.panels[0]!.id });
-			expect(
-				removed.isError,
-				'removing the seeded panel to make room for the new one must succeed'
-			).toBeFalsy();
-
-			const createPanelSpec = specs.get('create_panel')!;
-			const created = await createPanelSpec.execute({
-				kind: 'chart',
-				rect: { col: 0, row: 0, col_span: 2, row_span: 4 }
-			});
-			expect(
-				created.isError,
-				'creating a chart panel through the panel tool group must succeed'
-			).toBeFalsy();
-			const envelope = (await textOf(created)) as { affected_ids: string[] };
-			const newPanelId = envelope.affected_ids[0]!;
-
-			const getCanvasStateSpec = specs.get('get_canvas_state')!;
-			const canvasResult = await getCanvasStateSpec.execute({});
-			expect(
-				canvasResult.isError,
-				'reading canvas state back through the workbench-core tool group must succeed'
-			).toBeFalsy();
-			const canvas = (await textOf(canvasResult)) as { panels: { id: string }[] };
-			expect(canvas.panels.map((p) => p.id)).toContain(newPanelId);
-		} finally {
-			vi.unstubAllGlobals();
-		}
-	});
-
-	it('registers the panel, workbench-core, and screener tool groups together', async () => {
+	it('registers only the trimmed-down chart-demo tool set: the panel tool group plus resolve_ticker', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		try {
 			await registerWorkbenchComposition();
 			const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
 			expect(names).toContain('create_panel');
-			expect(names).toContain('get_canvas_state');
-			expect(names).toContain('run_screener');
-			expect(names).toContain('create_screener');
+			expect(names).toContain('bind_panel_source');
+			expect(names).toContain(RESOLVE_TICKER_TOOL_NAME);
+			for (const trimmedName of OUT_OF_SCOPE_TOOL_NAMES_TRIMMED_FOR_DEMO) {
+				expect(
+					names,
+					`"${trimmedName}" belongs to a tool group commented out for the chart demo -- ` +
+						'registerWorkbenchComposition() must not register it'
+				).not.toContain(trimmedName);
+			}
 		} finally {
 			vi.unstubAllGlobals();
 		}
 	});
 
-	// T-0020-5: today this is true by inspection (chart/similarity/backtest/
-	// alert/watchlist/followup all still have their own flags off), but
-	// nothing asserted it -- a future accidental flip of one of those flags
-	// without also updating this composition root would go uncaught without
-	// this test.
-	it('never registers a chart/similarity/backtest/alert/watchlist/followup tool name (AC2)', async () => {
+	// T-0020-5, narrowed by T-1015-3: today this is true by inspection
+	// (backtest/alert/watchlist still have their own flags off), but nothing
+	// asserted it -- a future accidental flip of one of those flags without
+	// also updating this composition root would go uncaught without this
+	// test.
+	it('never registers a backtest/alert/watchlist tool name (T-1015-3 Solution Approach)', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		try {
