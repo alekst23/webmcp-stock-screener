@@ -1,55 +1,144 @@
 # WebMCP Tool Surface
 
-The app is a hypothesis workbench, not a screener: the atom is a
-`(ticker, date)` **event**, not a ticker. Tools operate on handles the agent
-receives from earlier calls and the human can see (and manipulate) in the UI.
+MarketPane is a screener and research workbench, not the original
+event-atom hypothesis workbench (that surface was retired in EPIC-1015 —
+see "Capability changes" below). The atom now is an **instrument**: an
+agent and a human build a typed filter tree over a universe of
+instruments, run it, inspect and chart the results, find historically
+similar setups, and act on what they find, all through one shared
+workspace document both sides can read and mutate.
 
 ## Nouns
 
 | Handle | Meaning |
 |---|---|
-| Study | Named derived series (`volume / sma(volume, 20)`) |
-| Setup | Temporal pattern: sequence of condition steps with `within`/`sustained` |
-| InstanceSet | Concrete `(ticker, date)` events matching a setup |
-| Panel | Rendered view (small-multiples grid, histogram, chart) |
+| Workspace | The one document a session reads and mutates: panels, layout, links, screeners, and revision history. Created automatically on first load. |
+| Panel | A rendered view on the canvas (results table, chart, watchlist, alert draft, similar-setups, filter builder, ...), addressable by ID. |
+| Screener | A saved definition: a typed filter tree, a universe, and a ranking. |
+| Run | A pinned execution of a screener — the result set every read tool below returns bounded slices of, without silently re-running it. |
+| Filter tree | A typed AND/OR tree of condition nodes (comparison, cross, temporal, pattern, rank, and more) that a screener evaluates per instrument. |
+| Instrument | A tradable security resolved from free text to a canonical ID via the catalog. |
+| Captured setup | A saved chart configuration (instrument, interval, studies, view) used as a similarity-search seed. |
 
-## Tools
+## Tool groups
 
-| Tool | Does | Available when |
+Every group below registers unconditionally once the WebMCP bridge
+connects — there is no legacy-style progressive registration (see
+"Capability changes"). ~39 tools are live in the shipped app today,
+composed by `src/lib/workbench/composition/workbenchCompositionRoot.ts`
+(the sole call site, from `src/routes/+page.svelte`).
+
+| Group | Tools | Full contract |
 |---|---|---|
-| `defineStudy` | Expression → studyId; parse errors return the function catalog | always |
-| `defineSetup` | Condition steps + temporal windows → setupId | always |
-| `findInstances` | Setup + universe/date filters → instanceSetId | always |
-| `getWorkspace` | Shared state incl. the human's current focus/selection | always |
-| `sampleInstances` | Concrete events (random/recent/best/worst) | instance set exists |
-| `measure` | Metric across a set + universe base-rate comparison | instance set exists |
-| `splitInstances` | Child sets by outcome (winners/losers) or condition | instance set exists |
-| `showGrid` | Small-multiples panel aligned at t=0, study overlays | instance set exists |
-| `focusInstance` | Zoom the user's view to one event | panel exists |
+| Panels (14) | `create_panel`, `duplicate_panel`, `remove_panel`, `set_panel_layout`, `apply_layout_template`, `split_panel`, `maximize_panel`, `link_panels`, `unlink_panels`, `set_panel_selection`, `bind_panel_source`, `set_panel_renderer`, `configure_chart_grid`, `configure_panel_view` | [Panel System](design/panel-system/spec.md) |
+| Results (2) | `get_screener_results`, `explain_result` | [Results & Explain](design/results-and-explain/spec.md) |
+| Workspace & safety (9) | `get_app_context`, `get_canvas_state`, `create_workspace`, `save_workspace`, `undo_change`, `get_change_history`, `restore_workspace_revision`, `preview_workspace_changes`, `apply_previewed_changes` | [Workspace & Revisions](design/workspace-revisions/spec.md), [Safety: Preview & Apply](design/safety-preview-apply/spec.md) |
+| Screener (6) | `create_screener`, `edit_filter_tree`, `set_screener_ranking`, `run_screener`, `set_screener_universe`, `validate_screener` | [Screener Core](design/screener-core/spec.md) |
+| Chart (3) | `get_chart_data`, `capture_chart_setup`, `add_chart_annotation` | [Chart Tools](design/chart-tools/spec.md) |
+| Similarity (3) | `find_similar_setups`, `explain_similarity`, `compare_setups` | [Similarity Search](design/similarity-search/spec.md) |
+| Follow-up authoring (2) | `create_computed_field`, `create_custom_study` | [Screener Follow-up Tools](design/screener-followup-tools/spec.md) |
 
-## Design rules
+`get_canvas_state` sees every registered panel kind, not a fixed set —
+its read path widens to whatever the panel-kind registry actually holds
+(T-1015-11 fixed a pre-existing blind spot here; see "Capability
+changes").
 
-- **Dynamic registration**: the surface evolves with the research —
-  `register.ts` diffs desired-vs-registered after every tool execution, so
-  `measure` appears only once `findInstances` has produced a set. This is the
-  `toolchange` story for the submission.
-- **Self-correcting errors**: `ExpressionError` returns the full function
-  catalog in the tool result (`isError: true`) instead of throwing, so the
-  agent fixes its formula in one turn.
-- **One tool per intent**: no near-duplicate tools (`measure` subsumes
-  outcome measurement, cross-set measurement, and base-rate comparison);
-  conditions are inline expressions, not a separate registry.
-- **Results are JSON text content** in MCP-style `{ content: [...] }` shape.
+### Not yet part of the live tool surface
 
-## Code layout
+The rest of the follow-up-tools group — `derive_filters_from_setup`,
+`refine_similarity_search`, `backtest_screener`, `get_backtest_results`,
+`upsert_watchlist`, `save_results_to_watchlist`, `create_alert_draft`,
+`edit_alert_draft`, `enable_alert`, `disable_alert`, `preview_alert`,
+`export_results` — is real, merged, tested code, but is not registered by
+`workbenchCompositionRoot.ts` and each module's own `*_TOOLS_ENABLED`
+flag (`BACKTEST_TOOLS_ENABLED`, `WATCHLIST_TOOLS_ENABLED`,
+`ALERT_TOOLS_ENABLED`, `FILTER_DRAFT_TOOLS_ENABLED`) is still `false`. The
+default workspace does seed `watchlist` and `alert_draft` panels (they
+render whatever state exists, currently empty) ahead of the tools that
+would populate them — wiring this group in is follow-up scope beyond
+this cutover, not a capability this ticket dropped.
 
-```
-src/lib/webmcp/types.ts     — handles, engine interface, WebMCP ambient types
-src/lib/webmcp/tools.ts     — the 9 tool specs (schemas + execute wiring)
-src/lib/webmcp/register.ts  — feature-detect + dynamic register/unregister
-src/lib/webmcp/tools.test.ts — availability gating + error-catalog tests
-```
+## Availability rules
 
-The tools delegate to a `ResearchEngine` interface (`types.ts`). Not yet
-built: the engine implementation (expression parser, temporal matcher,
-data snapshot) and the UI (grid renderer, panels, focus tracking).
+- Every tool operates on the one active workspace, seeded automatically
+  on first load — there is no "no workspace yet" state to gate on.
+- A few tools depend on prior state from an earlier call in the same
+  session (for example `run_screener` before `get_screener_results`,
+  `capture_chart_setup` before `find_similar_setups`, a screener/pinned
+  run/captured setup before the five availability-gated follow-up-
+  authoring tools). Calling one before its precondition exists returns an
+  error result naming what's missing, per the result contract below — it
+  does not throw and does not silently no-op.
+- Nothing is gated on a runtime `toolchange`-style unlock: every group
+  above is either fully registered or fully absent for the whole
+  session. See "Capability changes."
+
+## Result contract
+
+Every tool returns MCP's content-block shape,
+`{ content: [{ type: 'text', text }] }`, with the payload JSON-encoded in
+`text`. A failure sets `isError: true` on the same shape rather than
+throwing, so an agent gets a structured reason it can act on in the next
+turn. Both shapes come from one shared pair of constructors,
+`ok()`/`fail()` (`src/lib/webmcp/toolResult.ts`), used by every tool
+group above.
+
+## Capability changes since the legacy 11-tool surface
+
+EPIC-1015 retired the original 11-tool event-atom workbench
+(`defineStudy`, `defineSetup`, `findInstances`, `sampleInstances`,
+`measure`, `splitInstances`, `showGrid`, `showTickerCharts`,
+`clearPanels`, `focusInstance`, `getWorkspace`) in favor of the surface
+above. `docs/plan/EPIC-1015/capability-parity-matrix.md` is the full
+audit; the ten items below are its structural-gap findings, carried
+forward here because a capability gap is exactly what a reader of this
+file would come looking for.
+
+**Accepted as deliberate drops** — the user signed off on each of these
+as an acceptable loss, not an oversight:
+
+1. **Multi-step temporal sequencing.** The legacy `defineSetup` could
+   anchor step 2's window to the specific occurrence step 1 resolved on.
+   `edit_filter_tree`'s temporal condition type is a single-predicate
+   lookback per node; a filter tree can express "A happened recently AND
+   B happened recently," not "B happened within N days after that
+   specific A."
+2. **Outcome measurement as arbitrary metric-vs-universe comparison**
+   (`measure`). `backtest_screener`/`get_backtest_results` compute a
+   different shape — forward-return and drawdown stats after a signal —
+   not a generic statistic-vs-base-rate comparison. (Also still unwired;
+   see "Not yet part of the live tool surface.")
+3. **Instance splitting into labeled child sets** (`splitInstances`). No
+   tool partitions a result set into independently-usable winner/loser
+   or by-condition subsets.
+4. **Instance focus as a concept distinct from human selection**
+   (`focusInstance`). The new surface has one selection model
+   (`set_panel_selection`), not a separate agent-driven "zoom to this
+   one" state.
+5. **Progressive tool availability** (the legacy `toolchange`
+   demonstration — tools like `measure` appearing only once a result set
+   existed, via `register.ts`'s desired-vs-registered diff). Every group
+   in the table above registers unconditionally for the whole session
+   instead.
+6. **The manual tool-harness route** (`/dev`, hand-invoke any tool with
+   raw JSON). No replacement route exists; a developer convenience, not
+   a researcher-facing feature.
+
+**Shipped as new scope, not dropped** — these were flagged as gaps during
+the parity check and closed by tickets in this same epic before cutover:
+
+7. **Human-clickable single-panel close.** Every panel frame has a close
+   control (T-1015-10) with the same effect as the agent-side
+   `remove_panel` tool, including for panels an agent created.
+8. **Unified, human/agent-attributed action log.** `get_change_history`
+   and every recorded mutation now carry an `actor: 'human' | 'agent'`
+   field; the shell's compact log icon (T-1015-10) expands into the full
+   attributed history.
+9. **Workspace-status header.** The shell (T-1015-9) reports product
+   identity, data freshness, and WebMCP bridge/tool-count status — the
+   equivalent of the legacy page's header, rebuilt rather than reused.
+10. **`get_canvas_state`'s panel-state blind spot.** Fixed (T-1015-11):
+    the read path now covers every registered panel kind instead of a
+    closed set fixed when the read model was first built, which is also
+    what let T-1015-12 seed `watchlist` and `alert_draft` panels by
+    default and have them show up through this tool.
