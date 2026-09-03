@@ -174,6 +174,7 @@ describe('the shell exposes an expandable action log', () => {
 				webmcpStatus: null,
 				bridgeState: 'connecting',
 				historyDeps: deps,
+				resetLayoutDeps: null,
 				observer: null,
 				children: emptyChildrenSnippet()
 			}
@@ -207,6 +208,7 @@ describe('the shell exposes an expandable action log', () => {
 				webmcpStatus: null,
 				bridgeState: 'connecting',
 				historyDeps: null,
+				resetLayoutDeps: null,
 				observer: null,
 				children: emptyChildrenSnippet()
 			}
