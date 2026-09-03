@@ -84,6 +84,47 @@ produce a false failure.
 The deployment is the hackathon submission. Verify before announcing
 the cutover complete, and keep the rollback path available until it is.
 
+## Solution Approach
+
+**Implements**: the "Deployment verification" scenarios in spec.md (happy
+path, CORS, agent reachability, legacy reachability, rollback).
+
+**Approach**: gated on T-1015-7 and the full CI gate passing on the epic
+branch (AC1). Hands-on runbook ticket, not a code-writing one, following
+the established pattern for deployment work in this project
+(`docs/plan/EPIC-0001`'s deployment runbook ticket): a human executes
+against the real Render backend and Cloudflare Workers frontend, since no
+local run substitutes for the live one. Confirm `render.yaml`'s
+`healthCheckPath` (`/health`, unchanged by this epic per T-1015-1's
+finding that the original spike-endpoint hazard was already resolved
+pre-epic) and build/start commands, and `wrangler.jsonc`'s build output
+and public API base URL, match the post-cutover code. Hit the deployed
+health check directly; load the deployed frontend and check the console
+for errors; drive one representative flow from `capability-parity-
+matrix.md`'s confirmed-live rows (e.g. results-table selection, or
+whichever tool group's flag was actually flipped and shipped by
+T-1015-3) end to end in a real browser against the deployed backend,
+confirming CORS from the browser's own origin; connect a WebMCP-capable
+agent and confirm the bridge connects, the header reports connected, and
+registered tool names are the new surface's; probe the retired legacy
+routes/endpoints (`/`, `/dev`, `/spike`, `/api/spike/ping`,
+`/api/research/*`) and confirm none responds. All evidence (URLs hit,
+results) is appended to `docs/reference/deployment.md` (AC8), extending
+its existing verification-evidence format rather than replacing it. A
+rollback path (revert to the pre-cutover deploy of both services, by
+commit/tag) is stated in the ticket record before the runbook executes
+(AC9), and the rate-limit hazard (`RATE_LIMIT_DEFAULT`) is respected by
+not scripting repeated hits against the live service.
+
+**Contracts to introduce**: none.
+
+**Config vars introduced**: none.
+
+**References**: `docs/reference/deployment.md`, `render.yaml`,
+`wrangler.jsonc`, `docs/plan/EPIC-1015/capability-parity-matrix.md`
+(the representative flow in AC5 should be one of its confirmed-live
+rows), the `docs/plan/EPIC-0001` deployment runbook ticket.
+
 ## Out of Scope
 
 New deployment targets, re-platforming, or performance tuning. Fixing
