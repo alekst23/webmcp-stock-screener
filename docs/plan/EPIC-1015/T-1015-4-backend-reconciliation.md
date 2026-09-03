@@ -1,7 +1,7 @@
 # T-1015-4: Backend reconciliation
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1015-2
 **Blocks**: T-1015-7
 

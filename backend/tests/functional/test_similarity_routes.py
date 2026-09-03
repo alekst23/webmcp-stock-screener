@@ -1,7 +1,6 @@
 from fastapi.testclient import TestClient
 
-from api.routes.spike import PANEL_PATH
-from main import app
+from main import PANEL_PATH, app
 from scripts.generate_mock_panel import generate_panel, write_panel
 
 # Exercises api/routes/similarity.py's HTTP wiring against the real mock

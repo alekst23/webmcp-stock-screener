@@ -16,7 +16,7 @@ no point-in-time fundamentals source and no delisting/event calendar in
 Python (T-1014-5's own note). Reporting that explicitly -- empty
 `field_ids()`, `includes_delisted() is False`, empty event lists -- is this
 program's established "explicit unavailable, never a placeholder" pattern
-(domain/panel_disclosure.py, unavailableMarketData.ts on the TS side), not
+(unavailableMarketData.ts on the TS side), not
 a shortcut: the engine's own survivorship/lookahead logic already turns
 these honest capability flags into an honest reported statement.
 """

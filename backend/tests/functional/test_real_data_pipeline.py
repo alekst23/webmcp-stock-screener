@@ -9,13 +9,11 @@ and nothing here needs an API key.
 
 from __future__ import annotations
 
-import importlib
 import io
 from datetime import date
 
 import pandas as pd
 import pytest
-from fastapi.testclient import TestClient
 
 import main as main_module
 from application.append_daily_delta import (
@@ -32,7 +30,8 @@ from infra.panel_io import bars_to_parquet_bytes, parquet_bytes_to_bars
 from scripts.generate_mock_panel import generate_panel, write_panel
 from tests.mocks.fake_eodhd_transport import StubSession, bulk_row, eod_row
 from tests.mocks.fake_panel_store import InMemoryPanelStore
-from tests.unit.test_universe_metadata import AS_OF, SCREENER_CSV
+from tests.unit.test_universe_eligibility import METADATA_AS_OF as AS_OF
+from tests.unit.test_universe_eligibility import SCREENER_CSV
 
 FROM_DATE = date(2024, 1, 2)
 TO_DATE = date(2024, 1, 4)
@@ -219,22 +218,9 @@ class TestStartupPanelResolution:
         assert loaded is not None, "expected the mock panel to load"
         assert loaded.status.source == "mock", f"got {loaded.status.source}"
 
-
-class TestAsOfDateVisibility:
-    def test_api_response_includes_panel_as_of_date(self) -> None:
-        # AC4: a user must be able to see how current the data is, so results
-        # are never presented as more current than the panel behind them.
-        write_panel(generate_panel(), output_path=main_module.PANEL_PATH)
-        importlib.reload(main_module)
-
-        with TestClient(main_module.app) as client:
-            response = client.get("/api/research/panel")
-
-        assert response.status_code == 200, f"got {response.status_code}: {response.text}"
-        body = response.json()
-        assert "as_of" in body, f"expected an as_of date in the response, got {body}"
-        assert date.fromisoformat(body["as_of"]) == date(
-            2025, 12, 31
-        ), f"expected the mock panel's last bar date, got {body['as_of']}"
-        assert body["source"] == "mock", f"expected source 'mock', got {body['source']}"
-        assert body["ticker_count"] == 25, f"expected 25 tickers, got {body['ticker_count']}"
+    # TestAsOfDateVisibility used to live here, exercising GET
+    # /api/research/panel to confirm a response surfaces the panel's as-of
+    # date, source, and ticker count. That route retired with the rest of
+    # api/routes/research.py -- no surviving route serves panel-wide
+    # provenance the same way, so the capability (and this test) retired
+    # with it rather than being repointed at an unrelated route.

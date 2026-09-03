@@ -3,8 +3,11 @@
 Run locally from backend/:
     uv run uvicorn main:app --reload
 
-Serves the T-0001-2 platform spike endpoint and T-0001-5's 5 real networked
-WebMCP tool endpoints (api/routes/research.py).
+Serves the liveness health check plus the similarity and backtest routes
+that back the new panel/workspace surface. The platform spike endpoint and
+the legacy 5-endpoint research/pattern-search surface (api/routes/
+research.py), along with the pandas pattern-research engine underneath it,
+have been retired -- neither has an importer left in the tree.
 """
 
 from __future__ import annotations
@@ -27,16 +30,13 @@ from starlette.types import ASGIApp
 from api.routes.backtest import router as backtest_router
 from api.routes.health import HEALTH_PATH
 from api.routes.health import router as health_router
-from api.routes.research import router as research_router
 from api.routes.similarity import router as similarity_router
-from api.routes.spike import router as spike_router
 from application.backtest_jobs import BacktestJobStore
 from application.load_panel import load_panel
 from domain.backtest_engine import PortBacktestEngine
 from domain.contracts.backtest_engine import BacktestEngine
 from domain.models.panel import PanelStatus
 from infra.object_store import S3PanelStore, config_from_env
-from infra.pandas_engine import PandasPatternResearchEngine
 from infra.panel_market_data import NoFundamentalsPort, PanelPriceSeriesPort, PanelReferenceDataPort
 from infra.similarity_engine import PandasSimilarityEngine
 
@@ -45,9 +45,8 @@ PANEL_PATH = Path(__file__).resolve().parent / "data" / "mock" / "panel.parquet"
 
 def _allowed_origins() -> list[str]:
     """CORS origins allowed to call this API, from CORS_ALLOWED_ORIGINS
-    (comma-separated). Defaults to the local Vite dev server so the spike
-    tool's fetch() from the frontend works out of the box (see
-    backend/.env.example)."""
+    (comma-separated). Defaults to the local Vite dev server so a fetch()
+    from the frontend works out of the box (see backend/.env.example)."""
     raw = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
@@ -74,7 +73,6 @@ def _require_real_panel() -> bool:
 
 def _load_engine() -> (
     tuple[
-        PandasPatternResearchEngine | None,
         PandasSimilarityEngine | None,
         BacktestEngine | None,
         PanelStatus | None,
@@ -84,29 +82,28 @@ def _load_engine() -> (
     memory at startup for low-latency reads'), preferring the real
     object-store panel over T-0001-1's mock one.
 
-    Returns (None, None, None, None) when no panel exists anywhere --
-    api/routes/research.py's, api/routes/similarity.py's and
-    api/routes/backtest.py's dependencies then surface a clear 503 instead
-    of crashing app startup, mirroring the spike endpoint's own guard. That
-    fallback is itself refused when REQUIRE_REAL_PANEL is set and no object
-    store is configured -- see `_require_real_panel` and `load_panel`."""
+    Returns (None, None, None) when no panel exists anywhere --
+    api/routes/similarity.py's and api/routes/backtest.py's dependencies
+    then surface a clear 503 instead of crashing app startup, mirroring the
+    liveness probe's own tolerance for a missing panel (api/routes/
+    health.py). That fallback is itself refused when REQUIRE_REAL_PANEL is
+    set and no object store is configured -- see `_require_real_panel` and
+    `load_panel`."""
     loaded = load_panel(_panel_store(), PANEL_PATH, require_object_store=_require_real_panel())
     if loaded is None:
-        return None, None, None, None
-    engine = PandasPatternResearchEngine(loaded.panel, loaded.universe)
+        return None, None, None
     similarity_engine = PandasSimilarityEngine(loaded.panel, loaded.status)
     backtest_engine = PortBacktestEngine(
         price_port=PanelPriceSeriesPort(loaded.panel, loaded.status),
         fundamentals_port=NoFundamentalsPort(),
         reference_port=PanelReferenceDataPort(loaded.panel, loaded.universe),
     )
-    return engine, similarity_engine, backtest_engine, loaded.status
+    return similarity_engine, backtest_engine, loaded.status
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     (
-        app.state.engine,
         app.state.similarity_engine,
         app.state.backtest_engine,
         app.state.panel_status,
@@ -185,8 +182,6 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
-app.include_router(spike_router)
-app.include_router(research_router)
 app.include_router(similarity_router)
 app.include_router(backtest_router)
 
