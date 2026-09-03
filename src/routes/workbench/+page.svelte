@@ -1,3 +1,15 @@
+<script module lang="ts">
+	// T-0020-9: module-scoped, not component-scoped -- this survives across
+	// remounts of this same route module (SPA back/forward navigation
+	// without a full reload, a future in-app link into /workbench, an
+	// HMR-adjacent remount), so a second mount's onMount reuses the first
+	// mount's composition instead of silently building a second, orphaned
+	// one. See workbenchCompositionGuard.ts.
+	import { createWorkbenchCompositionGuard } from '$lib/workbench/composition/workbenchCompositionGuard';
+
+	const compositionGuard = createWorkbenchCompositionGuard();
+</script>
+
 <script lang="ts">
 	// The panel system's own surface (EPIC-1007) -- separate from
 	// src/routes/+page.svelte's existing 11-tool pattern-research surface,
@@ -7,20 +19,20 @@
 	// gap is the brief moment while all the route's tools finish registering
 	// against the bridge -- never a blank, unseeded workspace.
 	//
-	// T-0020-1: registerWorkbenchComposition() replaces the bare
+	// T-0020-1: registerWorkbenchComposition() (called through the module's
+	// compositionGuard above, T-0020-9) replaces the bare
 	// registerPanelTools() call -- it builds one shared repository/revisions/
 	// history/idempotency/PinnedRunStore and threads it into panel,
 	// workbench-core, and screener tools alike, then returns the same
 	// PanelShellRuntime this component still needs for PanelContainer.
 	import { onMount } from 'svelte';
-	import { registerWorkbenchComposition } from '$lib/workbench/composition/workbenchCompositionRoot';
 	import type { PanelShellRuntime } from '$lib/panels/shell/registerPanelTools';
 	import PanelContainer from '$lib/panels/shell/PanelContainer.svelte';
 
 	let runtime = $state<PanelShellRuntime | null>(null);
 
 	onMount(() => {
-		registerWorkbenchComposition().then((result) => {
+		compositionGuard.ensure().then((result) => {
 			runtime = result;
 		});
 	});
