@@ -69,12 +69,25 @@ describe('normalizeWorkspace', () => {
 	it('drops a malformed panel entry instead of throwing or corrupting the rest', () => {
 		const result = normalizeWorkspace({
 			panels: [
-				{ id: 'panel_chart_1', kind: 'not_a_real_kind' },
+				{ kind: 'results_table' /* missing id */ },
 				{ id: 'panel_grid_1', kind: 'results_table' }
 			]
 		});
 		expect(result.panels).toHaveLength(1);
 		expect(result.panels[0]?.id).toBe('panel_grid_1');
+	});
+
+	// T-1015-11: PanelKind widened from a closed 8-member union to `string` --
+	// normalizePanel no longer drops a panel just because its kind is outside
+	// the original union. See panels/application/panelKindReadParity.test.ts
+	// for the full regression coverage (the registry-consulting projection
+	// this enables, and the repository round-trip that used to re-drop it).
+	it('keeps a panel whose kind is outside the original 8-kind union rather than dropping it', () => {
+		const result = normalizeWorkspace({
+			panels: [{ id: 'panel_custom_1', kind: 'a_sibling_epic_kind' }]
+		});
+		expect(result.panels).toHaveLength(1);
+		expect(result.panels[0]?.kind).toBe('a_sibling_epic_kind');
 	});
 
 	it('drops a malformed link entry (bad channel) instead of throwing', () => {

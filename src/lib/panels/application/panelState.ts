@@ -1,20 +1,20 @@
 // The panel system's actual source of truth, and the write-only
 // projection that keeps EPIC-1006's `get_canvas_state` truthful.
 //
-// WHY the extension, not `doc.panels`: EPIC-1006's `PanelKind` union is
-// closed to eight kinds, and `normalizeWorkspace` silently *drops* any
-// panel record whose kind isn't in that union (workbench/domain/
-// workspace.ts). If this epic's panels lived in `doc.panels` directly, a
-// sibling epic registering a ninth panel kind would see its panels
-// vanish on the next normalize -- a workspace load, a revision restore,
-// anything that round-trips through `normalizeWorkspace`. Storing under
-// `doc.extensions['panel_system']` sidesteps that union entirely; only
-// the *projection* below has to respect it, and it does so by skipping
-// (never corrupting) whatever it can't represent.
+// WHY the extension, not `doc.panels`: even now that both `normalizeWorkspace`
+// (workbench/domain/workspace.ts) and the projection below have widened to
+// accept any registered kind (T-1015-11), a panel of a kind nobody has
+// registered against a given `PanelRegistry` instance still shouldn't show
+// up in `doc.panels` as if it were a real, addressable panel. Storing under
+// `doc.extensions['panel_system']` keeps the full, kind-agnostic state
+// intact regardless of registration; only the *projection* below decides
+// what's addressable, and it does so by skipping (never corrupting)
+// whatever isn't registered.
 import { emptyLinkGraph, type PanelLinkGraph, type PanelLinkGroup } from '../domain/links';
 import { isPanelLinkChannel, type PanelLinkChannel } from '../domain/channels';
 import { makePanel, type Panel, type PanelSourceRef } from '../domain/panel';
 import type { GridRect } from '../domain/grid';
+import type { PanelRegistry } from '../registry/panelKindRegistry';
 import type {
 	LayoutEntry,
 	PanelLink,
@@ -150,21 +150,6 @@ export function readPanelState(doc: WorkspaceDocument): PanelSystemState {
 	};
 }
 
-// EPIC-1006's PanelKind union, reproduced here because workbench/domain/
-// workspace.ts keeps its own copy private. Kept in sync with
-// docs/design/panel-system/technical.md's "kind -> link channel matrix",
-// which happens to be the same eight kinds EPIC-1006 already knows about.
-const PROJECTABLE_KINDS: ReadonlySet<string> = new Set([
-	'filter_builder',
-	'chart',
-	'study_library',
-	'results_table',
-	'similar_opportunities',
-	'watchlist',
-	'alerts',
-	'symbol_details'
-]);
-
 // The one place 'result_selection' becomes EPIC-1006's 'selection'.
 // Nothing else in this epic uses the wire name 'selection'.
 function projectChannel(channel: PanelLinkChannel): WorkbenchLinkChannel {
@@ -189,12 +174,12 @@ function boundResourceIdOf(source: Panel['source']): string | null {
 	return null;
 }
 
-function projectPanels(panels: Panel[]): PanelRecord[] {
+function projectPanels(panels: Panel[], registry: PanelRegistry): PanelRecord[] {
 	return panels
-		.filter((panel) => PROJECTABLE_KINDS.has(panel.kind))
+		.filter((panel) => registry.has(panel.kind))
 		.map((panel) => ({
 			id: panel.id,
-			kind: panel.kind as PanelRecord['kind'],
+			kind: panel.kind,
 			title: panel.title,
 			collapsed: panel.collapsed,
 			visible: !panel.hidden,
@@ -203,9 +188,9 @@ function projectPanels(panels: Panel[]): PanelRecord[] {
 		}));
 }
 
-function projectLayout(panels: Panel[]): LayoutEntry[] {
+function projectLayout(panels: Panel[], registry: PanelRegistry): LayoutEntry[] {
 	return panels
-		.filter((panel) => PROJECTABLE_KINDS.has(panel.kind))
+		.filter((panel) => registry.has(panel.kind))
 		.map((panel) => ({
 			panelId: panel.id,
 			col: panel.rect.col,
@@ -234,17 +219,20 @@ function projectLinks(graph: PanelLinkGraph): PanelLink[] {
 }
 
 // Recomputes doc.panels/doc.layout/doc.links wholesale from `state` on
-// every call -- never patched incrementally, never read back as state.
-// A panel whose kind falls outside EPIC-1006's eight-kind union is
-// skipped from the projection rather than corrupting the document.
+// every call -- never patched incrementally, never read back as state. A
+// panel whose kind isn't registered against `registry` is skipped from the
+// projection rather than corrupting the document (T-1015-11: this used to
+// check a hardcoded eight-kind set; now it consults the real registry, so
+// any registered kind -- placeholder or real, from any epic -- projects).
 export function writePanelState(
 	doc: WorkspaceDocument,
-	state: PanelSystemState
+	state: PanelSystemState,
+	registry: PanelRegistry
 ): WorkspaceDocument {
 	return {
 		...doc,
-		panels: projectPanels(state.panels),
-		layout: projectLayout(state.panels),
+		panels: projectPanels(state.panels, registry),
+		layout: projectLayout(state.panels, registry),
 		links: projectLinks(state.links),
 		extensions: { ...doc.extensions, [EXTENSION_KEY]: state }
 	};

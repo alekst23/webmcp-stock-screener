@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
 **Design**: docs/design/legacy-surface-cutover/
-**Status**: Open
+**Status**: Done
 **Depends on**: —
 **Blocks**: T-1015-12
 
