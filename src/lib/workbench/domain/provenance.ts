@@ -105,6 +105,21 @@ export function makeProvenance(input: ProvenanceInput): MarketDataProvenance {
 		: { ...core, liveness: input.liveness };
 }
 
+// T-0020-6: the one honest "no market-data source configured" default every
+// /workbench tool group falls back to (registerWorkbenchTools.ts,
+// registerScreenerTools.ts, workbenchCompositionRoot.ts) -- `static` rather
+// than a zero-second delay, and no currency/price-adjustment claim, since no
+// real market-data source is wired up anywhere in this codebase yet. Defined
+// once here so the three sites import one instance instead of each carrying
+// a byte-for-byte duplicate with nothing keeping them in sync.
+export const NOT_CONFIGURED_PROVENANCE: MarketDataProvenance = makeProvenance({
+	asOf: new Date(0).toISOString(),
+	sourceId: 'not_configured',
+	sourceLabel: 'No market-data source configured',
+	liveness: 'static',
+	timezone: 'America/New_York'
+});
+
 export interface WithProvenance<T> {
 	data: T;
 	provenance: MarketDataProvenance;

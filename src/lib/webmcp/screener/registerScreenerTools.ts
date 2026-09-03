@@ -9,22 +9,21 @@
 // flags) is new behavior in an existing runtime path, so it stays off, and
 // is not called from app startup, until this epic's surface is complete.
 //
-// Independent instances from registerWorkbenchTools.ts's own
-// createDefaultWorkbenchDeps() -- like registerPanelTools.ts, this
-// composition root builds its own repository/clock/ids rather than
-// importing that function, so this ticket does not have to decide how a
-// future single composition root shares one workspace repository across
-// every tool group. That sharing decision belongs to whichever ticket wires
-// every group into one running app.
+// T-0020-6: createDefaultScreenerToolDeps below builds against
+// registerPanelTools.ts's createWorkbenchSharedInfra() -- the same shared-bag
+// constructor registerWorkbenchTools.ts's createDefaultWorkbenchDeps() and
+// this route's own composition root (workbenchCompositionRoot.ts) build
+// against -- so a standalone call to this module still gets a
+// self-consistent, if independent-per-call, bag of instances rather than
+// three different constructions of "repository + clock + ids + ...".
 import { builtinCatalogRegistry } from '../../catalog/registry';
 import { createUnavailableInstrumentDirectory } from '../../discovery/unavailableDirectory';
-import { createChangeHistory } from '../../workbench/application/changeHistory';
-import { createIdempotencyCache } from '../../workbench/application/idempotency';
+import {
+	createWorkbenchSharedInfra,
+	type WorkbenchSharedInfra
+} from '../../panels/shell/registerPanelTools';
 import { operationRegistry } from '../../workbench/application/operationRegistry';
-import { createRevisionService } from '../../workbench/application/revisionService';
-import { createIdSequencer } from '../../workbench/domain/ids';
-import { makeProvenance, type MarketDataProvenance } from '../../workbench/domain/provenance';
-import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceRepository';
+import { NOT_CONFIGURED_PROVENANCE } from '../../workbench/domain/provenance';
 import { ensureModelContext } from '../bridge';
 import { buildScreenerTools, type ScreenerToolDeps } from './group';
 
@@ -35,33 +34,28 @@ import { buildScreenerTools, type ScreenerToolDeps } from './group';
 // call mutates the same workspace state the panel grid reads.
 export const SCREENER_TOOLS_ENABLED = true;
 
-// Matches registerWorkbenchTools.ts's FIXED_PROVENANCE: `static` rather
-// than a zero-second delay, and no currency/price-adjustment claim, since
-// no real market-data source is wired up here. None of the six screener
-// tools reads this field directly (they carry their own marketData/catalog
-// options), but WorkbenchDeps requires it.
-const FIXED_PROVENANCE: MarketDataProvenance = makeProvenance({
-	asOf: new Date(0).toISOString(),
-	sourceId: 'not_configured',
-	sourceLabel: 'No market-data source configured',
-	liveness: 'static',
-	timezone: 'America/New_York'
-});
-
-export function createDefaultScreenerToolDeps(): ScreenerToolDeps {
-	const repository = createLocalWorkspaceRepository();
-	const clock = { now: () => new Date().toISOString() };
-	const ids = createIdSequencer();
-	const idempotency = createIdempotencyCache();
+// T-0020-6: built directly against a given shared infra bag -- repository,
+// revisions, history, clock, ids, and idempotency are the exact same
+// instances every other /workbench tool group's deps object is built
+// against -- rather than this module constructing its own independent
+// copies. Mirrors registerPanelTools.ts's createPanelShellRuntime(shared) /
+// createDefaultPanelShellRuntime() split and
+// registerWorkbenchTools.ts's createWorkbenchDeps(shared):
+// createDefaultScreenerToolDeps below now delegates here, and
+// workbenchCompositionRoot.ts's own buildScreenerDeps calls this directly
+// with its shared bag instead of duplicating this field list. Deliberately
+// leaves runStore/panelBinding unset -- those are the composition root's
+// own cross-group wiring (T-0020-2), not part of this group's own default.
+export function createScreenerDeps(shared: WorkbenchSharedInfra): ScreenerToolDeps {
 	return {
-		repository,
-		revisions: createRevisionService({ repository, clock, ids, idempotency }),
-		history: createChangeHistory(),
+		repository: shared.repository,
+		revisions: shared.revisions,
+		history: shared.history,
 		registry: operationRegistry,
-		provenance: { current: () => FIXED_PROVENANCE },
-		clock,
-		ids,
-		idempotency,
+		provenance: { current: () => NOT_CONFIGURED_PROVENANCE },
+		clock: shared.clock,
+		ids: shared.ids,
+		idempotency: shared.idempotency,
 		catalog: builtinCatalogRegistry,
 		// Honest "no reference-data source" default (AC6's own convention in
 		// set_screener_universe), not a mock dataset.
@@ -72,6 +66,16 @@ export function createDefaultScreenerToolDeps(): ScreenerToolDeps {
 		// omitted, matching the deviation note's "browser-side over the
 		// ScreenerEvaluationPort domain port" architecture.
 	};
+}
+
+// Fresh instances every call -- never a module-global default -- so a
+// second mount (or a test) never sees another instance's registrations.
+// Kept for this module's own unit tests and any standalone caller;
+// /workbench's actual composition (workbenchCompositionRoot.ts, T-0020-1)
+// calls createScreenerDeps directly with its own shared bag instead, so
+// this group never builds independent instances in that composition.
+export function createDefaultScreenerToolDeps(): ScreenerToolDeps {
+	return createScreenerDeps(createWorkbenchSharedInfra());
 }
 
 export async function registerScreenerTools(

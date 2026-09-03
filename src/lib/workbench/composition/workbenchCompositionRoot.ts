@@ -5,11 +5,12 @@
 // same bag into all three tool groups this route registers -- panel tools,
 // workbench-core tools, and screener tools -- so a mutation made through
 // one is visible to a read through another. Deliberately does not call any
-// of the three groups' own createDefault*Deps(): each of those still
-// exists for that module's own unit tests (AC2), but this module builds
-// each group's deps object directly against the shared bag instead.
-import { builtinCatalogRegistry } from '../../catalog/registry';
-import { createUnavailableInstrumentDirectory } from '../../discovery/unavailableDirectory';
+// of the three groups' own createDefault*Deps() (each of those still exists
+// for that module's own unit tests, AC2) -- instead, buildWorkbenchDeps/
+// buildScreenerDeps below call each module's own createWorkbenchDeps(shared)/
+// createScreenerDeps(shared) constructor (T-0020-6) directly with this
+// route's shared bag, so the field list for each group's deps object is
+// owned by that group's own module, not duplicated here.
 import type { PanelToolDeps } from '../../panels/tools/panelTools';
 import {
 	createPanelShellRuntime,
@@ -18,46 +19,31 @@ import {
 	type PanelShellRuntime,
 	type WorkbenchSharedInfra
 } from '../../panels/shell/registerPanelTools';
-import { registerScreenerTools } from '../../webmcp/screener/registerScreenerTools';
+import {
+	createScreenerDeps,
+	registerScreenerTools
+} from '../../webmcp/screener/registerScreenerTools';
 import type { ScreenerToolDeps } from '../../webmcp/screener/group';
 import type { PanelBindingDeps } from '../../webmcp/screener/runScreener';
 import type { ScreenerEvaluationPort } from '../../screener/ports';
-import { registerWorkbenchTools, type DefaultWorkbenchDeps } from '../tools/registerWorkbenchTools';
-import { operationRegistry } from '../application/operationRegistry';
-import { createPreviewStore } from '../infra/previewStore';
-import { makeProvenance, type MarketDataProvenance } from '../domain/provenance';
+import {
+	createWorkbenchDeps,
+	registerWorkbenchTools,
+	type DefaultWorkbenchDeps
+} from '../tools/registerWorkbenchTools';
 
-export type { WorkbenchSharedInfra };
+// T-0020-9: only `createWorkbenchSharedInfra` (the value) is ever imported
+// from this module -- no importer anywhere in the codebase reaches for the
+// `WorkbenchSharedInfra` type through this re-export (callers that need the
+// type import it directly from registerPanelTools.ts, its real home), so it
+// is not re-exported here.
 export { createWorkbenchSharedInfra };
 
-// Matches registerWorkbenchTools.ts's and registerScreenerTools.ts's own
-// FIXED_PROVENANCE: no real market-data source is wired up on /workbench
-// yet, so every group that requires a ProvenanceSource is honest about it
-// carrying neither currency nor a price adjustment, and reporting `static`
-// liveness rather than a delay of zero (which would read as "live enough").
-const FIXED_PROVENANCE: MarketDataProvenance = makeProvenance({
-	asOf: new Date(0).toISOString(),
-	sourceId: 'not_configured',
-	sourceLabel: 'No market-data source configured',
-	liveness: 'static',
-	timezone: 'America/New_York'
-});
-
-// WorkbenchDeps built directly against the shared bag -- repository,
-// revisions, history, clock, ids, and idempotency are the exact same
-// instances every other group's deps object below also carries.
+// WorkbenchDeps built directly against the shared bag -- delegates to
+// registerWorkbenchTools.ts's own constructor (T-0020-6) so this module
+// does not duplicate that group's field list.
 export function buildWorkbenchDeps(shared: WorkbenchSharedInfra): DefaultWorkbenchDeps {
-	return {
-		repository: shared.repository,
-		revisions: shared.revisions,
-		history: shared.history,
-		registry: operationRegistry,
-		provenance: { current: () => FIXED_PROVENANCE },
-		clock: shared.clock,
-		ids: shared.ids,
-		idempotency: shared.idempotency,
-		previews: createPreviewStore({ clock: shared.clock })
-	};
+	return createWorkbenchDeps(shared);
 }
 
 // ScreenerToolDeps built directly against the shared bag, with `runStore`
@@ -68,7 +54,11 @@ export function buildWorkbenchDeps(shared: WorkbenchSharedInfra): DefaultWorkben
 // PanelToolDeps (T-0020-1's createPanelShellRuntime output) -- its
 // kinds/sourceRenderer/templates registries are reused as-is (T-0020-2:
 // bindRunToResultsPanel needs exactly those three) rather than this module
-// building second instances.
+// building second instances. The base fields (repository, revisions, ...,
+// catalog, instrumentDirectory) delegate to registerScreenerTools.ts's own
+// constructor (T-0020-6); only the cross-group extras this route's
+// composition alone knows about (runStore, panelBinding, evaluationPort
+// override) are added here.
 export function buildScreenerDeps(
 	shared: WorkbenchSharedInfra,
 	panelDeps: Pick<PanelToolDeps, 'kinds' | 'sourceRenderer' | 'templates'>,
@@ -80,19 +70,7 @@ export function buildScreenerDeps(
 		templates: panelDeps.templates
 	};
 	return {
-		repository: shared.repository,
-		revisions: shared.revisions,
-		history: shared.history,
-		registry: operationRegistry,
-		provenance: { current: () => FIXED_PROVENANCE },
-		clock: shared.clock,
-		ids: shared.ids,
-		idempotency: shared.idempotency,
-		catalog: builtinCatalogRegistry,
-		// Honest "no reference-data source" default (matches
-		// registerScreenerTools.ts's own createDefaultScreenerToolDeps), not a
-		// mock dataset.
-		instrumentDirectory: createUnavailableInstrumentDirectory(),
+		...createScreenerDeps(shared),
 		runStore: shared.runs,
 		panelBinding,
 		evaluationPort: overrides?.evaluationPort
