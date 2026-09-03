@@ -55,10 +55,14 @@ source type, or a renderer type into.
 7. **Register a panel kind, source type, or renderer type** so a new
    kind of panel, a new place data can come from, or a new way to show
    it becomes addable without changing the panel container itself.
-8. **Seed a new workspace with the default layout** — a filter-builder
-   panel, a results-table panel, and a chart panel, pre-arranged on the
-   grid — so a researcher opening a fresh workspace sees a working
-   research layout immediately rather than a blank canvas.
+8. **Seed a new workspace with the default layout** — just a filter-builder
+   panel, full-height on the left column — so a researcher opening a
+   fresh workspace starts from a minimal canvas and adds what they need,
+   rather than being handed a pre-populated research layout.
+9. **Illustrate the empty grid** — every unoccupied cell on the 6x4 grid
+   shows a faint outline of its own boundaries, so the grid the agent (or
+   the human) can place panels onto is always visible, not just implied
+   by where existing panels happen to sit.
 
 ## Supported panel kinds
 
@@ -185,12 +189,31 @@ source type, or a renderer type into.
 
 ### Seed a new workspace with the default layout
 
+_Amended by hotfix/empty-grid-canvas — supersedes the three-panel seed below
+(and the six-panel "full target composition" it was later expanded to under
+T-1015-12). The default layout is now deliberately minimal: the researcher
+sees one working control (the filter builder) and an obviously-empty grid
+inviting them to add panels, rather than a pre-populated research layout.
+This also reverses the more-populated-default-layout intent stated in
+docs/design/legacy-surface-cutover/spec.md's route migration feature — that
+intent is superseded by this change._
+
 | Scenario | Given | When | Then |
 |----------|-------|------|------|
-| Happy path | a newly created, otherwise-empty workspace | the workspace finishes creating | it already contains three panels — `filter_builder` (left), `results_table` (center), and `chart` (right) — pre-arranged on the grid, with no additional agent or user action required |
-| Unbound sources | the seeded panels have nothing to show yet | the workspace is opened | each seeded panel renders its kind's normal empty/not-yet-bound state (e.g. "no screener run yet") rather than an error; binding a source to any of them behaves exactly as it would for a panel added by `create_panel` |
+| Happy path | a newly created, otherwise-empty workspace | the workspace finishes creating | it already contains one panel — `filter_builder`, full-height on the left column (col 0, rowSpan 4) — with no additional agent or user action required; the remaining 20 cells are empty |
+| Unbound source | the seeded panel has nothing to show yet | the workspace is opened | the seeded panel renders its kind's normal empty/not-yet-bound state (e.g. "no filters yet") rather than an error; binding a source to it behaves exactly as it would for a panel added by `create_panel` |
 | Not a template a caller can request | the default layout | an agent calls `apply_layout_template` | it is not registered under any template name — it is create-time-only behavior, not a template the agent can re-apply later; an agent that wants this arrangement again after rearranging the workspace lays it out explicitly or via a named template |
 | Restored/duplicated workspace | a workspace loaded from an existing revision, or a duplicated workspace | it is opened | the default layout is never applied — seeding happens only once, at creation of a genuinely new, empty workspace |
+
+### Illustrate the empty grid
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Happy path | a workspace with some cells unoccupied | the workspace is rendered | every unoccupied cell shows a faint outline of its own grid boundaries, distinct from an occupied cell's panel chrome |
+| Fully occupied | every cell on the 6x4 grid is occupied | the workspace is rendered | no empty-cell outlines are shown |
+| Fully empty | no panels exist yet | the workspace is rendered | all 24 cells show the empty-cell outline |
+| Non-interactive | an empty cell's outline | the human clicks or hovers it | nothing happens — the outline never intercepts pointer events or blocks interaction with panels above or beside it |
+| Updates live | a panel is added, removed, resized, or moved | the workspace re-renders | the set of outlined empty cells updates to match the new occupancy, with no stale outlines left behind |
 
 ## Non-Goals
 
@@ -261,5 +284,5 @@ that the grid has a hard capacity._
 
 ---
 
-*Implemented by: EPIC-1007. Depends on the common workspace contract from
-EPIC-1006.*
+*Implemented by: EPIC-1007, hotfix/empty-grid-canvas. Depends on the common
+workspace contract from EPIC-1006.*
