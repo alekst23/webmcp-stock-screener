@@ -14,7 +14,11 @@
 	// rewritten, so panel rendering underneath is unaffected (AC5) -- only
 	// the header became an importable, independently testable component.
 	import type { Snippet } from 'svelte';
-	import { formatFreshness, formatPanelStatus, type PanelStatus } from '../../workspace/panelStatus';
+	import {
+		formatFreshness,
+		formatPanelStatus,
+		type PanelStatus
+	} from '../../workspace/panelStatus';
 	import {
 		formatAgentToolsContext,
 		formatAvailableStatus,

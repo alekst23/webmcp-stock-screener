@@ -107,9 +107,10 @@ describe('the canonical app URL renders the new panel/workspace model in the she
 		const shellOpenIndex = MAIN_ROUTE.indexOf('<WorkbenchShell');
 		const panelContainerIndex = MAIN_ROUTE.indexOf('<PanelContainer');
 		const shellCloseIndex = MAIN_ROUTE.indexOf('</WorkbenchShell>');
-		expect(shellOpenIndex, 'WorkbenchShell must be rendered on the canonical route').toBeGreaterThan(
-			-1
-		);
+		expect(
+			shellOpenIndex,
+			'WorkbenchShell must be rendered on the canonical route'
+		).toBeGreaterThan(-1);
 		expect(
 			panelContainerIndex,
 			'PanelContainer must render inside the WorkbenchShell open/close tags'
