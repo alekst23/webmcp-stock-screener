@@ -27,7 +27,7 @@
 		panel: Panel;
 		kindDefinition: PanelKindDefinition;
 		linkedValue?: LinkedValueEntry;
-		onBroadcast: (channel: PanelLinkChannel, value: string) => void;
+		onBroadcast: (channel: PanelLinkChannel, value: string) => boolean;
 	} = $props();
 
 	// The draft form's starting channel is seeded once from the panel's kind
@@ -37,12 +37,25 @@
 		untrack(() => kindDefinition.linkChannels[0] ?? null)
 	);
 	let draftValue = $state('');
+	// Set after a broadcast that reached nobody -- cleared on the next
+	// successful send or channel change. Chosen over disabling the button
+	// outright: whether a channel currently has any linked panel isn't
+	// available to this component as reactive state (only the *result* of a
+	// send is, via onBroadcast's return), so an inline message after the
+	// no-op attempt is the accurate signal to give, rather than silently
+	// clearing the input as if the broadcast had gone somewhere.
+	let unreachedChannel = $state<PanelLinkChannel | null>(null);
 
 	function submitBroadcast(): void {
 		if (draftChannel === null || draftValue.trim() === '') {
 			return;
 		}
-		onBroadcast(draftChannel, draftValue);
+		const reached = onBroadcast(draftChannel, draftValue);
+		if (!reached) {
+			unreachedChannel = draftChannel;
+			return;
+		}
+		unreachedChannel = null;
 		draftValue = '';
 	}
 </script>
@@ -73,7 +86,12 @@
 
 	{#if kindDefinition.linkChannels.length > 0}
 		<form class="broadcast" onsubmit={(e) => (e.preventDefault(), submitBroadcast())}>
-			<select class="field" bind:value={draftChannel} aria-label="Channel">
+			<select
+				class="field"
+				bind:value={draftChannel}
+				onchange={() => (unreachedChannel = null)}
+				aria-label="Channel"
+			>
 				{#each kindDefinition.linkChannels as channel (channel)}
 					<option value={channel}>{channel}</option>
 				{/each}
@@ -81,6 +99,11 @@
 			<input class="field" type="text" placeholder="value" bind:value={draftValue} />
 			<button type="submit" class="control">Broadcast</button>
 		</form>
+		{#if unreachedChannel !== null}
+			<p class="broadcast-feedback" role="status">
+				No panel is linked on <code>{unreachedChannel}</code> — nothing to broadcast to.
+			</p>
+		{/if}
 	{/if}
 </div>
 
@@ -130,5 +153,11 @@
 	.broadcast .field {
 		min-width: 0;
 		flex: 1;
+	}
+
+	.broadcast-feedback {
+		margin: 0;
+		font-size: var(--font-size-xs);
+		color: var(--text-muted);
 	}
 </style>

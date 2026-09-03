@@ -53,7 +53,7 @@ describe('a human can close a panel by hand', () => {
 				kindDefinition: undefined,
 				onToggleCollapse: () => {},
 				onRemove: (panelId: string) => removed.push(panelId),
-				onBroadcast: () => {}
+				onBroadcast: () => false
 			}
 		});
 		flushSync();

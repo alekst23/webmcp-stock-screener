@@ -80,6 +80,22 @@ export function createPanel(deps: PanelUseCaseDeps, request: CreatePanelRequest)
 		}
 
 		const id = deps.ids.next('panel', request.kind);
+		if (state.panels.some((p) => p.id === id)) {
+			// The sequencer is the only thing that mints panel IDs, and its
+			// contract is that it never repeats one for a given (kind,
+			// discriminator) pair -- see workbench/domain/ids.ts. Reaching this
+			// means it was constructed without (or with a stale) seed, so a
+			// prior panel with this exact ID already exists in state. Throwing
+			// here rather than silently accepting a colliding ID keeps this
+			// class of bug loud instead of corrupting the workspace with two
+			// panels sharing one ID.
+			throw new PanelOperationError(
+				'panel_id_collision',
+				`Minted panel ID "${id}" already exists. The ID sequencer was not seeded from ` +
+					`the active workspace -- this is an internal bug, not a caller error.`,
+				{ id }
+			);
+		}
 		const panel: Panel = makePanel({
 			id,
 			kind: request.kind,

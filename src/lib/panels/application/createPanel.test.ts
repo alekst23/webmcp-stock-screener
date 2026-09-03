@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { createIdempotencyCache } from '../../workbench/application/idempotency';
+import { createRevisionService } from '../../workbench/application/revisionService';
 import { RevisionConflictError } from '../../workbench/domain/errors';
+import { createIdSequencer } from '../../workbench/domain/ids';
 import { GRID_COLUMNS, GRID_ROWS } from '../domain/grid';
 import { PanelOperationError } from './errors';
-import { readPanelState } from './panelState';
+import { panelIdSeed, readPanelState } from './panelState';
 import { createPanelTestHarness } from './testSupport';
 import { createPanel } from './createPanel';
 
@@ -165,5 +168,64 @@ describe('createPanel', () => {
 		expect(state1.panels[0]!.rect, 'identical requests must auto-place identically').toEqual(
 			state2.panels[0]!.rect
 		);
+	});
+
+	// Regression: without a seed, a fresh IdSequencer built after a
+	// reload/remount that reuses the existing active document restarts its
+	// counters at 0, so create_panel would re-mint an ID a panel already in
+	// that document holds.
+	it('regression: an unseeded sequencer reused against an existing document collides, and createPanel refuses rather than corrupting state', () => {
+		const deps = createPanelTestHarness();
+		createPanel(deps, { context: ctx(), kind: 'chart' }); // mints panel_chart_1
+
+		// Simulates a reload/remount: same repository and workspace document,
+		// but a brand-new, unseeded sequencer -- exactly what
+		// createWorkbenchSharedInfra() built before this fix.
+		const staleIds = createIdSequencer();
+		const reloaded = {
+			...deps,
+			ids: staleIds,
+			revisions: createRevisionService({
+				repository: deps.repository,
+				clock: deps.clock,
+				ids: staleIds,
+				idempotency: createIdempotencyCache()
+			})
+		};
+
+		try {
+			createPanel(reloaded, { context: ctx(), kind: 'chart' });
+			expect.fail('expected the colliding create to be refused');
+		} catch (err) {
+			expect(err).toBeInstanceOf(PanelOperationError);
+			expect((err as PanelOperationError).code).toBe('panel_id_collision');
+		}
+		expect(
+			readPanelState(deps.repository.get(deps.workspaceId)!).panels.length,
+			'the refused create must not have added a second, colliding panel'
+		).toBe(1);
+	});
+
+	it('panelIdSeed fixes the regression: a sequencer seeded from the reloaded document mints a fresh, non-colliding id', () => {
+		const deps = createPanelTestHarness();
+		createPanel(deps, { context: ctx(), kind: 'chart' }); // mints panel_chart_1
+
+		const doc = deps.repository.get(deps.workspaceId)!;
+		const seededIds = createIdSequencer(panelIdSeed(doc));
+		const reloaded = {
+			...deps,
+			ids: seededIds,
+			revisions: createRevisionService({
+				repository: deps.repository,
+				clock: deps.clock,
+				ids: seededIds,
+				idempotency: createIdempotencyCache()
+			})
+		};
+
+		const envelope = createPanel(reloaded, { context: ctx(), kind: 'chart' });
+		expect(envelope.affectedIds).toEqual(['panel_chart_2']);
+		const state = readPanelState(deps.repository.get(deps.workspaceId)!);
+		expect(state.panels.map((p) => p.id)).toEqual(['panel_chart_1', 'panel_chart_2']);
 	});
 });

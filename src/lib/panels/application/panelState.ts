@@ -14,6 +14,7 @@ import { emptyLinkGraph, type PanelLinkGraph, type PanelLinkGroup } from '../dom
 import { isPanelLinkChannel, type PanelLinkChannel } from '../domain/channels';
 import { makePanel, type Panel, type PanelSourceRef } from '../domain/panel';
 import type { GridRect } from '../domain/grid';
+import { parseId } from '../../workbench/domain/ids';
 import type { PanelRegistry } from '../registry/panelKindRegistry';
 import type {
 	LayoutEntry,
@@ -148,6 +149,30 @@ export function readPanelState(doc: WorkspaceDocument): PanelSystemState {
 		links: normalizeLinkGraph(raw.links),
 		selections: normalizeSelections(raw.selections)
 	};
+}
+
+// High-water mark for `createIdSequencer`, so a reloaded workspace never
+// mints a panel ID an existing panel already holds. Reads the panel_system
+// extension via readPanelState -- the real source of truth -- rather than
+// doc.panels: that top-level field is projectPanels' registry-filtered
+// view, which drops any panel whose kind isn't currently registered, and a
+// sequencer seeded from it could then re-mint that panel's ID. Panel IDs
+// carry their kind as the discriminator (`panel_<kind>_<n>`), so the seed
+// is keyed per kind, mirroring watchlistIdSeed/chartIdSeed/filterDraftIdSeed.
+export function panelIdSeed(doc: WorkspaceDocument | null): Record<string, number> {
+	if (!doc) {
+		return {};
+	}
+	const seed: Record<string, number> = {};
+	for (const panel of readPanelState(doc).panels) {
+		const parsed = parseId(panel.id);
+		if (!parsed || parsed.kind !== 'panel' || !parsed.discriminator) {
+			continue;
+		}
+		const key = `panel:${parsed.discriminator}`;
+		seed[key] = Math.max(seed[key] ?? 0, parsed.sequence);
+	}
+	return seed;
 }
 
 // The one place 'result_selection' becomes EPIC-1006's 'selection'.

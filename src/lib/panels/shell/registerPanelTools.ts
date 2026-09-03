@@ -28,6 +28,7 @@ import {
 import { createIdSequencer, type IdSequencer } from '../../workbench/domain/ids';
 import type { Clock, WorkspaceRepository } from '../../workbench/domain/ports';
 import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceRepository';
+import { panelIdSeed } from '../application';
 import {
 	createLayoutTemplateRegistry,
 	registerDefaultLayoutTemplates
@@ -82,7 +83,14 @@ export interface WorkbenchSharedInfra {
 export function createWorkbenchSharedInfra(): WorkbenchSharedInfra {
 	const repository = createLocalWorkspaceRepository();
 	const clock = { now: () => new Date().toISOString() };
-	const ids = createIdSequencer();
+	// Seeded from the active workspace's existing panels (bug fix, see git
+	// history): without a seed, this sequencer's in-memory counters restart
+	// at 0 on every reload/remount that reuses an existing document, so
+	// create_panel could re-mint an ID a panel already in that document
+	// holds. Mirrors chartIdSeed/watchlistIdSeed/filterDraftIdSeed's own
+	// active-doc-seeded pattern.
+	const activeId = repository.getActiveId();
+	const ids = createIdSequencer(panelIdSeed(activeId ? repository.get(activeId) : null));
 	const idempotency = createIdempotencyCache();
 	const history = createChangeHistory();
 	const revisions = createRevisionService({ repository, clock, ids, idempotency });

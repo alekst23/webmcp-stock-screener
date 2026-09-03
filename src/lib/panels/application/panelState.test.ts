@@ -3,8 +3,10 @@ import { emptyWorkspace } from '../../workbench/domain/workspace';
 import { makePanel } from '../domain/panel';
 import { linkPanels, type LinkContext } from '../domain/links';
 import { createPanelRegistry, type PanelRegistry } from '../registry/panelKindRegistry';
+import { createIdSequencer } from '../../workbench/domain/ids';
 import {
 	emptyPanelState,
+	panelIdSeed,
 	readPanelState,
 	writePanelState,
 	type PanelSystemState
@@ -199,5 +201,80 @@ describe('writePanelState', () => {
 			'the wire name result_selection must never appear in the projection'
 		).toBe(false);
 		expect(channels.has('symbol')).toBe(true);
+	});
+});
+
+describe('panelIdSeed', () => {
+	it('is empty when there is no workspace to seed from', () => {
+		expect(panelIdSeed(null)).toEqual({});
+	});
+
+	it('is empty for a workspace with no panels yet', () => {
+		expect(panelIdSeed(emptyWorkspace('workspace_1', 'Fresh', '2026-01-01T00:00:00.000Z'))).toEqual(
+			{}
+		);
+	});
+
+	// The regression this exists to prevent: a workspace document reloaded
+	// from storage (or a remount reusing the active document) must not let a
+	// fresh, unseeded IdSequencer re-mint an ID that already exists.
+	it('reports the highest sequence per kind, keyed the same way ids.next("panel", kind) is called', () => {
+		const registry = registryWithOriginalEightKinds();
+		const panels = [
+			makePanel({
+				id: 'panel_chart_1',
+				kind: 'chart',
+				title: 'Chart',
+				config: {},
+				rect: { col: 0, row: 0, colSpan: 1, rowSpan: 1 }
+			}),
+			makePanel({
+				id: 'panel_chart_3',
+				kind: 'chart',
+				title: 'Chart 2',
+				config: {},
+				rect: { col: 1, row: 0, colSpan: 1, rowSpan: 1 }
+			}),
+			makePanel({
+				id: 'panel_watchlist_1',
+				kind: 'watchlist',
+				title: 'Watchlist',
+				config: {},
+				rect: { col: 2, row: 0, colSpan: 1, rowSpan: 1 }
+			})
+		];
+		const state: PanelSystemState = { panels, links: { groups: [] }, selections: {} };
+		const doc = writePanelState(
+			emptyWorkspace('workspace_1', 'Research', '2026-01-01T00:00:00.000Z'),
+			state,
+			registry
+		);
+
+		expect(panelIdSeed(doc)).toEqual({ 'panel:chart': 3, 'panel:watchlist': 1 });
+	});
+
+	it('never re-mints an ID a reloaded document already holds', () => {
+		const registry = registryWithOriginalEightKinds();
+		const state: PanelSystemState = {
+			panels: [
+				makePanel({
+					id: 'panel_chart_1',
+					kind: 'chart',
+					title: 'Chart',
+					config: {},
+					rect: { col: 0, row: 0, colSpan: 1, rowSpan: 1 }
+				})
+			],
+			links: { groups: [] },
+			selections: {}
+		};
+		const doc = writePanelState(
+			emptyWorkspace('workspace_1', 'Research', '2026-01-01T00:00:00.000Z'),
+			state,
+			registry
+		);
+
+		const ids = createIdSequencer(panelIdSeed(doc));
+		expect(ids.next('panel', 'chart')).toBe('panel_chart_2');
 	});
 });

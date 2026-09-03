@@ -48,7 +48,7 @@ function mountPanel(panel: Panel, deps: PanelUseCaseDeps): Mounted {
 	document.body.appendChild(target);
 	const instance = mount(WatchlistPanel, {
 		target,
-		props: { panel, onBroadcast: () => {}, deps: { useCaseDeps: deps } }
+		props: { panel, onBroadcast: () => false, deps: { useCaseDeps: deps } }
 	});
 	flushSync();
 	return { target, instance };

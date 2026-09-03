@@ -31,7 +31,7 @@
 		linkedValue?: LinkedValueEntry;
 		onToggleCollapse: (panelId: string, collapsed: boolean) => void;
 		onRemove: (panelId: string) => void;
-		onBroadcast: (channel: PanelLinkChannel, value: string) => void;
+		onBroadcast: (channel: PanelLinkChannel, value: string) => boolean;
 	} = $props();
 
 	type BodyLoadState = ResolvedPanelBody | { kind: 'loading' };

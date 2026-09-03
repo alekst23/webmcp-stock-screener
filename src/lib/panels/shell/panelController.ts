@@ -197,7 +197,11 @@ export function readSnapshot(
 export interface PanelBodyProps {
 	panel: Panel;
 	linkedValue?: LinkedValueEntry;
-	onBroadcast: (channel: PanelLinkChannel, value: string) => void;
+	// Returns whether the broadcast actually reached at least one linked
+	// panel (bug fix, see git history) -- a body that shows the human its own
+	// feedback (PlaceholderPanelBody's "no linked recipients" state) needs
+	// this to distinguish a real send from a no-op.
+	onBroadcast: (channel: PanelLinkChannel, value: string) => boolean;
 }
 
 // `component` is always the normalized, directly-renderable function -- a
