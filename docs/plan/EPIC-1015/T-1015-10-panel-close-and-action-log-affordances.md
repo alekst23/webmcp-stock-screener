@@ -42,6 +42,83 @@ the two apart.
 5. A production build succeeds and both affordances work with no console
    errors, verified via browser check.
 
+## Solution Approach
+
+**Implements**: spec.md's "Panel close" and "Action log access"
+scenarios. Depends on T-1015-9's shell existing to host the log icon.
+
+**Approach**: frontend-only, two independent affordances.
+
+1. **Panel close (AC1, AC4)** — `PanelFrame.svelte`'s header already has
+   a `.collapse` control wired through an `onToggleCollapse` prop to
+   `PanelContainer.svelte`'s `handleToggleCollapse`, which calls
+   `panelController.ts`'s `togglePanelCollapsed` directly (not through a
+   tool) and then `refresh()`. This is the established pattern for a
+   human-triggered mutation — confirmed by `ResultsTablePanel.svelte`'s
+   and `alerts/application/{confirm,decline}AlertActivation.ts`'s own
+   `context: { actor: 'human' }` call sites, all of which call a use case
+   directly rather than round-tripping through the tool wire format. Add
+   a second control next to `.collapse` in `PanelFrame.svelte`, a new
+   `onRemove: (panelId: string) => void` prop, wired in
+   `PanelContainer.svelte` to a new `panelController.ts` function:
+   `removePanelByHuman(deps: PanelUseCaseDeps, panelId: string):
+   MutationEnvelope` that calls the existing, unmodified
+   `panels/application/removePanel.ts`'s `removePanel` with
+   `context: { actor: 'human' }`, then `refresh()` — same shape as
+   `handleToggleCollapse`. AC4 (closing an agent-created panel) needs no
+   extra work: `removePanel` never inspects who created the panel.
+
+   Note for the implementer: `togglePanelCollapsed` currently hardcodes
+   `actor: 'agent'` even though it is only ever invoked from this same
+   human-triggered path — a pre-existing inconsistency, out of scope to
+   fix here (not one of this ticket's ACs). Do not copy that mistake for
+   the new close button; pass `'human'` explicitly, as designed above.
+
+2. **Action log (AC2, AC3)** — **AC2's field already exists.**
+   `workbench/domain/mutation.ts` already defines `Actor = 'human' |
+   'agent'`, and `workbench/application/changeHistory.ts`'s
+   `ChangeRecord.actor: Actor` is already populated by every
+   `recordCommit` call site: agent tool calls pass `'agent'`
+   (`workbench/tools/index.ts`), and a few existing human-triggered paths
+   already pass `'human'` (`ResultsTablePanel.svelte`,
+   `confirmAlertActivation`/`declineAlertActivation`) — this ticket's new
+   close button (above) adds one more. `workbench/tools/index.ts`'s
+   `getChangeHistory` already serializes `actor` in its output. So there
+   is no new field to add; verify this at implementation time and treat
+   the ticket doc/technical.md's "does not yet" framing as stale rather
+   than re-deriving a field that already exists.
+
+   What's actually missing is the **UI** (AC3): a compact icon in
+   T-1015-9's shell header that expands into a log view. Read via a new
+   `panelController.ts` helper, `readActionLog(deps: Pick<PanelUseCaseDeps,
+   'history' | 'workspaceId'>, limit?: number): ChangeRecord[]` — calling
+   `deps.history.list(deps.workspaceId, { limit })` directly, mirroring
+   `panelController.ts`'s existing direct-use-case-call convention rather
+   than round-tripping through `get_change_history`'s tool wire format
+   client-side. New presentational component (e.g.
+   `panels/shell/ActionLogPanel.svelte`) renders each record's `at`,
+   `diffSummary`, and an actor badge (`actor === 'human' ? 'Human' :
+   'Agent'` — reimplemented inline, not imported from
+   `workspace/activity.ts`'s `actorLabel`, since that module is a
+   T-1015-6 deletion target per `legacyModelRemoval.test.ts`'s own stub).
+   The icon + expand/collapse state lives in T-1015-9's shell component;
+   this ticket adds the icon and the log component, not the shell itself.
+
+**Contracts to introduce**: none new — `Actor` and `ChangeRecord.actor`
+already carry what AC2 asks for.
+
+**Config vars introduced**: none.
+
+**References**: `src/lib/panels/shell/PanelFrame.svelte`,
+`PanelContainer.svelte`, `panelController.ts` (`togglePanelCollapsed` as
+the pattern to follow), `panels/application/removePanel.ts`,
+`workbench/domain/mutation.ts` (`Actor`),
+`workbench/application/changeHistory.ts` (`ChangeRecord`),
+`workbench/tools/index.ts`'s `getChangeHistory`,
+`src/lib/workspace/legacyModelRemoval.test.ts` (T-1015-6's stub noting
+`activity.ts` waits on this ticket), `src/lib/workspace/activity.ts`
+(retired reference only, not reused).
+
 ## Design References
 
 - `docs/design/legacy-surface-cutover/spec.md` — "Route migration"

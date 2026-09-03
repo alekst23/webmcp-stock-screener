@@ -46,9 +46,20 @@ reused as-is — they are generic and already kept per the epic's AC6.
 
 ### Action log entry (attribution field)
 
+**Correction (T-1015-10 design pass):** this field already exists, and did
+not need adding. `workbench/domain/mutation.ts`'s `Actor = 'human' |
+'agent'` and `workbench/application/changeHistory.ts`'s `ChangeRecord.actor:
+Actor` are already populated by every `recordCommit` call site, including
+existing human-triggered ones (`ResultsTablePanel.svelte`,
+`confirmAlertActivation`/`declineAlertActivation`), and `get_change_history`
+already serializes it. What T-1015-10 actually adds is the **UI**: a
+compact shell icon (hosted in T-1015-9's shell) that expands into a log
+view built from `ChangeHistory.list()`, plus a human-clickable panel-close
+control that becomes the log's one new `actor: 'human'` call site.
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `actor` | `'human' \| 'agent'` | Who performed the recorded action — the field the legacy log already had and the new history model does not yet. |
+| `actor` | `'human' \| 'agent'` | Who performed the recorded action. Already present on `ChangeRecord` and already returned by `get_change_history`. |
 
 ### New panel kinds for the default layout
 
