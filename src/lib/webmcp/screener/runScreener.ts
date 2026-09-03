@@ -307,9 +307,16 @@ async function execute(
 		if (panelBinding) {
 			try {
 				bindRunToResultsPanel(deps, panelBinding, workspaceId, runId);
-			} catch {
+			} catch (err) {
 				// AC2/AC5: best-effort -- binding never blocks or alters
-				// run_screener's own already-built success response.
+				// run_screener's own already-built success response. Still logged
+				// (not silently swallowed) so a real binding defect stays visible,
+				// matching this codebase's convention for comparable best-effort
+				// failures (register.ts, session.ts).
+				console.warn(
+					'run_screener: auto-bind to results_table panel failed (best-effort, run itself still succeeded)',
+					err
+				);
 			}
 		}
 	}

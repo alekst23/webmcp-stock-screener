@@ -1,39 +1,33 @@
 // T-0020-3: the full path an agent actually drives on /workbench, through
-// the real shared composition root -- not hand-built fixtures. Builds the
-// harness from T-0020-1/T-0020-2's own exported composition-root functions
-// (createWorkbenchSharedInfra, createPanelShellRuntime, buildWorkbenchDeps,
-// buildScreenerDeps) and the real registerPanelTools/registerWorkbenchTools/
-// registerScreenerTools registration calls -- exactly what
-// registerWorkbenchComposition() itself calls, proven equivalent to it by
-// workbenchCompositionRoot.test.ts's own identity assertions.
+// the REAL composition-root entry point -- registerWorkbenchComposition()
+// itself, the exact function +page.svelte calls, not a hand-reconstruction
+// of its internals (createWorkbenchSharedInfra -> createPanelShellRuntime ->
+// buildWorkbenchDeps/buildScreenerDeps -> the three register*Tools calls).
+// A future bug in that real function's call order or wiring would fail this
+// test; it would not have with a hand-copied reconstruction that could drift
+// from it and still pass.
 //
-// One seam is substituted: ScreenerToolDeps.evaluationPort. No real
-// ScreenerMarketData adapter exists anywhere in this codebase yet (every
-// other screener test -- runScreener.test.ts, engine.test.ts -- fakes this
-// exact port for the same reason); the shipped honest-unavailable default
-// (unavailableMarketData.ts) resolves any universe to zero instruments,
-// which screener-core's own existing (unchanged, out-of-scope-to-touch)
-// validation always treats as a *blocking* empty_universe problem -- so a
-// real run against the honest default is always refused, never a live
-// demonstration of the auto-bind path. Substituting only the evaluation
-// port -- not the composition, not the binding, not the panel/workbench
-// wiring -- is how this test proves the actually-new wiring (AC1) without
-// re-testing or changing screener-core's own matching/validation logic
-// (explicitly out of scope for this epic).
+// One seam is substituted: ScreenerToolDeps.evaluationPort, via
+// registerWorkbenchComposition()'s own optional `overrides` parameter. No
+// real ScreenerMarketData adapter exists anywhere in this codebase yet
+// (every other screener test -- runScreener.test.ts, engine.test.ts -- fakes
+// this exact port for the same reason); the shipped honest-unavailable
+// default (unavailableMarketData.ts) resolves any universe to zero
+// instruments, which screener-core's own existing (unchanged,
+// out-of-scope-to-touch) validation always treats as a *blocking*
+// empty_universe problem -- so a real run against the honest default is
+// always refused, never a live demonstration of the auto-bind path.
+// Substituting only the evaluation port -- not the composition, not the
+// binding, not the panel/workbench wiring -- is how this test proves the
+// actually-new wiring (AC1) without re-testing or changing screener-core's
+// own matching/validation logic (explicitly out of scope for this epic).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyFilterTree } from '../../screener/definition';
 import type { ScreenerEvaluationPort } from '../../screener/ports';
 import { makeScreenerRun, type ScreenerMatch } from '../../screener/run';
 import { makeProvenance, type MarketDataProvenance } from '../domain/provenance';
 import type { ToolResult, ToolSpec } from '../../webmcp/types';
-import { registerScreenerTools } from '../../webmcp/screener/registerScreenerTools';
-import { registerPanelTools, createPanelShellRuntime } from '../../panels/shell/registerPanelTools';
-import { registerWorkbenchTools } from '../tools/registerWorkbenchTools';
-import {
-	buildScreenerDeps,
-	buildWorkbenchDeps,
-	createWorkbenchSharedInfra
-} from './workbenchCompositionRoot';
+import { registerWorkbenchComposition } from './workbenchCompositionRoot';
 
 beforeEach(() => {
 	localStorage.clear();
@@ -107,17 +101,7 @@ async function registerSpecs(): Promise<Map<string, ToolSpec>> {
 	const registerTool = vi.fn();
 	vi.stubGlobal('document', { modelContext: { registerTool } });
 
-	const shared = createWorkbenchSharedInfra();
-	const panelRuntime = createPanelShellRuntime(shared);
-	const workbenchDeps = buildWorkbenchDeps(shared);
-	const screenerDeps = {
-		...buildScreenerDeps(shared, panelRuntime.deps),
-		evaluationPort: fakeEvaluationPort()
-	};
-
-	await registerPanelTools(panelRuntime);
-	await registerWorkbenchTools(workbenchDeps);
-	await registerScreenerTools(screenerDeps);
+	await registerWorkbenchComposition({ evaluationPort: fakeEvaluationPort() });
 
 	return new Map<string, ToolSpec>(
 		registerTool.mock.calls.map((args: unknown[]) => {

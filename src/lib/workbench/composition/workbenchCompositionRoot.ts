@@ -21,6 +21,7 @@ import {
 import { registerScreenerTools } from '../../webmcp/screener/registerScreenerTools';
 import type { ScreenerToolDeps } from '../../webmcp/screener/group';
 import type { PanelBindingDeps } from '../../webmcp/screener/runScreener';
+import type { ScreenerEvaluationPort } from '../../screener/ports';
 import { registerWorkbenchTools, type DefaultWorkbenchDeps } from '../tools/registerWorkbenchTools';
 import { operationRegistry } from '../application/operationRegistry';
 import { createPreviewStore } from '../infra/previewStore';
@@ -70,7 +71,8 @@ export function buildWorkbenchDeps(shared: WorkbenchSharedInfra): DefaultWorkben
 // building second instances.
 export function buildScreenerDeps(
 	shared: WorkbenchSharedInfra,
-	panelDeps: Pick<PanelToolDeps, 'kinds' | 'sourceRenderer' | 'templates'>
+	panelDeps: Pick<PanelToolDeps, 'kinds' | 'sourceRenderer' | 'templates'>,
+	overrides?: WorkbenchCompositionOverrides
 ): ScreenerToolDeps {
 	const panelBinding: PanelBindingDeps = {
 		kinds: panelDeps.kinds,
@@ -92,19 +94,34 @@ export function buildScreenerDeps(
 		// mock dataset.
 		instrumentDirectory: createUnavailableInstrumentDirectory(),
 		runStore: shared.runs,
-		panelBinding
+		panelBinding,
+		evaluationPort: overrides?.evaluationPort
 	};
+}
+
+// Injection seam for tests only: `+page.svelte`'s real call site never
+// passes this, so the shipped default behavior (createScreenerEngine wired
+// to the honest-unavailable ScreenerMarketData, per createRunScreenerTool's
+// own default in runScreener.ts) is unchanged. Exists so a test can call
+// the REAL registerWorkbenchComposition() -- not a hand-reconstruction of
+// its internals -- while still substituting a fake evaluation port (no real
+// ScreenerMarketData adapter exists anywhere in this codebase yet, so every
+// real evaluation refuses with empty_universe).
+export interface WorkbenchCompositionOverrides {
+	evaluationPort?: ScreenerEvaluationPort;
 }
 
 // Builds the shared infra once, constructs each group's deps against it,
 // and registers all three tool groups in order (panel, workbench-core,
 // screener). Returns the PanelShellRuntime so the /workbench route can
 // still hand `deps`/`observer` to PanelContainer exactly as before.
-export async function registerWorkbenchComposition(): Promise<PanelShellRuntime> {
+export async function registerWorkbenchComposition(
+	overrides?: WorkbenchCompositionOverrides
+): Promise<PanelShellRuntime> {
 	const shared = createWorkbenchSharedInfra();
 	const panelRuntime = createPanelShellRuntime(shared);
 	const workbenchDeps = buildWorkbenchDeps(shared);
-	const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps);
+	const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps, overrides);
 
 	await registerPanelTools(panelRuntime);
 	await registerWorkbenchTools(workbenchDeps);

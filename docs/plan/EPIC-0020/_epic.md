@@ -74,6 +74,15 @@ each rather than a parallel fan-out.
    tests, backend tests (backend is untouched by this epic but must stay
    green), and a production build.
 
+## Known Limitation
+
+Because no real `ScreenerMarketData` adapter exists yet anywhere in this
+codebase, a live `run_screener` call today is refused (`empty_universe`)
+rather than returning real matches. This epic's own tests substitute a fake
+evaluation port to prove the composition-root wiring is correct — they do
+not and cannot demonstrate real market data flowing through yet. A real
+adapter is a separate, future piece of work.
+
 ## Out of Scope
 
 - Chart, similarity, backtest, alert, watchlist, and followup tool groups —
