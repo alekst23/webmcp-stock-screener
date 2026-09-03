@@ -187,9 +187,11 @@ fake needed.
 `PanelContainer.svelte` calls `computeEmptyCells(snapshot.rects)` and
 renders one outline element per result as a sibling to each `PanelFrame`,
 positioned with the same `panelFrameStyle`-style grid-line mapping
-`gridStyle.ts` already uses for occupied panels. Styled with the existing
-`--separator` token (already used for `PanelFrame`'s subtle borders) and
-`pointer-events: none`, stacked behind panel content.
+`gridStyle.ts` already uses for occupied panels. Each outline element
+carries `data-testid="empty-cell"` (the contract `PanelContainer.test.ts`
+asserts against) and `pointer-events: none`, styled with the existing
+`--separator` token (already used for `PanelFrame`'s subtle borders),
+stacked behind panel content.
 
 ### Tool surface (`src/lib/webmcp/v2/panelTools.ts`)
 
