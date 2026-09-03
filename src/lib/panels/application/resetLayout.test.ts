@@ -1,7 +1,6 @@
-// hotfix/panel-system: failing stubs for resetLayout.ts's contract, ahead of
-// its real implementation. resetLayout(deps, request) currently throws
-// ("not implemented") from every call, so every test below is red until the
-// implementing agent replaces that stub body.
+// hotfix/panel-system: tests for resetLayout.ts's contract -- see
+// docs/design/panel-system/spec.md's "Reset the workspace layout to the
+// default seed" and technical.md's "Reset layout to default".
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEED_PANELS } from '../domain/defaultLayout';
 import { readPanelState } from './panelState';
@@ -86,12 +85,20 @@ describe('resetLayout', () => {
 		resetLayout(deps, { context: ctx() });
 		const afterFirstReset = readPanelState(deps.repository.get(deps.workspaceId)!).panels;
 
-		resetLayout(deps, { context: ctx() });
+		const envelope = resetLayout(deps, { context: ctx() });
 		const afterSecondReset = readPanelState(deps.repository.get(deps.workspaceId)!).panels;
 
 		expect(
 			afterSecondReset.map((p) => ({ kind: p.kind, rect: p.rect })),
 			'expected the same kind/rect arrangement after resetting an already-default layout'
 		).toEqual(afterFirstReset.map((p) => ({ kind: p.kind, rect: p.rect })));
+		expect(
+			afterSecondReset.map((p) => p.id).sort(),
+			'expected panel ids to be literally unchanged on a no-op reset, not newly minted'
+		).toEqual(afterFirstReset.map((p) => p.id).sort());
+		expect(
+			envelope.affectedIds,
+			'expected no affected ids reported for a no-op reset'
+		).toEqual([]);
 	});
 });
