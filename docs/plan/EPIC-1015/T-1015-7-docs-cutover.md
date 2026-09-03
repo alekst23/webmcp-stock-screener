@@ -82,6 +82,48 @@ Documentation is not a place to preserve retired behavior "for
 reference" — that is the Dead Code Policy applied to prose. Git history
 holds it.
 
+## Solution Approach
+
+**Implements**: the "Documentation cutover" scenarios in spec.md (happy
+path, superseded spec, recorded drop).
+
+**Approach**: docs-only, gated on T-1015-4 and T-1015-6 (code cutover
+complete). Rewrite `README.md` to describe the shipped surface and its
+local-dev steps, running (not assuming) each named port, backend-URL
+fallback, allowed origin, and health-check command against the
+post-cutover code — the health-check command now targets `/health`, since
+T-1015-1's audit found the epic doc's original spike-endpoint hazard was
+already resolved by T-0016-2 before this epic started. Rewrite
+`docs/tools.md` to list only the shipped tools with their availability
+rules and result contract, dropping the "Code layout" section that would
+otherwise name deleted files. In `docs/design/README.md`, mark
+`docs/design/pattern-research-workbench/spec.md` and `docs/design/
+workspace-snapshots/spec.md` as superseded rather than deleting outright
+(the project convention: amend over delete when the concept partially
+survives — most of the legacy capability list did, in reduced or absorbed
+form, per the parity matrix). Update `docs/reference/deployment.md` and
+`docs/reference/data-provider.md` to name the post-T-1015-4 endpoints and
+health check. Add a "Capability changes" section, in `docs/tools.md` or
+the design index, that transcribes the **10 structural-gap items** from
+`capability-parity-matrix.md`'s sign-off section: the 6 the user accepted
+as deliberate drops (temporal sequencing, `measure`/`splitInstances`,
+instance focus, progressive availability, the manual harness route) get
+documented as accepted drops; the items that became T-1015-9/10/11/12
+scope get documented as shipped features once those tickets land, not as
+drops — this ticket must check their actual landed state rather than
+copy the matrix's wording verbatim, since it predates them. A final grep
+pass over the docs confirms no reference to a deleted file, tool, route,
+endpoint, or env var remains (AC6).
+
+**Contracts to introduce**: none.
+
+**Config vars introduced**: none.
+
+**References**: `docs/plan/EPIC-1015/retirement-inventory.md`,
+`capability-parity-matrix.md` (the drop list this ticket surfaces),
+`README.md`, `docs/tools.md`, `docs/design/README.md`,
+`docs/reference/deployment.md`, `docs/reference/data-provider.md`.
+
 ## Out of Scope
 
 Code changes beyond what a doc fix requires. Verifying the live deploy
