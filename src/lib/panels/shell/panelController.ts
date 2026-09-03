@@ -7,7 +7,8 @@
 import {
 	recordCommit,
 	undoChange,
-	type ChangeHistory
+	type ChangeHistory,
+	type ChangeRecord
 } from '../../workbench/application/changeHistory';
 import type { RevisionService } from '../../workbench/application/revisionService';
 import type { Clock, WorkspaceRepository } from '../../workbench/domain/ports';
@@ -19,6 +20,7 @@ import {
 	configurePanelView,
 	emptyPanelState,
 	readPanelState,
+	removePanel,
 	renderedRects,
 	type PanelSystemState,
 	type PanelUseCaseDeps
@@ -312,6 +314,27 @@ export function togglePanelCollapsed(
 	collapsed: boolean
 ): MutationEnvelope {
 	return configurePanelView(deps, { context: { actor: 'agent' }, panelId, collapsed });
+}
+
+// The close affordance's use case (T-1015-10 AC1): calls the exact same
+// removePanel an agent tool call would, just tagged actor: 'human' -- same
+// shape as togglePanelCollapsed above (PanelContainer's handler calls this
+// then refresh()). removePanel never inspects who created the panel, so
+// closing an agent-created panel takes this identical path (AC4).
+export function removePanelByHuman(deps: PanelUseCaseDeps, panelId: string): MutationEnvelope {
+	return removePanel(deps, { context: { actor: 'human' }, panelId });
+}
+
+// Read-only access to the change log for the shell's action-log icon
+// (T-1015-10 AC3) -- calls ChangeHistory.list directly, mirroring this
+// module's existing direct-use-case-call convention (readSnapshot,
+// togglePanelCollapsed) rather than round-tripping through
+// get_change_history's tool wire format client-side.
+export function readActionLog(
+	deps: Pick<PanelUseCaseDeps, 'history' | 'workspaceId'>,
+	limit?: number
+): ChangeRecord[] {
+	return deps.history.list(deps.workspaceId, { limit });
 }
 
 // Reuses EPIC-1006's undoChange directly (no reimplementation) so redeeming

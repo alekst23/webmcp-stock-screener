@@ -77,7 +77,15 @@
 	<title>MarketPane</title>
 </svelte:head>
 
-<WorkbenchShell {panelStatus} {webmcpStatus} {bridgeState}>
+<WorkbenchShell
+	{panelStatus}
+	{webmcpStatus}
+	{bridgeState}
+	historyDeps={runtime
+		? { history: runtime.deps.history, workspaceId: runtime.deps.workspaceId }
+		: null}
+	observer={runtime?.observer ?? null}
+>
 	<div class="panel-viewport">
 		{#if runtime}
 			<PanelContainer deps={runtime.deps} observer={runtime.observer} />

@@ -50,6 +50,7 @@ describe('PanelFrame renders a real body with its per-instance props', () => {
 				kindDefinition: realBodyKindDefinition(),
 				linkedValue: { channel: 'symbol', value: 'AAPL' },
 				onToggleCollapse: () => {},
+				onRemove: () => {},
 				onBroadcast: (channel, value) => broadcastCalls.push({ channel, value })
 			}
 		});

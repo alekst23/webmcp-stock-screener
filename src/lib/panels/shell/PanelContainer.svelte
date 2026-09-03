@@ -11,6 +11,7 @@
 	import {
 		propagateLinkedValue,
 		readSnapshot,
+		removePanelByHuman,
 		togglePanelCollapsed,
 		type LinkedValues,
 		type PanelSnapshot,
@@ -47,6 +48,11 @@
 		refresh();
 	}
 
+	function handleRemove(panelId: string): void {
+		removePanelByHuman(deps, panelId);
+		refresh();
+	}
+
 	function handleBroadcast(sourcePanelId: string) {
 		return (channel: PanelLinkChannel, value: string): void => {
 			const { next } = propagateLinkedValue(
@@ -71,6 +77,7 @@
 				kindDefinition={deps.kinds.get(panel.kind)}
 				linkedValue={linkedValues[panel.id]}
 				onToggleCollapse={handleToggleCollapse}
+				onRemove={handleRemove}
 				onBroadcast={handleBroadcast(panel.id)}
 			/>
 		{/if}

@@ -6,14 +6,22 @@
 	// a reuse of AppShell.svelte: this component owns its own markup and
 	// styles rather than importing the legacy shell (AC1 explicitly rules
 	// that out), because AppShell.svelte's three-region Snippet contract
-	// (topBar/children/log) is shaped around the legacy page's action log
-	// (T-1015-10, out of scope here), not this surface.
+	// (topBar/children/log) is shaped around the legacy page's
+	// always-visible action log, not this surface's own compact,
+	// expand-on-demand one (T-1015-10, added below).
 	//
 	// Markup and behavior here were lifted verbatim out of
 	// src/routes/+page.svelte (T-1015-3's inline header) rather than
 	// rewritten, so panel rendering underneath is unaffected (AC5) -- only
 	// the header became an importable, independently testable component.
+	//
+	// T-1015-10 AC3: this shell also owns the action-log icon and its
+	// expand/collapse state -- a compact affordance, not the legacy page's
+	// always-visible log. `historyDeps`/`observer` are null until the
+	// composition root's workspace runtime is ready (see +page.svelte), so
+	// the icon stays disabled and the log stays empty until then.
 	import type { Snippet } from 'svelte';
+	import type { ChangeRecord } from '../../workbench/application/changeHistory';
 	import {
 		formatFreshness,
 		formatPanelStatus,
@@ -27,16 +35,23 @@
 		type WebmcpBridgeState,
 		type WebmcpStatus
 	} from '../../webmcp/status';
+	import { readActionLog, type PanelWorkspaceObserver } from './panelController';
+	import type { PanelUseCaseDeps } from '../application';
+	import ActionLogPanel from './ActionLogPanel.svelte';
 
 	let {
 		panelStatus,
 		webmcpStatus,
 		bridgeState,
+		historyDeps,
+		observer,
 		children
 	}: {
 		panelStatus: PanelStatus | null;
 		webmcpStatus: WebmcpStatus | null;
 		bridgeState: WebmcpBridgeState;
+		historyDeps: Pick<PanelUseCaseDeps, 'history' | 'workspaceId'> | null;
+		observer: PanelWorkspaceObserver | null;
 		children: Snippet;
 	} = $props();
 
@@ -74,6 +89,32 @@
 		for (const menu of openToolMenus()) {
 			menu.open = false;
 			menu.querySelector<HTMLElement>('summary')?.focus();
+		}
+	}
+
+	// T-1015-10 AC3: starts collapsed -- scoped down from the legacy page's
+	// always-visible log, per the ticket's own direction.
+	let logExpanded = $state(false);
+	let logRecords = $state<ChangeRecord[]>([]);
+
+	function refreshLog(): void {
+		logRecords = historyDeps ? readActionLog(historyDeps) : [];
+	}
+
+	// Keeps the log current while it's open by re-reading on every workspace
+	// mutation, agent- or human-triggered alike -- the same observer
+	// PanelContainer already subscribes to for its own re-render.
+	$effect(() => {
+		if (!observer || !logExpanded) {
+			return;
+		}
+		return observer.subscribe(refreshLog);
+	});
+
+	function toggleLog(): void {
+		logExpanded = !logExpanded;
+		if (logExpanded) {
+			refreshLog();
 		}
 	}
 </script>
@@ -126,7 +167,21 @@
 			</div>
 			{@html `<!-- ${formatAgentToolsContext(webmcpStatus, bridgeState)} -->`}
 		{/if}
+		<button
+			type="button"
+			class="log-toggle"
+			aria-expanded={logExpanded}
+			aria-label={logExpanded ? 'Hide action log' : 'Show action log'}
+			disabled={!historyDeps}
+			onclick={toggleLog}
+		>
+			Log
+		</button>
 	</header>
+
+	{#if logExpanded}
+		<ActionLogPanel records={logRecords} />
+	{/if}
 
 	{@render children()}
 </div>
@@ -223,6 +278,29 @@
 	.tool-menu[open] summary {
 		border-color: var(--border-strong);
 		color: var(--text-primary);
+	}
+
+	.log-toggle {
+		flex: 0 0 auto;
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		padding: var(--space-xs) var(--space-sm);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--bg-elevated);
+		color: var(--text-secondary);
+		white-space: nowrap;
+	}
+
+	.log-toggle[aria-expanded='true'] {
+		border-color: var(--border-strong);
+		color: var(--text-primary);
+	}
+
+	.log-toggle:disabled {
+		color: var(--text-muted);
+		cursor: not-allowed;
 	}
 
 	.tool-menu ul,

@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
 **Design**: docs/design/legacy-surface-cutover/
-**Status**: Open
+**Status**: Done
 **Depends on**: T-1015-9
 **Blocks**: T-1015-6
 
@@ -128,6 +128,45 @@ the pattern to follow), `panels/application/removePanel.ts`,
 - `docs/design/pattern-research-workbench/technical.md` — how the legacy
   page's activity log and its human/agent attribution worked, for
   reference (retired, not reused as code).
+
+## Implementation Notes
+
+- `panelController.ts` gained `removePanelByHuman(deps, panelId)` (calls
+  `removePanel` with `context: { actor: 'human' }`) and
+  `readActionLog(deps, limit?)` (calls `ChangeHistory.list` directly),
+  exactly as designed above.
+- `PanelFrame.svelte` gained an `onRemove` prop and a `.control.remove`
+  close button next to `.collapse`; `PanelContainer.svelte` wires it to
+  `removePanelByHuman` + `refresh()`, mirroring `handleToggleCollapse`.
+- New `panels/shell/ActionLogPanel.svelte` renders `ChangeRecord[]` with an
+  inline `actor === 'human' ? 'Human' : 'Agent'` badge. `WorkbenchShell.svelte`
+  owns the expand/collapse state and a `.log-toggle` icon in its header;
+  `+page.svelte` feeds it `historyDeps` (`{ history, workspaceId }`) and the
+  panel `observer` so the log stays live while expanded, and starts
+  collapsed/disabled until the workspace runtime is ready.
+- AC2 confirmed already-populated as the solution approach predicted: no
+  new field was added; `panelCloseAndActionLog.test.ts` asserts
+  `ChangeRecord.actor` for both the new human close path and existing
+  agent paths.
+- Test stubs in `panelCloseAndActionLog.test.ts` were replaced with real
+  assertions: pure-logic coverage of `removePanelByHuman`/`readActionLog`
+  against `createPanelTestHarness()`, plus real component mounts (Svelte 5
+  `mount()`/`flushSync()`, the same pattern `PanelFrame.test.ts` already
+  used) proving the close button and the log icon/expand actually work,
+  not just that the wiring is described. `PanelFrame.test.ts`'s existing
+  mount was updated for the new required `onRemove` prop.
+- `npm run typecheck` and `npx vitest run` both pass; the only failing
+  tests in the suite are pre-existing "not implemented" stubs for sibling
+  tickets T-1015-6 (`legacyModelRemoval.test.ts`) and T-1015-12
+  (`richDefaultLayout.test.ts`), unrelated to this ticket's scope.
+- `npm run build` succeeds (production build).
+- AC5's live-browser verification is **outstanding**: a concurrent session
+  holds the chrome-devtools MCP's singleton browser profile
+  (`/Users/space/.cache/chrome-devtools-mcp/chrome-profile` already in
+  use), so no page could be opened even with an isolated context. This is
+  an environment/concurrency conflict, not a code failure -- same
+  convention as sibling tickets blocked on the dev-server port. Retry the
+  browser check once the other session releases the browser profile.
 
 ## Out of Scope
 
