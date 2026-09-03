@@ -68,9 +68,9 @@ current filter/results/chart set:
 
 | Kind | Status |
 |------|--------|
-| `similar_opportunities` | Already registered (EPIC-1012) — reuse, don't rebuild. |
-| `watchlist` | No panel kind exists yet — EPIC-1014 shipped the underlying tools, tool-only. |
-| `alert_draft` | No panel kind exists yet — EPIC-1014 shipped the underlying tools, tool-only. |
+| `similar_opportunities` | Real `PanelKindDefinition` already exists (`workbench/similarity/panel/domain/panelKind.ts`, EPIC-1012), but is not yet registered into the shared `/workbench` composition's live `PanelRegistry` — today it only exists inside `registerSimilarityTools.ts`'s own standalone, disconnected registry. T-1015-3 unifying the similarity tool group into the shared composition (its own scope) is what should resolve this; T-1015-12 must verify it landed rather than assume. `registerSimilarityTools.ts`'s own header comment, claiming a real+placeholder registration throws `PanelKindConflictError`, is stale against the registry's current placeholder-precedence handling — see `panelKindRegistry.ts`'s `register()`. |
+| `watchlist` | No panel kind exists yet — EPIC-1014 shipped the underlying tools, tool-only. `defaultPanelKinds.ts`'s existing placeholder `KindSpec` already has the right size/link-channel/binding-type/schema shape; only `component()`/`validateConfig` need a real implementation. |
+| `alert_draft` | No panel kind exists yet — EPIC-1014 shipped the underlying tools, tool-only. Distinct from `defaultPanelKinds.ts`'s existing `alerts` (plural) placeholder kind — this is a new kind name, not a re-registration of `alerts`. |
 
 ## Data Flow
 
