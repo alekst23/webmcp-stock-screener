@@ -51,7 +51,7 @@ overlapping ones, with no capability silently lost and no broken deploy.
 | 8 | T-1015-8 | Deployment cutover verification | T-1015-7 | Open |
 | 9 | T-1015-9 | Build the new shared shell and consolidate onto one URL | T-1015-3 | Open |
 | 10 | T-1015-10 | Restore panel-close and action-log UI affordances | T-1015-9 | Open |
-| 11 | T-1015-11 | Fix get_canvas_state's panel-state blind spot | — | Open |
+| 11 | T-1015-11 | Fix get_canvas_state's panel-state blind spot | — | Done |
 | 12 | T-1015-12 | Enrich the default workspace layout | T-1015-9, T-1015-11 | Open |
 
 **Superseded note (T-1015-2):** the NO-GO verdict stood on two blockers —

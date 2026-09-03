@@ -71,7 +71,7 @@ export function commitPanelChange(
 			mutate: (doc) => {
 				const state = readPanelState(doc);
 				const result = build(doc, state);
-				const nextDoc = writePanelState(doc, result.nextState);
+				const nextDoc = writePanelState(doc, result.nextState, deps.kinds);
 				return {
 					document: nextDoc,
 					affectedIds: result.affectedIds,
