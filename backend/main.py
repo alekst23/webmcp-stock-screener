@@ -3,11 +3,12 @@
 Run locally from backend/:
     uv run uvicorn main:app --reload
 
-Serves the liveness health check plus the similarity and backtest routes
-that back the new panel/workspace surface. The platform spike endpoint and
-the legacy 5-endpoint research/pattern-search surface (api/routes/
-research.py), along with the pandas pattern-research engine underneath it,
-have been retired -- neither has an importer left in the tree.
+Serves the liveness health check plus the similarity, backtest and chart
+routes that back the new panel/workspace surface. The platform spike
+endpoint and the legacy 5-endpoint research/pattern-search surface (api/
+routes/research.py), along with the pandas pattern-research engine
+underneath it, have been retired -- neither has an importer left in the
+tree.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from api.routes.backtest import router as backtest_router
+from api.routes.chart import router as chart_router
 from api.routes.health import HEALTH_PATH
 from api.routes.health import router as health_router
 from api.routes.similarity import router as similarity_router
@@ -76,29 +78,36 @@ def _load_engine() -> (
         PandasSimilarityEngine | None,
         BacktestEngine | None,
         PanelStatus | None,
+        PanelPriceSeriesPort | None,
     ]
 ):
     """Load the panel into memory once at startup (docs/plan.md: 'loaded into
     memory at startup for low-latency reads'), preferring the real
     object-store panel over T-0001-1's mock one.
 
-    Returns (None, None, None) when no panel exists anywhere --
-    api/routes/similarity.py's and api/routes/backtest.py's dependencies
-    then surface a clear 503 instead of crashing app startup, mirroring the
-    liveness probe's own tolerance for a missing panel (api/routes/
-    health.py). That fallback is itself refused when REQUIRE_REAL_PANEL is
-    set and no object store is configured -- see `_require_real_panel` and
-    `load_panel`."""
+    Returns (None, None, None, None) when no panel exists anywhere --
+    api/routes/similarity.py's, api/routes/backtest.py's and
+    api/routes/chart.py's dependencies then surface a clear 503 instead of
+    crashing app startup, mirroring the liveness probe's own tolerance for a
+    missing panel (api/routes/health.py). That fallback is itself refused
+    when REQUIRE_REAL_PANEL is set and no object store is configured -- see
+    `_require_real_panel` and `load_panel`.
+
+    The same `PanelPriceSeriesPort` instance backs both the backtest
+    engine's price port and api/routes/chart.py's bar-serving endpoint
+    (T-1014-6 built it, this reuses it rather than constructing a second
+    wrapper over the same panel)."""
     loaded = load_panel(_panel_store(), PANEL_PATH, require_object_store=_require_real_panel())
     if loaded is None:
-        return None, None, None
+        return None, None, None, None
     similarity_engine = PandasSimilarityEngine(loaded.panel, loaded.status)
+    price_series_port = PanelPriceSeriesPort(loaded.panel, loaded.status)
     backtest_engine = PortBacktestEngine(
-        price_port=PanelPriceSeriesPort(loaded.panel, loaded.status),
+        price_port=price_series_port,
         fundamentals_port=NoFundamentalsPort(),
         reference_port=PanelReferenceDataPort(loaded.panel, loaded.universe),
     )
-    return similarity_engine, backtest_engine, loaded.status
+    return similarity_engine, backtest_engine, loaded.status, price_series_port
 
 
 @asynccontextmanager
@@ -107,6 +116,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.similarity_engine,
         app.state.backtest_engine,
         app.state.panel_status,
+        app.state.price_series_port,
     ) = _load_engine()
     app.state.backtest_jobs = BacktestJobStore()
     yield
@@ -184,6 +194,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(similarity_router)
 app.include_router(backtest_router)
+app.include_router(chart_router)
 
 
 def main() -> None:

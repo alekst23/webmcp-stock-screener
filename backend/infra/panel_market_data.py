@@ -94,6 +94,14 @@ class PanelPriceSeriesPort:
         start, stop = _row_range(self._panel, ticker, from_date, to_date)
         return [self._panel.bar_at(i) for i in range(start, stop)]
 
+    def has_ticker(self, ticker: str) -> bool:
+        """Whether the loaded panel carries any data for `ticker` at all --
+        distinct from `get_bars` returning an empty list, which is also what
+        a *known* ticker with no bars inside the requested window looks
+        like. Callers that need to tell "unknown ticker" apart from "no bars
+        in this window" (api/routes/chart.py's 404) use this first."""
+        return self._panel.bounds(ticker) is not None
+
     def get_series(
         self, ticker: str, series_ref: SeriesRef, from_date: date, to_date: date
     ) -> list[SeriesObservation]:
