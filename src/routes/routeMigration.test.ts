@@ -17,7 +17,17 @@ const ROUTE_SOURCES = import.meta.glob('/src/routes/**/*.svelte', {
 	eager: true
 }) as Record<string, string>;
 
+// T-1015-9: the status header (and the formatters it calls) moved out of
+// this route and into WorkbenchShell.svelte -- read separately, since it is
+// no longer under src/routes.
+const LIB_SOURCES = import.meta.glob('/src/lib/panels/shell/*.svelte', {
+	query: '?raw',
+	import: 'default',
+	eager: true
+}) as Record<string, string>;
+
 const MAIN_ROUTE = ROUTE_SOURCES['/src/routes/+page.svelte'] ?? '';
+const WORKBENCH_SHELL = LIB_SOURCES['/src/lib/panels/shell/WorkbenchShell.svelte'] ?? '';
 
 describe('main route renders the new panel/workspace model', () => {
 	it('resolved the main route source at all (glob sanity)', () => {
@@ -52,9 +62,14 @@ describe('WebMCP status header on the migrated route', () => {
 		// connectWebmcp(engine, ...), which AC8 forbids importing here.
 		expect(MAIN_ROUTE).toContain('$lib/webmcp/newSurfaceSession');
 		expect(MAIN_ROUTE).not.toContain("from '$lib/webmcp/session'");
-		expect(MAIN_ROUTE).toContain('formatDefinedStatus');
-		expect(MAIN_ROUTE).toContain('formatAvailableStatus');
-		expect(MAIN_ROUTE).toContain('formatBridgeStatus');
+		// T-1015-9: the formatters themselves are called from
+		// WorkbenchShell.svelte now, not this route -- see
+		// sharedShellAndUrlConsolidation.test.ts for full coverage of the
+		// shell reading them. This route only needs to feed the shell the
+		// state those formatters read.
+		expect(WORKBENCH_SHELL).toContain('formatDefinedStatus');
+		expect(WORKBENCH_SHELL).toContain('formatAvailableStatus');
+		expect(WORKBENCH_SHELL).toContain('formatBridgeStatus');
 	});
 });
 

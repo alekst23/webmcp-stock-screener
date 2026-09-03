@@ -22,6 +22,9 @@ const PAGE = SOURCES['/src/routes/+page.svelte'] ?? '';
 const SHELL = SOURCES['/src/lib/shell/AppShell.svelte'] ?? '';
 const LAYOUT = SOURCES['/src/routes/+layout.svelte'] ?? '';
 const APP_HTML = HTML_SOURCES['/src/app.html'] ?? '';
+// T-1015-9: the status header (agent-context comment, tool counts) moved
+// out of +page.svelte and into this new, separately-composed shell.
+const WORKBENCH_SHELL = SOURCES['/src/lib/panels/shell/WorkbenchShell.svelte'] ?? '';
 
 // The regions the shell renders, in source order, named by the snippet prop
 // each one takes -- read out of the source rather than spelled here so
@@ -251,16 +254,22 @@ describe('restyle-sensitive page invariants (post-T-1015-3 migration)', () => {
 		// actual emitted comment -- not a rendered element, and not dropped.
 		// Asserted as three independent facts rather than one exact spelling,
 		// so extracting the template into a const stays a refactor.
-		expect(page, 'the agent context must still be raw-injected').toContain('{@html');
-		expect(page, 'formatAgentToolsContext must still be called').toContain(
+		// T-1015-9: this markup moved from +page.svelte into WorkbenchShell.svelte
+		// (a genuinely new component, AC1) -- the page still renders it, just
+		// through that component now, so the source-text check moves with it.
+		expect(WORKBENCH_SHELL, 'the agent context must still be raw-injected').toContain('{@html');
+		expect(WORKBENCH_SHELL, 'formatAgentToolsContext must still be called').toContain(
 			'formatAgentToolsContext('
 		);
-		expect(page, 'the context must still be emitted as an HTML comment').toContain('<!--');
+		expect(WORKBENCH_SHELL, 'the context must still be emitted as an HTML comment').toContain(
+			'<!--'
+		);
 	});
 
 	it('test_both_tool_counts_are_still_rendered_in_the_status_bar', () => {
-		const statusBar = page.match(/<header class="status-bar">([\s\S]*?)<\/header>/);
-		expect(statusBar, 'the page no longer renders a status-bar header').not.toBeNull();
+		// T-1015-9: the status-bar header itself moved into WorkbenchShell.svelte.
+		const statusBar = WORKBENCH_SHELL.match(/<header class="status-bar">([\s\S]*?)<\/header>/);
+		expect(statusBar, 'the shell no longer renders a status-bar header').not.toBeNull();
 		expect(statusBar![1], 'the defined-tool count left the status bar').toContain(
 			'formatDefinedStatus('
 		);

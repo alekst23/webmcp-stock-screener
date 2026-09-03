@@ -1,17 +1,19 @@
-// T-0020-9: `/workbench`'s shared composition (T-0020-1) must be built at
-// most once per page instance -- registerWorkbenchComposition() itself stays
-// ungated (its own test file and workbenchCompositionRoot.e2e.test.ts call it
-// fresh, repeatedly, each expecting a brand-new independent composition), so
-// the guard lives here instead: a small stateful wrapper +page.svelte's
-// onMount calls through, rather than the composition root directly.
+// T-0020-9: the shared composition (T-0020-1) must be built at most once per
+// page instance -- registerWorkbenchComposition() itself stays ungated (its
+// own test file and workbenchCompositionRoot.e2e.test.ts call it fresh,
+// repeatedly, each expecting a brand-new independent composition), so the
+// guard lives here instead: a small stateful wrapper the canonical route's
+// (`src/routes/+page.svelte`) onMount calls through, rather than the
+// composition root directly. Originally built for the interim `/workbench`
+// route (EPIC-0020); T-1015-9 retired that route and moved this guard's one
+// call site to `/`.
 //
-// No route currently links into `/workbench`, so a second mount (SPA
-// back/forward navigation without a full reload, a future in-app link into
-// the route, an HMR-adjacent remount) is latent, not active, today -- but
-// without this guard it would silently build a second, disconnected
-// WorkspaceRepository/PinnedRunStore/etc that no rendered PanelContainer
-// would ever read from again, and every tool name would rebind to it,
-// stranding any in-flight call from the first mount's infra.
+// A second mount (SPA back/forward navigation without a full reload, a
+// future in-app link into the route, an HMR-adjacent remount) is latent, not
+// active, today -- but without this guard it would silently build a second,
+// disconnected WorkspaceRepository/PinnedRunStore/etc that no rendered
+// PanelContainer would ever read from again, and every tool name would
+// rebind to it, stranding any in-flight call from the first mount's infra.
 import type { PanelShellRuntime } from '../../panels/shell/registerPanelTools';
 import { registerWorkbenchComposition } from './workbenchCompositionRoot';
 

@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
 **Design**: docs/design/legacy-surface-cutover/
-**Status**: Open
+**Status**: Done — see Implementation Notes below
 **Depends on**: T-1015-3
 **Blocks**: T-1015-6, T-1015-10, T-1015-12
 
@@ -132,3 +132,88 @@ reused as code), `src/lib/workspace/panelStatus.ts`.
 Panel-close and action-log affordances inside the shell (T-1015-10).
 Rich default layout content (T-1015-12). Deleting the legacy shell
 component or legacy route's remaining files (T-1015-6).
+
+## Implementation Notes
+
+**Status**: implemented.
+
+- AC1: added `src/lib/panels/shell/WorkbenchShell.svelte` -- a new
+  component, not a reuse of `src/lib/shell/AppShell.svelte` (which
+  stays untouched for T-1015-6). Its markup and styles were lifted
+  verbatim out of `+page.svelte`'s own interim inline header (the
+  measure T-1015-3's Implementation Notes flagged as ahead of this
+  ticket's shared shell), so the rendered output is unchanged (AC5) --
+  only the ownership moved. It takes `panelStatus`, `webmcpStatus`,
+  `bridgeState`, and a `children` snippet as props, and owns: product
+  identity (`MarketPane` + the WebMCP protocol badge), the
+  data-freshness pill (`workspace/panelStatus.ts`'s `formatFreshness`/
+  `formatPanelStatus` -- confirmed still live, T-1015-4 kept the
+  backend endpoint), and the WebMCP status group
+  (`formatDefinedStatus`/`formatAvailableStatus`/`formatBridgeStatus`/
+  `formatAgentToolsContext` from `webmcp/status.ts`), plus the
+  dismiss-on-outside-click/Escape affordance for the two tool-name
+  disclosures.
+- AC1/status wrapper: `src/lib/webmcp/newSurfaceSession.ts`'s
+  `connectNewSurfaceBridge` (built by T-1015-3) already satisfied this
+  ticket's "WebMCP status wrapper" requirement exactly as described --
+  reports `'connecting'` synchronously, `'connected'` with the live
+  tool list on resolve, `'failed'` with a logged error on rejection --
+  confirmed by reading it and its existing full-coverage test suite
+  (`newSurfaceSession.test.ts`). No second wrapper was built. "Available"
+  count is never tracked as a second live number: `WorkbenchShell`
+  derives `availableCount` from the same `webmcpStatus.toolCount`
+  `formatDefinedStatus` reads, gated only on `bridgeState === 'connected'`
+  (spec.md Open Question 4 -- progressive availability is a confirmed
+  drop).
+- AC2: `src/routes/+page.svelte` now renders
+  `<WorkbenchShell {panelStatus} {webmcpStatus} {bridgeState}>` wrapping
+  the existing `.panel-viewport`/`PanelContainer` markup; the route
+  keeps only data fetching and bridge-connection wiring (`onMount`,
+  `fetchPanelStatus`, `connectNewSurfaceBridge`), no header markup.
+- AC3: `src/routes/workbench/+page.svelte` (EPIC-0020's interim route,
+  the only place the composition rendered before this ticket, unwrapped)
+  is deleted outright, not redirected -- the composition guard it used
+  (`workbenchCompositionGuard.ts`) now has its one call site on `/`.
+  Nothing else in the codebase links or navigates to `/workbench`.
+- AC4: `npm run build` succeeds (static adapter output, no errors). The
+  interactive "loads with no console errors on first paint" browser
+  check could not be run from this worktree -- port 5173 was held by a
+  concurrent session's dev server (confirmed via `lsof`) -- outstanding,
+  to be run via `/at-browser-check` before/at ticket close, same
+  situation T-1015-3 recorded.
+- AC5: no change to `PanelContainer.svelte` or its CSS; the
+  `.panel-viewport` wrapper (the `contain: layout` containing-block
+  trick for `PanelContainer`'s `position: fixed; inset: 0`) stays in
+  `+page.svelte`, structurally identical to before, just now rendered
+  as `WorkbenchShell`'s `children` snippet instead of a sibling of the
+  inline header. The visual "no regression" claim itself is verified
+  via the same outstanding browser check as AC4.
+- Sibling tests that asserted on the header markup's previous location
+  (inline in `+page.svelte`) were updated to read
+  `WorkbenchShell.svelte` instead, since T-1015-9 legitimately moves
+  that markup: `src/routes/routeMigration.test.ts`'s WebMCP status
+  header test, and `src/lib/theme/paletteGuard.test.ts`'s
+  `test_agent_context_comment_is_still_emitted` and
+  `test_both_tool_counts_are_still_rendered_in_the_status_bar`. No
+  assertion's underlying claim changed, only which file's source text
+  it reads.
+- `src/lib/panels/shell/sharedShellAndUrlConsolidation.test.ts`'s
+  throw-stubs were replaced with real source-text assertions (the same
+  no-component-render-harness convention `routeMigration.test.ts`
+  established for T-1015-3). The AC4 and AC5 "no console errors" /
+  "no visual regression" claims stay documented
+  pending-browser-check stubs (`expect(true).toBe(true)`, matching
+  `routeMigration.test.ts`'s own AC7 stub) rather than fabricated DOM
+  assertions -- they are UI-observable claims only a real browser can
+  prove. The WebMCP-status-wrapper describe block does not duplicate
+  `newSurfaceSession.test.ts`'s full connecting/connected/failed
+  coverage; it checks the wiring decision this ticket actually makes
+  (the shell is backed by `connectNewSurfaceBridge`, not `session.ts`,
+  and never tracks a second "available" number).
+- Verification run from this worktree: `npm run typecheck` (0 errors),
+  `npx vitest run` (this ticket's test file and every file it touched
+  pass; the only remaining failures in the full suite are pre-existing
+  failing stubs for sibling tickets T-1015-6/10/12 and T-1015-5's
+  toolSurfaceRemoval.test.ts/legacyModelRemoval.test.ts, none of which
+  this ticket modifies -- confirmed against the pre-change baseline via
+  `git stash`), `npm run build` (succeeds).
