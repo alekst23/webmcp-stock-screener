@@ -1,5 +1,6 @@
 # T-0017-1: Validate `within` bounds and clamp instances to `to_date`
 
+**Status**: Done
 **Design**: docs/design/pattern-research-workbench/
 **Depends on**: —
 **Resolves #17**
@@ -54,11 +55,21 @@ until then).
 
 ## Solution Approach
 
-_To be filled in by `/at-ticket-design` before implementation — this ticket
-was triaged with enough behavioral detail (via issue #17 plus a scoping
-interview) to skip a design gate that would otherwise re-derive its own AC5-7
-content, but the actual code location for `within` validation (Pydantic
-validator on `SetupStep` vs. a check at the API boundary) is an implementation
-decision, not a behavioral one, and should be resolved by whoever implements
-this against the existing validation pattern in `backend/domain/models/pattern.py`
-and `backend/api/schemas/research.py`._
+- **`within` validation**: a `@model_validator(mode="after")` on `Setup`
+  (not a field validator on `SetupStep`), matching the existing pattern in
+  `domain/models/similarity.py`'s `MarketDataProvenance`. It lives on `Setup`
+  rather than `SetupStep` because the required error message ("naming the
+  offending step index") needs the step's position in the sequence, which a
+  standalone `SetupStep` has no way to know. This validates both
+  construction sites for free: `pandas_engine.define_setup` and the API
+  boundary (`FindInstancesRequest.setup: Setup`), since pydantic runs nested
+  model validation either way.
+- **`to_date` clamp**: `_search_all_tickers` now computes, per ticker, where
+  `to_date` falls in that ticker's own date series
+  (`np.searchsorted(date_codes, to_code, side="right")`) and passes that as
+  the walk's usable length instead of the ticker's full row count. This
+  reuses the walk's existing "partial" handling for the panel's physical
+  trailing edge — a step whose window runs past the `to_date` boundary is
+  now also "partial" (still in progress) rather than a decisive match,
+  which is what AC5 requires. No change to `_walk_anchor`'s decision logic
+  was needed, only what `length` value it's called with.
