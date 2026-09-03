@@ -12,6 +12,15 @@ import {
 } from '../../screener/run';
 import { createPinnedRunStore } from '../../screener/runStore';
 import { PROBLEM_CODES } from '../../screener/validation';
+import { createPanel, readPanelState, type PanelUseCaseDeps } from '../../panels/application';
+import {
+	createLayoutTemplateRegistry,
+	registerDefaultLayoutTemplates
+} from '../../panels/domain/layoutTemplates';
+import { createPanelRegistry } from '../../panels/registry/panelKindRegistry';
+import { registerDefaultPanelKinds } from '../../panels/registry/defaultPanelKinds';
+import { createSourceRendererRegistry } from '../../panels/registry/sourceRendererRegistry';
+import { registerDefaultSourceRendererTypes } from '../../panels/registry/defaultSourceRendererTypes';
 import { createChangeHistory } from '../../workbench/application/changeHistory';
 import { createIdempotencyCache } from '../../workbench/application/idempotency';
 import { createOperationRegistry } from '../../workbench/application/operationRegistry';
@@ -23,7 +32,7 @@ import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceR
 import { memoryStorage } from '../../workbench/testSupport';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import { createCreateScreenerTool } from './createScreener';
-import { createRunScreenerTool } from './runScreener';
+import { createRunScreenerTool, type PanelBindingDeps } from './runScreener';
 import { createSetScreenerRankingTool } from './setScreenerRanking';
 import type { ToolResult } from '../types';
 
@@ -495,5 +504,145 @@ describe('run_screener', () => {
 			'revision_conflict'
 		);
 		expect(fake.callCount(), 'a rejected call must never reach the evaluation port').toBe(0);
+	});
+});
+
+// T-0020-2: auto-binding a completed run to the workspace's first
+// results_table panel. Builds real panel registries (not fakes) so
+// bindPanelSource's own validateSource path actually runs, matching AC1's
+// "the existing bind_panel_source application logic ... not a
+// parallel/duplicate binding path".
+describe('run_screener: auto-bind to the results_table panel (T-0020-2)', () => {
+	let deps: WorkbenchDeps;
+	let panelBinding: PanelBindingDeps;
+
+	beforeEach(() => {
+		const repository = createLocalWorkspaceRepository(memoryStorage());
+		const clock = fixedClock('2026-01-01T00:00:00.000Z');
+		const ids = createIdSequencer();
+		const idempotency = createIdempotencyCache();
+		deps = {
+			repository,
+			revisions: createRevisionService({ repository, clock, ids, idempotency }),
+			history: createChangeHistory(),
+			registry: createOperationRegistry(),
+			provenance: { current: () => FIXED_PROVENANCE },
+			clock,
+			ids,
+			idempotency
+		};
+
+		const kinds = createPanelRegistry();
+		registerDefaultPanelKinds(kinds);
+		const sourceRenderer = createSourceRendererRegistry();
+		registerDefaultSourceRendererTypes(sourceRenderer);
+		const templates = createLayoutTemplateRegistry();
+		registerDefaultLayoutTemplates(templates);
+		panelBinding = { kinds, sourceRenderer, templates };
+	});
+
+	async function seedScreener(): Promise<{ workspaceId: string; screenerId: string }> {
+		const workspaceId = deps.ids.next('workspace');
+		const created = jsonOf(
+			await createCreateScreenerTool(deps).execute({
+				workspace_id: workspaceId,
+				name: 'Test Screener'
+			})
+		) as { affected_ids: string[] };
+		const screenerId = created.affected_ids[0];
+		if (!screenerId) {
+			throw new Error('create_screener did not return a screener id.');
+		}
+		deps.repository.setActiveId(workspaceId);
+		return { workspaceId, screenerId };
+	}
+
+	function panelUseCaseDeps(workspaceId: string): PanelUseCaseDeps {
+		return {
+			workspaceId,
+			repository: deps.repository,
+			revisions: deps.revisions,
+			history: deps.history,
+			clock: deps.clock,
+			ids: deps.ids,
+			kinds: panelBinding.kinds,
+			sourceRenderer: panelBinding.sourceRenderer,
+			templates: panelBinding.templates
+		};
+	}
+
+	function resultsTablePanelSource(workspaceId: string): unknown {
+		const doc = deps.repository.get(workspaceId);
+		if (!doc) {
+			throw new Error(`Workspace not found: ${workspaceId}`);
+		}
+		const panel = readPanelState(doc).panels.find((p) => p.kind === 'results_table');
+		return panel?.source ?? null;
+	}
+
+	it('test_runScreener_seededResultsTablePanel_bindsPanelSourceToNewRun', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		createPanel(panelUseCaseDeps(workspaceId), {
+			context: { actor: 'agent' },
+			kind: 'results_table'
+		});
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, panelBinding });
+
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const json = jsonOf(result) as { run_id: string };
+
+		expect(result.isError, 'AC2: the run itself must still succeed').toBeFalsy();
+		expect(
+			resultsTablePanelSource(workspaceId),
+			'AC1: the panel source resolves to the new run'
+		).toEqual({
+			type: 'screener_results',
+			ref: { run_id: json.run_id }
+		});
+	});
+
+	it('test_runScreener_noResultsTablePanel_stillSucceedsAndReturnsRunId', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		// No results_table panel created at all -- AC2's "seeded one was closed".
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, panelBinding });
+
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const json = jsonOf(result) as { run_id: string };
+
+		expect(result.isError, 'AC2: binding is best-effort, never a precondition').toBeFalsy();
+		expect(typeof json.run_id, 'AC2: the run must still return its run_id').toBe('string');
+	});
+
+	it('test_runScreener_secondRunAgainstBoundPanel_replacesBindingRatherThanDuplicating', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		createPanel(panelUseCaseDeps(workspaceId), {
+			context: { actor: 'agent' },
+			kind: 'results_table'
+		});
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, panelBinding });
+
+		const first = jsonOf(
+			await tool.execute({ workspace_id: workspaceId, screener_id: screenerId })
+		) as { run_id: string };
+		const second = jsonOf(
+			await tool.execute({ workspace_id: workspaceId, screener_id: screenerId })
+		) as { run_id: string };
+
+		expect(second.run_id, 'two separate runs must mint two separate run ids').not.toBe(
+			first.run_id
+		);
+		expect(
+			resultsTablePanelSource(workspaceId),
+			'AC4: the binding points at the second run only, not both'
+		).toEqual({ type: 'screener_results', ref: { run_id: second.run_id } });
+
+		const doc = deps.repository.get(workspaceId);
+		const resultsPanels = doc
+			? readPanelState(doc).panels.filter((p) => p.kind === 'results_table')
+			: [];
+		expect(resultsPanels, 'AC4: no duplicate panel was created by the second bind').toHaveLength(1);
 	});
 });

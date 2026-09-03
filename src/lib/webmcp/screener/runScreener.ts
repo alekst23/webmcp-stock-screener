@@ -14,6 +14,10 @@
 // must not change idempotency.ts's shared type to fit.
 
 import { builtinCatalogRegistry, type CatalogRegistry } from '../../catalog/registry';
+import { bindPanelSource, readPanelState, type PanelUseCaseDeps } from '../../panels/application';
+import type { LayoutTemplateRegistry } from '../../panels/domain/layoutTemplates';
+import type { PanelRegistry } from '../../panels/registry/panelKindRegistry';
+import type { SourceRendererRegistry } from '../../panels/registry/sourceRendererRegistry';
 import { createScreenerEngine } from '../../screener/engine/engine';
 import { createUnavailableMarketData } from '../../screener/engine/unavailableMarketData';
 import { createPinnedRunStore } from '../../screener/runStore';
@@ -143,6 +147,57 @@ interface RunReplayCache {
 	remember(key: string, fingerprint: string, result: ToolResult): void;
 }
 
+// T-0020-2: the three panel-only registries PanelUseCaseDeps needs besides
+// the six fields WorkbenchDeps already carries (repository/revisions/
+// history/clock/ids/idempotency) -- injected so this module never builds
+// its own registry instances, only reuses whichever ones the shared
+// composition root already built (T-0020-1).
+export interface PanelBindingDeps {
+	kinds: PanelRegistry;
+	sourceRenderer: SourceRendererRegistry;
+	templates: LayoutTemplateRegistry;
+}
+
+// AC1/AC3/AC4/AC5: binds the workspace's first results_table panel (by
+// existing panel order) to the just-completed run, via the exact same
+// bindPanelSource application function every other panel source change
+// uses -- so replacing a prior binding, and recording the change through
+// RevisionService/change-history, both come for free. Best-effort (AC2):
+// any failure here (no results_table panel, a rejected source, a workspace
+// that vanished between the run and this call) is swallowed by the caller,
+// never surfacing as a run_screener failure.
+function bindRunToResultsPanel(
+	deps: WorkbenchDeps,
+	panelBinding: PanelBindingDeps,
+	workspaceId: string,
+	runId: string
+): void {
+	const doc = deps.repository.get(workspaceId);
+	if (!doc) {
+		return;
+	}
+	const target = readPanelState(doc).panels.find((p) => p.kind === 'results_table');
+	if (!target) {
+		return;
+	}
+	const panelDeps: PanelUseCaseDeps = {
+		workspaceId,
+		repository: deps.repository,
+		revisions: deps.revisions,
+		history: deps.history,
+		clock: deps.clock,
+		ids: deps.ids,
+		kinds: panelBinding.kinds,
+		sourceRenderer: panelBinding.sourceRenderer,
+		templates: panelBinding.templates
+	};
+	bindPanelSource(panelDeps, {
+		context: { actor: 'agent' },
+		panelId: target.id,
+		source: { type: 'screener_results', ref: { run_id: runId } }
+	});
+}
+
 function createRunReplayCache(): RunReplayCache {
 	const entries = new Map<string, { fingerprint: string; result: ToolResult }>();
 	return {
@@ -167,6 +222,7 @@ async function execute(
 	evaluationPort: ScreenerEvaluationPort,
 	runStore: PinnedRunStore,
 	replayCache: RunReplayCache,
+	panelBinding: PanelBindingDeps | undefined,
 	rawInput: unknown
 ): Promise<ToolResult> {
 	const input = (rawInput ?? {}) as RawInput;
@@ -248,6 +304,14 @@ async function execute(
 	} else {
 		runStore.putRun(outcome);
 		result = ok(toWireScreenerRun(outcome));
+		if (panelBinding) {
+			try {
+				bindRunToResultsPanel(deps, panelBinding, workspaceId, runId);
+			} catch {
+				// AC2/AC5: best-effort -- binding never blocks or alters
+				// run_screener's own already-built success response.
+			}
+		}
 	}
 
 	if (idempotencyKey) {
@@ -268,6 +332,11 @@ export interface RunScreenerToolOptions {
 	evaluationPort?: ScreenerEvaluationPort;
 	runStore?: PinnedRunStore;
 	now?: () => Date;
+	// T-0020-2: when supplied, a successful run auto-binds the workspace's
+	// first results_table panel to it (best-effort -- see
+	// bindRunToResultsPanel). Omitted entirely means no binding is attempted,
+	// matching every other caller/test of this tool before T-0020-2.
+	panelBinding?: PanelBindingDeps;
 }
 
 export function createRunScreenerTool(
@@ -296,6 +365,7 @@ export function createRunScreenerTool(
 		description: DESCRIPTION,
 		inputSchema: INPUT_SCHEMA,
 		available: () => true,
-		execute: (input) => execute(deps, evaluationPort, runStore, replayCache, input)
+		execute: (input) =>
+			execute(deps, evaluationPort, runStore, replayCache, options.panelBinding, input)
 	};
 }

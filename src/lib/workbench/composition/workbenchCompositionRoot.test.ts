@@ -29,7 +29,7 @@ describe('createWorkbenchSharedInfra + per-group deps builders', () => {
 		const shared = createWorkbenchSharedInfra();
 		const panelRuntime = createPanelShellRuntime(shared);
 		const workbenchDeps = buildWorkbenchDeps(shared);
-		const screenerDeps = buildScreenerDeps(shared);
+		const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps);
 
 		expect(panelRuntime.deps.repository).toBe(shared.repository);
 		expect(workbenchDeps.repository).toBe(shared.repository);
@@ -48,6 +48,12 @@ describe('createWorkbenchSharedInfra + per-group deps builders', () => {
 
 		expect(panelRuntime.runs).toBe(shared.runs);
 		expect(screenerDeps.runStore).toBe(shared.runs);
+
+		// T-0020-2: the auto-bind wiring reuses the panel runtime's own
+		// registries, not second instances.
+		expect(screenerDeps.panelBinding?.kinds).toBe(panelRuntime.deps.kinds);
+		expect(screenerDeps.panelBinding?.sourceRenderer).toBe(panelRuntime.deps.sourceRenderer);
+		expect(screenerDeps.panelBinding?.templates).toBe(panelRuntime.deps.templates);
 	});
 });
 

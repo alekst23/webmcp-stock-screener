@@ -2,6 +2,7 @@
 
 **Epic**: EPIC-0020 (Wire the workbench composition root)
 **Design**: docs/design/workbench-composition-root/
+**Status**: Done
 **Depends on**: T-0020-1
 **Blocks**: T-0020-3
 
@@ -59,3 +60,61 @@ agent.
   exists — first-found only.
 - The end-to-end integration test (T-0020-3) — this ticket's own tests
   cover the bind operation itself, not the full multi-step tool-call chain.
+
+## Solution Approach
+
+`runScreener.ts` gains a new optional dependency, `panelBinding`, on
+`RunScreenerToolOptions`:
+
+```ts
+export interface PanelBindingDeps {
+	kinds: PanelRegistry;
+	sourceRenderer: SourceRendererRegistry;
+	templates: LayoutTemplateRegistry;
+}
+```
+
+(the three panel-only registries `PanelUseCaseDeps` needs besides
+`workspaceId`/`repository`/`revisions`/`history`/`clock`/`ids` — all six of
+those already live on `WorkbenchDeps`, which `execute()` already has.)
+
+1. After a successful (non-refused) run and `runStore.putRun(outcome)`, if
+   `panelBinding` was supplied, call a new private helper
+   `bindRunToResultsPanel(deps, panelBinding, workspaceId, runId)`:
+   - Re-reads the doc via `deps.repository.get(workspaceId)` (the same
+     `workspaceId` `execute()` already resolved for this call — not
+     `panelBinding`'s own fixed id, so this binds whichever workspace the
+     run actually executed against).
+   - Builds one `PanelUseCaseDeps` object from `deps`'s six shared fields
+     plus `panelBinding`'s three registries.
+   - `readPanelState(doc).panels.find((p) => p.kind === 'results_table')` —
+     first found, by existing panel order (AC3).
+   - If none found, return (AC2: run already succeeded and returned;
+     nothing else to do).
+   - Otherwise call `bindPanelSource(panelDeps, { context: { actor: 'agent' },
+     panelId: target.id, source: { type: 'screener_results', ref: { run_id: runId } } })`
+     — the exact application function T-0020-2's AC1 names, so replacing an
+     existing binding (AC4) and going through
+     `commitPanelChange`/`RevisionService`/change-history (AC5) both come
+     for free.
+   - The whole call is wrapped in try/catch; any error (no active
+     workspace, a rejected source, whatever) is swallowed, never surfacing
+     as a `run_screener` failure or altering its already-built `result`
+     (AC2's "best-effort, never a precondition").
+2. `group.ts`'s `ScreenerToolDeps` gains an optional `panelBinding?:
+   PanelBindingDeps` field (mirroring `runStore`/`evaluationPort`'s own
+   optional-injection style) and `buildScreenerTools` passes it through to
+   `createRunScreenerTool`'s options.
+3. `workbenchCompositionRoot.ts`'s `buildScreenerDeps` gains a second
+   parameter, the panel runtime's own `PanelToolDeps` (already built first
+   in `registerWorkbenchComposition`, and already carrying
+   `kinds`/`sourceRenderer`/`templates`), and sets
+   `panelBinding: { kinds, sourceRenderer, templates }` from it — no new
+   instances, reusing exactly what T-0020-1 already built.
+4. Tests (`runScreener.test.ts`, extending its existing harness): a run
+   against a workspace with a seeded `results_table` panel ends with that
+   panel's `source` resolving to the new run; a run against a workspace
+   with no `results_table` panel still succeeds and returns a `run_id`
+   (asserting the workspace's panel list is unaffected); a second run
+   against an already-bound panel replaces the binding (asserts exactly one
+   `source`, pointing at the new run, not two or a stale one).

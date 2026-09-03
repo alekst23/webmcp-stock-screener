@@ -19,7 +19,7 @@ import type {
 import type { ToolSpec } from '../types';
 import { createCreateScreenerTool } from './createScreener';
 import { createEditFilterTreeTool } from './editFilterTree';
-import { createRunScreenerTool } from './runScreener';
+import { createRunScreenerTool, type PanelBindingDeps } from './runScreener';
 import { createSetScreenerRankingTool } from './setScreenerRanking';
 import { createSetScreenerUniverseTool, type SetScreenerUniverseDeps } from './setScreenerUniverse';
 import { createValidateScreenerTool } from './validateScreener';
@@ -40,6 +40,12 @@ export interface ScreenerToolDeps extends SetScreenerUniverseDeps {
 	evaluationPort?: ScreenerEvaluationPort;
 	runStore?: PinnedRunStore;
 	now?: () => Date;
+	// T-0020-2: when supplied, a completed run_screener call auto-binds the
+	// workspace's first results_table panel to it. Undefined means no
+	// binding is attempted (registerScreenerTools.ts's own default deps
+	// build no panel registries, matching this group's pre-T-0020-2
+	// behavior).
+	panelBinding?: PanelBindingDeps;
 }
 
 export const SCREENER_TOOL_NAMES = [
@@ -73,7 +79,8 @@ export function buildScreenerTools(deps: ScreenerToolDeps): ToolSpec[] {
 			...evaluationOptions(deps, deps.catalog),
 			evaluationPort: deps.evaluationPort,
 			runStore: deps.runStore,
-			now: deps.now
+			now: deps.now,
+			panelBinding: deps.panelBinding
 		})
 	];
 }

@@ -10,6 +10,7 @@
 // each group's deps object directly against the shared bag instead.
 import { builtinCatalogRegistry } from '../../catalog/registry';
 import { createUnavailableInstrumentDirectory } from '../../discovery/unavailableDirectory';
+import type { PanelToolDeps } from '../../panels/tools/panelTools';
 import {
 	createPanelShellRuntime,
 	createWorkbenchSharedInfra,
@@ -19,6 +20,7 @@ import {
 } from '../../panels/shell/registerPanelTools';
 import { registerScreenerTools } from '../../webmcp/screener/registerScreenerTools';
 import type { ScreenerToolDeps } from '../../webmcp/screener/group';
+import type { PanelBindingDeps } from '../../webmcp/screener/runScreener';
 import { registerWorkbenchTools, type DefaultWorkbenchDeps } from '../tools/registerWorkbenchTools';
 import { operationRegistry } from '../application/operationRegistry';
 import { createPreviewStore } from '../infra/previewStore';
@@ -61,8 +63,20 @@ export function buildWorkbenchDeps(shared: WorkbenchSharedInfra): DefaultWorkben
 // pointed at the same PinnedRunStore the panel shell's results_table panel
 // kind and table renderer contract already close over -- the precondition
 // T-0020-2's auto-bind needs: a run_screener call and a results_table panel
-// read must agree on what's pinned.
-export function buildScreenerDeps(shared: WorkbenchSharedInfra): ScreenerToolDeps {
+// read must agree on what's pinned. `panelDeps` is the panel runtime's own
+// PanelToolDeps (T-0020-1's createPanelShellRuntime output) -- its
+// kinds/sourceRenderer/templates registries are reused as-is (T-0020-2:
+// bindRunToResultsPanel needs exactly those three) rather than this module
+// building second instances.
+export function buildScreenerDeps(
+	shared: WorkbenchSharedInfra,
+	panelDeps: Pick<PanelToolDeps, 'kinds' | 'sourceRenderer' | 'templates'>
+): ScreenerToolDeps {
+	const panelBinding: PanelBindingDeps = {
+		kinds: panelDeps.kinds,
+		sourceRenderer: panelDeps.sourceRenderer,
+		templates: panelDeps.templates
+	};
 	return {
 		repository: shared.repository,
 		revisions: shared.revisions,
@@ -77,7 +91,8 @@ export function buildScreenerDeps(shared: WorkbenchSharedInfra): ScreenerToolDep
 		// registerScreenerTools.ts's own createDefaultScreenerToolDeps), not a
 		// mock dataset.
 		instrumentDirectory: createUnavailableInstrumentDirectory(),
-		runStore: shared.runs
+		runStore: shared.runs,
+		panelBinding
 	};
 }
 
@@ -89,7 +104,7 @@ export async function registerWorkbenchComposition(): Promise<PanelShellRuntime>
 	const shared = createWorkbenchSharedInfra();
 	const panelRuntime = createPanelShellRuntime(shared);
 	const workbenchDeps = buildWorkbenchDeps(shared);
-	const screenerDeps = buildScreenerDeps(shared);
+	const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps);
 
 	await registerPanelTools(panelRuntime);
 	await registerWorkbenchTools(workbenchDeps);
