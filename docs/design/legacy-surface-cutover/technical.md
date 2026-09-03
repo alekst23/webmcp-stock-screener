@@ -11,6 +11,20 @@ is what makes the "Workspace read parity" scenario true. The panel
 registry itself already tracks arbitrary registered kinds; the read
 model's projection is what needs to stop assuming a fixed list.
 
+**T-1015-11's actual fix touches two places**, both in
+`src/lib/workbench/domain/workspace.ts` and
+`src/lib/panels/application/panelState.ts` respectively:
+
+| Location | Was | Becomes |
+|----------|-----|---------|
+| `workspace.ts`'s `normalizePanel` (runs on every `WorkspaceRepository.get`/`list`/`getRevision`) | `PANEL_KINDS.has(kind)`, an 8-entry closed set | any non-empty string; `PanelKind` widens from a closed union to `string` |
+| `panelState.ts`'s `projectPanels`/`projectLayout` (runs in `writePanelState`, the only writer of `doc.panels`/`doc.layout`) | a second, independently-hardcoded `PROJECTABLE_KINDS` set of the same 8 kinds | `PanelRegistry.has(kind)`, via a `PanelRegistry` parameter threaded through `writePanelState`/`projectPanels`/`projectLayout` |
+
+Both must change together: widening only the projection lets a novel-kind
+panel into `doc.panels` once, but the next `repository.get()` (a real
+localStorage-backed read re-parses JSON and re-normalizes) drops it again
+via the first, unwidened filter.
+
 ### Action log entry (attribution field)
 
 | Field | Type | Description |
