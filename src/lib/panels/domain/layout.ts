@@ -289,3 +289,14 @@ function splitAlong(
 export function fullGridRect(): GridRect {
 	return { col: 0, row: 0, colSpan: GRID_COLUMNS, rowSpan: GRID_ROWS };
 }
+
+// CONTRACT STUB — signature only; see docs/design/panel-system/technical.md
+// "Illustrate the empty grid" for the intended implementation. Body
+// replaced by the implementing agent, driven by layout.test.ts.
+export function computeEmptyCells(
+	occupied: OccupiedRect[],
+	columns: number = GRID_COLUMNS,
+	rows: number = GRID_ROWS
+): GridRect[] {
+	throw new Error('not implemented');
+}

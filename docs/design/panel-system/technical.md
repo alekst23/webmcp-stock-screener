@@ -156,15 +156,40 @@ AC10).
 
 ### Default workspace layout (seeding, not a tool)
 
-Owned entirely by this epic, no change to EPIC-1006's `create_workspace`
-required: the composition root (T-1007-6) watches for a newly created,
-still-empty workspace becoming the active one and immediately runs three
-`createPanel` calls (`filter_builder` left, `results_table` center,
-`chart` right, footprints fitting the 6x4 grid) before first paint, so the
-human never sees the blank intermediate state. Not registered as a named
-layout template — `apply_layout_template` has no entry for it, since
-re-applying it later is a distinct, explicit action (agent lays it out or
-picks an actual template), not this create-time default.
+Owned entirely by this feature, no change to EPIC-1006's `create_workspace`
+required: `seedDefaultWorkspace` in `src/lib/panels/shell/panelController.ts`
+runs for a newly created, still-empty workspace (`justCreated === true`)
+before first paint, so the human never sees the blank intermediate state.
+Not registered as a named layout template — `apply_layout_template` has no
+entry for it, since re-applying it later is a distinct, explicit action
+(agent lays it out or picks an actual template), not this create-time
+default.
+
+_Amended by hotfix/empty-grid-canvas — `DEFAULT_SEED_PANELS` in
+`panelController.ts` is reduced to a single entry, `filter_builder` at
+`{ col: 0, row: 0, colSpan: 2, rowSpan: 4 }`. This replaces the six-panel
+full-tile seed (`filter_builder`, `chart`, `similar_opportunities`,
+`results_table`, `watchlist`, `alert_draft`) that T-1015-12 grew the
+original three-panel seed into — see spec.md's amended "Seed a new
+workspace with the default layout" section for the product intent behind
+the change._
+
+### Illustrate the empty grid
+
+New in hotfix/empty-grid-canvas. A pure function,
+`computeEmptyCells(occupied: OccupiedRect[], columns = GRID_COLUMNS, rows = GRID_ROWS): GridRect[]`,
+added to `src/lib/panels/domain/layout.ts` alongside `findFreeRect` and
+reusing its `rectsOverlap` check: walks all `columns * rows` unit cells and
+returns the ones not covered by any occupied rect, each as a `{ col, row,
+colSpan: 1, rowSpan: 1 }`. No Protocol — a single implementation, no test
+fake needed.
+
+`PanelContainer.svelte` calls `computeEmptyCells(snapshot.rects)` and
+renders one outline element per result as a sibling to each `PanelFrame`,
+positioned with the same `panelFrameStyle`-style grid-line mapping
+`gridStyle.ts` already uses for occupied panels. Styled with the existing
+`--separator` token (already used for `PanelFrame`'s subtle borders) and
+`pointer-events: none`, stacked behind panel content.
 
 ### Tool surface (`src/lib/webmcp/v2/panelTools.ts`)
 
