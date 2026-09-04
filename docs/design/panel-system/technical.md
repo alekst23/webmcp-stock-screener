@@ -174,6 +174,14 @@ original three-panel seed into — see spec.md's amended "Seed a new
 workspace with the default layout" section for the product intent behind
 the change._
 
+_Amended by hotfix/panel-default-width-grid-lines — the seed entry's
+`colSpan` is corrected from `2` to `1`: `{ col: 0, row: 0, colSpan: 1,
+rowSpan: 4 }` in both `domain/defaultLayout.ts`'s `DEFAULT_SEED_PANELS` and
+the `filter_builder` `KindSpec.defaultSize` in
+`registry/defaultPanelKinds.ts` (`minSize` there was already `{ colSpan: 1,
+rowSpan: 2 }`, so this was always a valid size). 20 of 24 cells now render
+empty, matching spec.md's stated cell count._
+
 ### Illustrate the empty grid
 
 New in hotfix/empty-grid-canvas. A pure function,
@@ -189,9 +197,28 @@ renders one outline element per result as a sibling to each `PanelFrame`,
 positioned with the same `panelFrameStyle`-style grid-line mapping
 `gridStyle.ts` already uses for occupied panels. Each outline element
 carries `data-testid="empty-cell"` (the contract `PanelContainer.test.ts`
-asserts against) and `pointer-events: none`, styled with the existing
-`--separator` token (already used for `PanelFrame`'s subtle borders),
-stacked behind panel content.
+asserts against) and `pointer-events: none`.
+
+_Amended by hotfix/panel-default-width-grid-lines — the outline's border no
+longer uses the shared `--separator` token (that token also draws
+`PanelFrame`'s visible dividers, which must stay a clearly-visible solid
+line; reusing it here would have coupled two unrelated visual intents).
+Instead:_
+
+- _`tokens.ts` gains a new semantic role, `gridLine`, a color between
+  `bgApp` (`#080b12`) and `separator` (`#18202c`) — dark enough that the
+  outline reads as barely-there against the grid background.
+  `border`/`separator`-class roles are explicitly exempt from
+  `terminal-ui-theme`'s contrast floor, so this is allowed._
+- _`gridStyle.ts` gains `emptyCellBorderStyle(): string`, returning
+  `` `border: 1px dotted var(--grid-line);` ``, mirroring
+  `containerGridStyle`/`panelFrameStyle`'s existing pattern of testable
+  exported CSS-string functions (chosen over the static `.empty-cell` CSS
+  class it replaces, so the style is unit-testable without relying on
+  jsdom to resolve scoped `<style>` blocks)._
+- _`PanelContainer.svelte` applies `emptyCellBorderStyle()` inline
+  alongside `panelFrameStyle(cell)`, replacing the `.empty-cell` class's
+  `border: 1px solid var(--separator);` rule._
 
 ### Tool surface (`src/lib/webmcp/v2/panelTools.ts`)
 
