@@ -32,3 +32,12 @@ export function panelFrameStyle(rect: GridRect): string {
 		'min-width: 0; min-height: 0; overflow: hidden;'
 	);
 }
+
+// CONTRACT STUB -- hotfix/panel-default-width-grid-lines. Implemented per
+// docs/design/panel-system/technical.md's "Illustrate the empty grid"
+// amendment: a dotted border in the new, darker `--grid-line` token,
+// replacing the outline's old solid `--separator` border so it blends
+// further into the background. Body replaced by the implementing agent.
+export function emptyCellBorderStyle(): string {
+	throw new Error('not implemented');
+}

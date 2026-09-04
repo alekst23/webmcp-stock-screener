@@ -37,6 +37,23 @@ describe('resetLayout', () => {
 		).toEqual(state.panels.map((p) => p.id).sort());
 	});
 
+	// hotfix/panel-default-width-grid-lines: pins the actual column span
+	// rather than deriving it from DEFAULT_SEED_PANELS itself, so this test
+	// fails if the seed constant regresses back to two columns.
+	it('resets filter_builder to a one-column, full-height footprint', () => {
+		const deps = createPanelTestHarness();
+		createPanel(deps, { context: ctx(), kind: 'chart', rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 } });
+
+		resetLayout(deps, { context: ctx() });
+
+		const state = readPanelState(deps.repository.get(deps.workspaceId)!);
+		const filterBuilder = state.panels.find((p) => p.kind === 'filter_builder')!;
+		expect(
+			filterBuilder.rect,
+			'expected the reset filter_builder to be one column wide, full height'
+		).toEqual({ col: 0, row: 0, colSpan: 1, rowSpan: 4 });
+	});
+
 	it('drops link groups and selections that referenced the pre-reset panels', () => {
 		const deps = createPanelTestHarness();
 		createPanel(deps, {
