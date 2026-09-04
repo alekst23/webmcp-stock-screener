@@ -1,7 +1,7 @@
 # T-0020-12: Disambiguate screener-revision vs. workspace-revision in the tool surface
 
 **Epic:** EPIC-0020
-**Status:** Open
+**Status:** Done
 
 ## Goal
 
@@ -65,3 +65,40 @@ control flow, no new contracts.
 ### Contracts to define
 
 None — description strings and an error message only.
+
+## Implementation Notes
+
+- `run_screener`'s `INPUT_SCHEMA` (`src/lib/webmcp/screener/runScreener.ts:72-86`):
+  `expected_revision` gained a description naming it as the workspace's own
+  revision and naming `screener_revision` by name as the parameter it is not.
+  `screener_revision`'s existing description was extended to name
+  `expected_revision` by name in the same way.
+- `resolveScreenerRevision()`'s `OperationValidationError`
+  (`src/lib/webmcp/screener/runScreener.ts:143-148`) now leads with
+  "screener_revision must be the screener definition's own revision, not the
+  workspace's expected_revision" before stating the unretained revision number
+  and screener id that were actually received.
+- `define_screener`'s `expected_revision` field
+  (`src/lib/webmcp/screener/defineScreenerSchema.ts:98-104`) had the same gap
+  (`{ type: 'number' }`, no description) and got the same workspace-revision
+  description; it also notes that `define_screener` never accepts
+  `screener_revision` as input (only returns it), so the description points to
+  where the screener's own revision does appear in this tool's contract.
+- No change was needed to `define_screener.ts` itself (line ~74) beyond the
+  schema import it already uses from `defineScreenerSchema.ts` — the schema
+  file is the single source of the wire-facing description text.
+- Added `test_inputSchema_screenerRevisionDescription_namesItAsTheScreenerDefinitionsRevision`
+  and error-message assertions to `runScreener.test.ts`, and
+  `test_inputSchema_expectedRevisionDescription_namesItAsTheWorkspaceRevision`
+  to `defineScreener.test.ts`, per the AC's "test snapshots or asserts on the
+  relevant tool description text and the error message text" requirement —
+  the one pre-written stub only covered `run_screener`'s `expected_revision`.
+- No new read tool was added; `docs/design/screener-core/spec.md`'s "no
+  separate read tool" decision is unchanged.
+- `npx vitest run` on both test files: 2 pre-existing failures remain
+  (`test_runScreener_noResultsTablePanel_createsOneAndBindsIt` and
+  `test_runScreener_rerunAfterAutoCreate_recyclesSamePanelRatherThanCreatingAnother`)
+  — these are failing stubs for a different ticket (T-0020-10, create-if-absent
+  results panel) that were already failing before this ticket's changes and are
+  out of this ticket's scope. All T-0020-12 tests pass.
+- `npm run typecheck`: 0 errors, 0 warnings.
