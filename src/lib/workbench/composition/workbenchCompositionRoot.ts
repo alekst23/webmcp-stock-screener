@@ -33,11 +33,13 @@ import {
 import type { ScreenerToolDeps } from '../../webmcp/screener/group';
 import type { PanelBindingDeps } from '../../webmcp/screener/runScreener';
 import type { ScreenerEvaluationPort } from '../../screener/ports';
+import { createHttpScreenerEvaluationPort } from '../../screener/infra/httpEvaluationPort';
 import {
 	createWorkbenchDeps,
 	// registerWorkbenchTools,
 	type DefaultWorkbenchDeps
 } from '../tools/registerWorkbenchTools';
+import { resolveApiBaseUrl } from '../../workspace/apiConfig';
 // T-1015-3: the chart, similarity, and follow-up-authoring tool groups were
 // merged, tested, and flag-gated off pending exactly this -- a route that
 // calls them. Each one still builds its own default deps (its own
@@ -90,6 +92,15 @@ export function buildWorkbenchDeps(shared: WorkbenchSharedInfra): DefaultWorkben
 // constructor (T-0020-6); only the cross-group extras this route's
 // composition alone knows about (runStore, panelBinding, evaluationPort
 // override) are added here.
+//
+// T-0026-4: `evaluationPort` now defaults to HttpScreenerEvaluationPort,
+// pointed at the same backend base URL the chart tool group already
+// resolves (`overrides?.chartBaseUrl`, itself `resolveApiBaseUrl(env....)`
+// from +page.svelte -- not a second, independent URL resolution), rather
+// than leaving the default to fall through to run_screener.ts's own
+// in-browser-engine fallback. `overrides?.evaluationPort` still substitutes
+// cleanly ahead of this default -- workbenchCompositionRoot.test.ts's fake
+// evaluation port seam is unchanged.
 export function buildScreenerDeps(
 	shared: WorkbenchSharedInfra,
 	panelDeps: Pick<PanelToolDeps, 'kinds' | 'sourceRenderer' | 'templates'>,
@@ -104,18 +115,18 @@ export function buildScreenerDeps(
 		...createScreenerDeps(shared),
 		runStore: shared.runs,
 		panelBinding,
-		evaluationPort: overrides?.evaluationPort
+		evaluationPort:
+			overrides?.evaluationPort ??
+			createHttpScreenerEvaluationPort({ baseUrl: resolveApiBaseUrl(overrides?.chartBaseUrl) })
 	};
 }
 
-// Injection seam for tests only: `+page.svelte`'s real call site never
-// passes this, so the shipped default behavior (createScreenerEngine wired
-// to the honest-unavailable ScreenerMarketData, per createRunScreenerTool's
-// own default in runScreener.ts) is unchanged. Exists so a test can call
-// the REAL registerWorkbenchComposition() -- not a hand-reconstruction of
-// its internals -- while still substituting a fake evaluation port (no real
-// ScreenerMarketData adapter exists anywhere in this codebase yet, so every
-// real evaluation refuses with empty_universe).
+// Injection seam for tests: `+page.svelte`'s real call site never passes
+// `evaluationPort`, so the shipped default (T-0026-4: HttpScreenerEvaluationPort
+// against the real backend, see buildScreenerDeps above) applies. Exists so
+// a test can call the REAL registerWorkbenchComposition() -- not a
+// hand-reconstruction of its internals -- while still substituting a fake
+// evaluation port instead of making real network calls.
 export interface WorkbenchCompositionOverrides {
 	evaluationPort?: ScreenerEvaluationPort;
 	// The chart tool group's own backend base URL (bug fix, see git history):
