@@ -39,3 +39,37 @@ results panel" and "Recycled results panel" sections for the full behavioral spe
   created), and its rows reflect the second run's matches.
 - Mutation-checked: temporarily make the create-if-absent branch always create a
   new panel (never rebind an existing one) and confirm the recycling test fails.
+
+## Solution Approach
+
+Implements the "Create-if-absent results panel" and "Recycled results panel"
+scenarios from `docs/design/workbench-composition-root/spec.md`. Wiring only —
+no new domain contracts.
+
+- `bindRunToResultsPanel()` in `src/lib/webmcp/screener/runScreener.ts:169-199`
+  currently does `readPanelState(doc).panels.find(p => p.kind === 'results_table')`
+  and returns early if `undefined`. Change the `undefined` branch to call
+  `createPanel(panelDeps, { context: { actor: 'agent' }, kind: 'results_table',
+  rect: { col: <auto>, row: <auto>, colSpan: 2, rowSpan: 1 } })` (see
+  `src/lib/panels/application/createPanel.ts`'s `CreatePanelRequest` — `rect` is
+  optional; per the confirmed UX decision, do NOT pass an explicit `col`/`row` and
+  let `createPanel`'s own `resolveAutoRect` (`support.ts`) choose placement, only
+  fixing `colSpan: 2, rowSpan: 1` as the requested footprint), then bind the new
+  panel's id exactly as the existing-panel branch already does today.
+- `panelDeps: PanelUseCaseDeps` is already constructed in this function for the
+  bind call — `createPanel` takes the same `PanelUseCaseDeps` shape, so no new
+  dependency wiring is needed, only calling `createPanel` before `bindPanelSource`
+  when the find comes back empty.
+- Preserve the existing best-effort contract for free: the call site
+  (`runScreener.ts:309`) already wraps `bindRunToResultsPanel(...)` in a
+  `try/catch` that `console.warn`s and never rethrows (AC2/AC5's existing
+  "best-effort" comment). A `createPanel` failure (e.g. `grid_full`) thrown from
+  inside the new create-then-bind branch is caught by that same existing
+  try/catch — no new error handling needs to be added, only the new call inside
+  the function it already wraps.
+- No config vars, no new contracts, no mock stubs.
+
+### Contracts to define
+
+None — no new domain models or Protocols. This is new control flow inside an
+existing function using an existing sibling use case (`createPanel`).

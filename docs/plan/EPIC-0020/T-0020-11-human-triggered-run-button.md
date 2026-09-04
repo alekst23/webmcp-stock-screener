@@ -38,3 +38,45 @@ Follow the existing human-action precedent in `src/lib/panels/shell/panelControl
 - A test proves the disabled-when-undefined state, the in-flight disabled state,
   and that a successful click produces an action-log entry attributed to the human
   actor.
+
+## Solution Approach
+
+Implements the "Human-triggered run" scenarios from
+`docs/design/workbench-composition-root/spec.md`. Depends on T-0020-10 landing
+first (the create-or-bind path this control triggers).
+
+- Add a `runScreenerByHuman(deps, ...)` function to
+  `src/lib/panels/shell/panelController.ts`, alongside `removePanelByHuman` /
+  `createChartFromDrop` (~line 325-390), following the exact same shape: calls
+  the same execution `run_screener`'s tool handler performs (evaluate via the
+  injected `ScreenerEvaluationPort`, `runStore.putRun`, then T-0020-10's
+  create-or-rebind), tagged `context: { actor: 'human' }`. `run_screener`'s
+  `execute()` in `runScreener.ts` is currently only reachable through the tool
+  wire boundary (`rawInput: unknown`) — this new function should call the same
+  underlying pieces `execute()` calls (evaluation port, `runStore.putRun`,
+  `bindRunToResultsPanel`) directly with typed arguments, not round-trip through
+  the tool's JSON wire shape, matching how other `panelController.ts` human
+  actions call use cases directly rather than through a tool's wire format.
+- `FilterBuilderPanel.svelte`: add a header "Run" button. Wire it to call the new
+  `runScreenerByHuman` (via whatever prop/context `PanelContainer.svelte` already
+  threads action functions through to panel bodies — follow the pattern
+  `removePanelByHuman`/chart-drop actions already use to reach their panel
+  components). Button states:
+  - Disabled + explanatory tooltip when `doc.screenerId` is unset.
+  - Disabled + loading/spinner state while a run triggered by this control is
+    in flight (track in local component state; re-enable on completion or
+    error).
+  - Otherwise enabled.
+- Action-log entry: `bindRunToResultsPanel`/`bindPanelSource` already record
+  through `RevisionService`/change-history when `context.actor` is set — confirm
+  the action log's existing read path (`readActionLog` in `panelController.ts`)
+  surfaces the `actor` field so a human-run entry is visually distinguishable
+  from an agent one; if the log's rendering doesn't already show actor, add it
+  there rather than inventing a separate log entry format.
+- No config vars, no new contracts, no mock stubs.
+
+### Contracts to define
+
+None — new functions and UI wiring only, reusing `run_screener`'s existing
+execution pieces and the panel system's existing human-action/action-log
+conventions.
