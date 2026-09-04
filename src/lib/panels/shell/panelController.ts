@@ -35,6 +35,10 @@ import type { GridPosition, GridRect } from '../domain/grid';
 import type { Panel, PanelSourceRef } from '../domain/panel';
 import type { PanelKindDefinition } from '../registry/panelKindRegistry';
 import type { ToolSpec } from '../../webmcp/types';
+import { bindRunToResultsPanel } from '../../webmcp/screener/runScreener';
+import type { ScreenerEvaluationPort, PinnedRunStore } from '../../screener/ports';
+import type { ScreenerRunOutcome } from '../../screener/run';
+import { readScreener } from '../../screener/state';
 
 // T-0027-2: the chart panel kind's own name -- spec.md item 11 and
 // technical.md's "Amendment (EPIC-0027)" both specify that dropping a
@@ -390,6 +394,109 @@ export function createChartFromDrop(
 		source,
 		...(gridIsFull ? {} : { rect })
 	});
+}
+
+// ---------------------------------------------------------------------------
+// Human-triggered screener run (T-0020-11)
+// ---------------------------------------------------------------------------
+
+export interface RunScreenerByHumanDeps {
+	useCaseDeps: PanelUseCaseDeps;
+	evaluationPort: ScreenerEvaluationPort;
+	runStore: PinnedRunStore;
+}
+
+export type RunScreenerByHumanResult =
+	// AC: "when no screener is currently defined ... disabled with an
+	// explanation rather than being clickable and failing" -- the button
+	// itself stays disabled in that state (FilterBuilderPanel.svelte reads
+	// doc.screenerId directly), so this is defense-in-depth for any other
+	// caller (including this ticket's own tests) rather than the primary
+	// guard a person actually hits.
+	| { status: 'no_screener' }
+	| { status: 'error'; message: string }
+	| { status: 'ok'; outcome: ScreenerRunOutcome };
+
+// Keyed by the caller's own RunScreenerByHumanDeps object identity (the
+// filter_builder panel kind's one registered runtime-deps singleton, in
+// practice) so two activations of the same control while a run is still in
+// flight share one execution instead of racing a second -- the AC's "a
+// second activation during that window does not trigger a second concurrent
+// run" holds even if a click reaches this function before Svelte's own
+// disabled-state re-render lands, without this module reaching into any
+// component's local state to enforce it.
+const humanRunsInFlight = new WeakMap<
+	RunScreenerByHumanDeps,
+	Promise<RunScreenerByHumanResult>
+>();
+
+async function executeHumanRun(deps: RunScreenerByHumanDeps): Promise<RunScreenerByHumanResult> {
+	const { useCaseDeps, evaluationPort, runStore } = deps;
+	const doc = useCaseDeps.repository.get(useCaseDeps.workspaceId);
+	const screenerId = doc?.screenerId;
+	const definition = doc && screenerId ? readScreener(doc, screenerId) : null;
+	if (!definition) {
+		return { status: 'no_screener' };
+	}
+
+	const runId = useCaseDeps.ids.next('run');
+	let outcome: ScreenerRunOutcome;
+	try {
+		outcome = await evaluationPort.execute({ definition, runId });
+	} catch (err) {
+		return { status: 'error', message: err instanceof Error ? err.message : String(err) };
+	}
+
+	if (outcome.status === 'complete') {
+		runStore.putRun(outcome);
+		try {
+			// T-0020-11's own wrinkle: bindRunToResultsPanel used to hardcode
+			// actor: 'agent' -- now threaded through so this human-triggered
+			// create-or-rebind (T-0020-10) records in the action log as
+			// actor: 'human', matching every other human action in this module,
+			// while execute()'s own tool-call path (runScreener.ts) still always
+			// passes 'agent'.
+			bindRunToResultsPanel(
+				useCaseDeps,
+				{
+					kinds: useCaseDeps.kinds,
+					sourceRenderer: useCaseDeps.sourceRenderer,
+					templates: useCaseDeps.templates
+				},
+				useCaseDeps.workspaceId,
+				runId,
+				'human'
+			);
+		} catch (err) {
+			// Best-effort, mirroring run_screener's own binding failure
+			// handling (runScreener.ts): binding never turns an otherwise
+			// successful run into a failure for the human who clicked Run.
+			console.warn(
+				'runScreenerByHuman: auto-bind to results_table panel failed (best-effort, run itself still succeeded)',
+				err
+			);
+		}
+	}
+	return { status: 'ok', outcome };
+}
+
+// The filter panel's "Run" control's use case (T-0020-11): calls the exact
+// same evaluation/pin/bind pipeline run_screener's tool handler performs
+// (ScreenerEvaluationPort.execute, PinnedRunStore.putRun, then T-0020-10's
+// create-or-rebind), tagged actor: 'human', directly against typed
+// arguments rather than round-tripping through run_screener's JSON tool-wire
+// shape -- matching this module's own direct-use-case-call convention
+// (readSnapshot, togglePanelCollapsed) instead of introducing a new one.
+export function runScreenerByHuman(
+	deps: RunScreenerByHumanDeps
+): Promise<RunScreenerByHumanResult> {
+	const inFlight = humanRunsInFlight.get(deps);
+	if (inFlight) {
+		return inFlight;
+	}
+	const promise = executeHumanRun(deps).finally(() => humanRunsInFlight.delete(deps));
+	humanRunsInFlight.set(deps, promise);
+	return promise;
 }
 
 // Read-only access to the change log for the shell's action-log icon

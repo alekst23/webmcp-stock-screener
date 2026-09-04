@@ -1,7 +1,7 @@
 # T-0020-11: Human-triggered "Run" action in the filter panel
 
 **Epic:** EPIC-0020
-**Status:** Open
+**Status:** Done
 **Depends on:** T-0020-10
 
 ## Goal
@@ -80,3 +80,60 @@ first (the create-or-bind path this control triggers).
 None — new functions and UI wiring only, reusing `run_screener`'s existing
 execution pieces and the panel system's existing human-action/action-log
 conventions.
+
+## Implementation Notes
+
+**The actor-plumbing wrinkle.** `bindRunToResultsPanel` (runScreener.ts) took
+an added `actor: Actor` parameter (no default — every call site now states
+its actor explicitly) and was exported; its `deps` parameter was narrowed
+from the full `WorkbenchDeps` to `Pick<WorkbenchDeps, 'repository' |
+'revisions' | 'history' | 'clock' | 'ids'>` (the only fields it actually
+reads), so `panelController.ts` could pass a `PanelUseCaseDeps`-shaped object
+directly instead of assembling a fake `WorkbenchDeps`. `execute()`'s own call
+site now passes `'agent'` explicitly — run_screener's agent-facing behavior
+and its full pre-existing test suite (21/21) are unchanged. The new
+`runScreenerByHuman` in `panelController.ts` replicates `execute()`'s own
+orchestration (read the current screener, mint a run id, call
+`ScreenerEvaluationPort.execute`, `PinnedRunStore.putRun`, then
+`bindRunToResultsPanel(..., 'human')`) directly against typed arguments
+rather than round-tripping through `run_screener`'s JSON tool-wire shape —
+per the ticket's own Solution Approach.
+
+**Concurrency guard.** Rather than relying solely on Svelte component-local
+state to prevent a second concurrent run (which the ticket's own testing
+note rules out testing directly, since this repo has no
+`@testing-library/svelte`), `runScreenerByHuman` itself is single-flight:
+a `WeakMap` keyed by the caller's `RunScreenerByHumanDeps` object caches the
+in-flight promise, so two activations before the first settles share one
+execution and one result. `FilterBuilderPanel.svelte`'s local `running`
+`$state` boolean still drives the disabled/spinner UI affordance the AC
+asks for, but the actual "never a second concurrent run" guarantee is
+enforced at the function level, where it's directly testable.
+
+**Wiring order.** `FilterBuilderPanel`'s runtime-deps singleton
+(`filterBuilderPanelContext.ts`) is set at panel-kind registration time
+(`createFilterBuilderPanelKindDefinition`, inside `createPanelShellRuntime`)
+with only `useCaseDeps` — at that point the screener tool group's
+`ScreenerEvaluationPort`/`PinnedRunStore` don't exist yet (they're built
+later, in `workbenchCompositionRoot.ts`'s `buildScreenerDeps` call). A new
+`FilterBuilderPanelRunDeps` (`evaluationPort`, `runStore`, `observer`) was
+added as an optional second field (`run?`) on the runtime-deps interface,
+filled in by a new `setFilterBuilderPanelRunDeps()` call from
+`registerWorkbenchComposition()` once `screenerDeps` is built — always
+before `/`'s `PanelContainer` (and this lazily-loaded panel body) ever
+mounts, since `+page.svelte` awaits the whole composition first. The
+`evaluationPort` instance is now resolved once in `registerWorkbenchComposition`
+and reused for both `run_screener` and the human Run control, instead of
+building two separate adapter instances.
+
+**Test coverage** (`src/lib/panels/shell/runScreenerByHuman.test.ts`):
+disabled-when-no-screener (function returns `no_screener`, engine never
+called), in-flight prevents a second concurrent evaluation (a deferred fake
+port proves only one `execute()` call happens across two overlapping
+activations), a successful run creates-or-recycles the results panel
+(T-0020-10) and records the bind/create as `actor: 'human'` in the action
+log, and a refusal is forwarded without binding a panel. Also updated
+`FilterBuilderPanel.test.ts`'s pre-existing AC4 assertion ("no controls that
+mutate the screener") to allow exactly the new Run control, since AC4 is
+about the screener *definition*, not execution (this ticket's own Goal
+section).

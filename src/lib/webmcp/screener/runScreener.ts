@@ -43,6 +43,7 @@ import {
 	OperationValidationError,
 	RevisionConflictError
 } from '../../workbench/domain/errors';
+import type { Actor } from '../../workbench/domain/mutation';
 import type { WorkspaceDocument } from '../../workbench/domain/workspace';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import type { WorkspaceRepository } from '../../workbench/domain/ports';
@@ -190,11 +191,21 @@ export interface PanelBindingDeps {
 // own 4x2 defaultSize) and auto-placed by resolveAutoRect, the same
 // placement helper createPanel itself falls back to when no explicit rect
 // is given -- no new placement logic.
-function bindRunToResultsPanel(
-	deps: WorkbenchDeps,
+//
+// T-0020-11: `actor` is threaded through (not hardcoded 'agent') so a
+// human-triggered run (panelController.ts's runScreenerByHuman) can record
+// the resulting create/bind as actor: 'human' in the action log, the same
+// way every other human-vs-agent mutation in this codebase is distinguished
+// -- execute() below still always passes 'agent', so run_screener's own
+// tool-call behavior is unchanged. Exported (and narrowed to only the
+// WorkbenchDeps fields this function actually reads) so runScreenerByHuman
+// can call the exact same binding logic directly instead of duplicating it.
+export function bindRunToResultsPanel(
+	deps: Pick<WorkbenchDeps, 'repository' | 'revisions' | 'history' | 'clock' | 'ids'>,
 	panelBinding: PanelBindingDeps,
 	workspaceId: string,
-	runId: string
+	runId: string,
+	actor: Actor
 ): void {
 	const doc = deps.repository.get(workspaceId);
 	if (!doc) {
@@ -219,7 +230,7 @@ function bindRunToResultsPanel(
 	} else {
 		const rect = resolveAutoRect({ colSpan: 2, rowSpan: 1 }, visibleOccupied(state.panels));
 		const created = createPanel(panelDeps, {
-			context: { actor: 'agent' },
+			context: { actor },
 			kind: 'results_table',
 			rect
 		});
@@ -230,7 +241,7 @@ function bindRunToResultsPanel(
 		targetId = newPanelId;
 	}
 	bindPanelSource(panelDeps, {
-		context: { actor: 'agent' },
+		context: { actor },
 		panelId: targetId,
 		source: { type: 'screener_results', ref: { run_id: runId } }
 	});
@@ -344,7 +355,7 @@ async function execute(
 		result = ok(toWireScreenerRun(outcome));
 		if (panelBinding) {
 			try {
-				bindRunToResultsPanel(deps, panelBinding, workspaceId, runId);
+				bindRunToResultsPanel(deps, panelBinding, workspaceId, runId, 'agent');
 			} catch (err) {
 				// AC2/AC5: best-effort -- binding never blocks or alters
 				// run_screener's own already-built success response. Still logged

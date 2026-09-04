@@ -8,15 +8,50 @@
 // createFilterBuilderPanelKindDefinition sets this once, synchronously, at
 // panel-kind registration time -- before component() is ever called.
 import type { PanelUseCaseDeps } from '../../panels/application';
+import type { PanelWorkspaceObserver } from '../../panels/shell/panelController';
+import type { PinnedRunStore, ScreenerEvaluationPort } from '../ports';
+
+// T-0020-11: the "Run" control's own extra dependencies -- evaluationPort
+// and runStore are the screener tool group's own instances (T-0020-1's
+// shared composition root), and observer is the panel shell's own
+// notification hub (registerPanelTools.ts) -- undefined until
+// workbenchCompositionRoot.ts's registerWorkbenchComposition() has built
+// both. That happens strictly after createFilterBuilderPanelKindDefinition
+// registers this kind (see that module's own comment), so `run` starts
+// absent and is filled in by setFilterBuilderPanelRunDeps() below once
+// composition finishes -- always before this lazily-loaded panel body is
+// ever mounted (registerWorkbenchComposition is awaited before `/`'s
+// PanelContainer renders; see +page.svelte's connectComposition()).
+export interface FilterBuilderPanelRunDeps {
+	evaluationPort: ScreenerEvaluationPort;
+	runStore: PinnedRunStore;
+	observer: PanelWorkspaceObserver;
+}
 
 export interface FilterBuilderPanelRuntimeDeps {
 	useCaseDeps: PanelUseCaseDeps;
+	run?: FilterBuilderPanelRunDeps;
 }
 
 let current: FilterBuilderPanelRuntimeDeps | null = null;
 
 export function setFilterBuilderPanelRuntimeDeps(deps: FilterBuilderPanelRuntimeDeps): void {
 	current = deps;
+}
+
+// The composition root's second-phase call (see FilterBuilderPanelRunDeps'
+// own comment for why this can't be folded into registration time): merges
+// the Run control's dependencies into whatever useCaseDeps registration
+// already set, without disturbing it.
+export function setFilterBuilderPanelRunDeps(run: FilterBuilderPanelRunDeps): void {
+	if (!current) {
+		throw new Error(
+			'Filter builder panel runtime dependencies were never configured -- register the ' +
+				'filter_builder panel kind via createFilterBuilderPanelKindDefinition before calling ' +
+				'setFilterBuilderPanelRunDeps.'
+		);
+	}
+	current = { ...current, run };
 }
 
 // Throws rather than returning undefined: reaching this without deps having

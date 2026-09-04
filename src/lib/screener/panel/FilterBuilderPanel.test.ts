@@ -138,11 +138,20 @@ describe('FilterBuilderPanel', () => {
 		unmount(second.instance);
 	});
 
-	it('AC4: exposes no controls that mutate the screener', () => {
+	it('AC4: exposes no controls that mutate the screener definition', () => {
 		const deps = harness();
 		seedCurrentScreener(deps);
 		const { target, instance } = mountPanel(deps);
-		expect(target.querySelectorAll('button, input, select, textarea').length).toBe(0);
+		// T-0020-11 adds the human "Run" control -- scoped to executing the
+		// existing definition, not editing it (see that ticket's own Goal
+		// section for why this doesn't touch T-0027-1's own AC4). Everything
+		// else -- inputs, selects, textareas, and any OTHER button -- must
+		// still be absent.
+		const controls = Array.from(target.querySelectorAll('button, input, select, textarea'));
+		expect(controls.length, 'expected exactly the Run control and nothing else').toBe(1);
+		expect(controls[0]?.classList.contains('run-button'), 'expected the one control to be Run').toBe(
+			true
+		);
 		unmount(instance);
 	});
 });
