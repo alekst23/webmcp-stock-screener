@@ -32,3 +32,10 @@ export function panelFrameStyle(rect: GridRect): string {
 		'min-width: 0; min-height: 0; overflow: hidden;'
 	);
 }
+
+// hotfix/panel-default-width-grid-lines: a dotted border in the darker
+// `--grid-line` token, replacing the outline's old solid `--separator`
+// border so it blends further into the background.
+export function emptyCellBorderStyle(): string {
+	return 'border: 1px dotted var(--grid-line);';
+}

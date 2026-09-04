@@ -16,6 +16,7 @@ export type SemanticRole =
 	| 'border'
 	| 'borderStrong'
 	| 'separator'
+	| 'gridLine'
 	// Text
 	| 'textPrimary'
 	| 'textSecondary'
@@ -71,10 +72,13 @@ export const theme: ThemeTokens = {
 
 		// `border` and `separator` only group content and are exempt from the
 		// contrast floor; `borderStrong` bounds interactive controls and so
-		// clears 3:1 on every ground.
+		// clears 3:1 on every ground. `gridLine` is dimmer still -- it draws
+		// the empty-grid outline, which should read as barely-there scaffolding
+		// against `bgApp`, not as a visible divider like `separator`.
 		border: '#202b3b',
 		borderStrong: '#8293a9',
 		separator: '#18202c',
+		gridLine: '#0c1119',
 
 		textPrimary: '#e6edf5',
 		textSecondary: '#aebbcd',

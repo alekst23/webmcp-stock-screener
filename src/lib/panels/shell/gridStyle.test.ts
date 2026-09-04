@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { containerGridStyle, panelFrameStyle } from './gridStyle';
+import { containerGridStyle, emptyCellBorderStyle, panelFrameStyle } from './gridStyle';
 
 describe('containerGridStyle', () => {
 	it('lays out a 6x4 fractional grid filling the viewport', () => {
@@ -42,5 +42,19 @@ describe('panelFrameStyle', () => {
 		expect(style, `expected overflow to be contained to the frame, got: ${style}`).toContain(
 			'overflow: hidden;'
 		);
+	});
+});
+
+// hotfix/panel-default-width-grid-lines: the empty-grid outline should blend
+// further into the background -- a dotted line in the new, darker
+// --grid-line token, rather than the old solid --separator border.
+describe('emptyCellBorderStyle', () => {
+	it('renders a dotted border in the darker grid-line token, not a solid one', () => {
+		const style = emptyCellBorderStyle();
+		expect(style, `expected a dotted border style, got: ${style}`).toContain('dotted');
+		expect(style, `expected the dedicated --grid-line token, got: ${style}`).toContain(
+			'--grid-line'
+		);
+		expect(style, `expected no solid border left over, got: ${style}`).not.toContain('solid');
 	});
 });

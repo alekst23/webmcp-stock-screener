@@ -61,7 +61,7 @@ const KIND_SPECS: KindSpec[] = [
 	{
 		kind: 'filter_builder',
 		defaultTitle: 'Filter Builder',
-		defaultSize: { colSpan: 2, rowSpan: 4 },
+		defaultSize: { colSpan: 1, rowSpan: 4 },
 		minSize: { colSpan: 1, rowSpan: 2 },
 		linkChannels: ['filters'],
 		bindingTypes: [],
