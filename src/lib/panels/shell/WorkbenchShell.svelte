@@ -35,7 +35,7 @@
 		type WebmcpBridgeState,
 		type WebmcpStatus
 	} from '../../webmcp/status';
-	import { readActionLog, type PanelWorkspaceObserver } from './panelController';
+	import { readActionLog, resetLayoutByHuman, type PanelWorkspaceObserver } from './panelController';
 	import type { PanelUseCaseDeps } from '../application';
 	import ActionLogPanel from './ActionLogPanel.svelte';
 
@@ -44,6 +44,7 @@
 		webmcpStatus,
 		bridgeState,
 		historyDeps,
+		resetLayoutDeps,
 		observer,
 		children
 	}: {
@@ -51,6 +52,7 @@
 		webmcpStatus: WebmcpStatus | null;
 		bridgeState: WebmcpBridgeState;
 		historyDeps: Pick<PanelUseCaseDeps, 'history' | 'workspaceId'> | null;
+		resetLayoutDeps: PanelUseCaseDeps | null;
 		observer: PanelWorkspaceObserver | null;
 		children: Snippet;
 	} = $props();
@@ -117,6 +119,22 @@
 			refreshLog();
 		}
 	}
+
+	// spec.md "Reset the workspace layout to the default seed": a confirm
+	// dialog gates the action (declined confirmation changes nothing), then
+	// calls the same use case the agent-invokable reset_layout tool calls,
+	// tagged actor: 'human' -- mirrors PanelContainer.svelte's handleRemove
+	// (use case call + refresh) so the header updates immediately.
+	function handleResetLayout(): void {
+		if (!resetLayoutDeps) {
+			return;
+		}
+		if (!window.confirm('Reset the workspace layout to its default arrangement?')) {
+			return;
+		}
+		resetLayoutByHuman(resetLayoutDeps);
+		observer?.notify();
+	}
 </script>
 
 <svelte:window onpointerdown={dismissToolMenus} onkeydown={dismissToolMenusOnEscape} />
@@ -176,6 +194,14 @@
 			onclick={toggleLog}
 		>
 			Log
+		</button>
+		<button
+			type="button"
+			class="reset-layout"
+			disabled={!resetLayoutDeps}
+			onclick={handleResetLayout}
+		>
+			Reset
 		</button>
 	</header>
 
@@ -299,6 +325,24 @@
 	}
 
 	.log-toggle:disabled {
+		color: var(--text-muted);
+		cursor: not-allowed;
+	}
+
+	.reset-layout {
+		flex: 0 0 auto;
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		padding: var(--space-xs) var(--space-sm);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--bg-elevated);
+		color: var(--text-secondary);
+		white-space: nowrap;
+	}
+
+	.reset-layout:disabled {
 		color: var(--text-muted);
 		cursor: not-allowed;
 	}

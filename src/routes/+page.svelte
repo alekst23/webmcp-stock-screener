@@ -110,6 +110,7 @@
 	historyDeps={runtime
 		? { history: runtime.deps.history, workspaceId: runtime.deps.workspaceId }
 		: null}
+	resetLayoutDeps={runtime?.deps ?? null}
 	observer={runtime?.observer ?? null}
 >
 	<div class="panel-viewport">

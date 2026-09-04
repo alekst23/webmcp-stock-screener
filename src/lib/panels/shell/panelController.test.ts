@@ -392,11 +392,11 @@ describe('wrapToolsWithNotify + panel tool registration', () => {
 		return { ...harness, workspaceId: init.workspaceId, maximized: createMaximizedPanelState() };
 	}
 
-	it('registers the fourteen panel tools against a fake document.modelContext, reported available', async () => {
+	it('registers the fifteen panel tools against a fake document.modelContext, reported available (hotfix/panel-system: reset_layout)', async () => {
 		const deps = buildRegisteredDeps();
 		const observer = createPanelWorkspaceObserver();
 		const tools = wrapToolsWithNotify(buildPanelTools(deps), observer);
-		expect(tools.length, `expected fourteen panel tools, got ${tools.length}`).toBe(14);
+		expect(tools.length, `expected fifteen panel tools, got ${tools.length}`).toBe(15);
 
 		const registered = new Map<string, { name: string }>();
 		const fakeModelContext = {
@@ -412,7 +412,7 @@ describe('wrapToolsWithNotify + panel tool registration', () => {
 		expect(
 			available.length,
 			`expected every registered tool to be reported available, got ${available.length}`
-		).toBe(14);
+		).toBe(15);
 		for (const name of [
 			'create_panel',
 			'duplicate_panel',
@@ -427,7 +427,8 @@ describe('wrapToolsWithNotify + panel tool registration', () => {
 			'configure_panel_view',
 			'link_panels',
 			'unlink_panels',
-			'set_panel_selection'
+			'set_panel_selection',
+			'reset_layout'
 		]) {
 			expect(registered.has(name), `expected "${name}" to be registered`).toBe(true);
 		}

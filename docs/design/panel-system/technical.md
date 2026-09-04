@@ -244,6 +244,61 @@ A linked change (e.g. the chart's symbol) reaches
 `propagationTargets(graph, 'symbol', sourcePanelId)` and is applied to
 each target's config by that target's kind, not by the container.
 
+## Reset layout to default (hotfix/panel-system)
+
+A header control (human) and a `reset_layout` tool (agent) both replace the
+workspace's current panels with the canonical default seed
+(`domain/defaultLayout.ts`'s `DEFAULT_SEED_PANELS` — the same panels
+`seedDefaultWorkspace` creates for a brand-new workspace) as one revisioned,
+undoable mutation. Unlike `apply_layout_template`, this is not a named
+template application against caller-supplied panel ids — it replaces the
+entire panel set (count, kinds, and rects) with the seed, minting fresh
+panel ids rather than reusing the current ones, since the current
+arrangement may not have matching panels to reuse ids from. Links and
+selections reference panel ids that no longer exist after a reset, so both
+reset to empty (`emptyLinkGraph()`, `{}`) rather than being projected
+forward.
+
+### Layering
+
+`domain/defaultLayout.ts` (moved out of `shell/panelController.ts`, which
+had it private and only for `seedDefaultWorkspace`) is now the one source
+of truth both `seedDefaultWorkspace` and `resetLayout` build from.
+
+### Contracts
+
+| Symbol | Signature | Description |
+|--------|-----------|-------------|
+| `DEFAULT_SEED_PANELS` | `readonly SeedPanelSpec[]` (`domain/defaultLayout.ts`) | the `{kind, rect}` seed specs (currently a single `filter_builder` entry, per hotfix/empty-grid-canvas); already existed, moved from `panelController.ts` and exported |
+| `resetLayout` | `(deps: PanelUseCaseDeps, request: ResetLayoutRequest) => MutationEnvelope` (`application/resetLayout.ts`) | mints one fresh panel per `DEFAULT_SEED_PANELS` entry (id via `deps.ids.next('panel', kind)`, title/config/renderer from the kind's own registry definition, same as `createPanel`), replaces `state.panels` wholesale, resets `links`/`selections` to empty, commits as one `commitPanelChange('panels.reset_layout', ...)` call |
+| `resetLayoutByHuman` | `(deps: PanelUseCaseDeps) => MutationEnvelope` (`shell/panelController.ts`) | calls `resetLayout` with `context: { actor: 'human' }`, same shape as `removePanelByHuman` |
+| `reset_layout` tool | `resetLayoutSchema()` in `tools/schemas.ts`; wired in `tools/layoutTools.ts` | no panel-specific input, just `expected_revision`/`idempotency_key` via `revisionFields()`; calls `resetLayout` with `context: parseContext(input)` |
+
+### `WorkbenchShell.svelte` (UI wiring, not a contract)
+
+- New prop `resetLayoutDeps: PanelUseCaseDeps | null`, passed from
+  `+page.svelte` as `runtime?.deps ?? null` — same null-until-ready gating
+  `historyDeps` already uses.
+- A `Reset` button in `<header class="status-bar">`, next to `.log-toggle`,
+  reusing its exact CSS class shape (new `.reset-layout` class with the same
+  declarations). `disabled={!resetLayoutDeps}`.
+- `onclick`: `window.confirm('Reset the workspace layout to its default
+  arrangement? This cannot be undone from this button, but the action is
+  itself undoable from the action log.')` (exact copy TBD at implementation
+  — the point is a native confirm gates the call); only on confirm, calls
+  `resetLayoutByHuman(resetLayoutDeps)` then `observer?.notify()`, mirroring
+  `PanelContainer.svelte`'s `handleRemove` (`removePanelByHuman` +
+  `refresh()`) pattern.
+
+### Data Flow
+
+`reset_layout` / header Reset → for each `DEFAULT_SEED_PANELS` entry, look
+up the panel kind in `deps.kinds` (throws `unknown_panel_kind` if a seed
+kind is somehow unregistered — should never happen in practice) → mint a
+fresh panel via `makePanel` → replace `state.panels` with the newly minted
+panels, `links` with `emptyLinkGraph()`, `selections` with `{}` → bump
+revision → envelope naming all newly minted panel ids as `affectedIds`.
+
 ---
 
 _Product design: [spec.md](spec.md)_

@@ -22,11 +22,12 @@ import {
 	readPanelState,
 	removePanel,
 	renderedRects,
+	resetLayout,
 	type PanelSystemState,
 	type PanelUseCaseDeps
 } from '../application';
 import type { OccupiedRect } from '../domain/layout';
-import type { GridRect } from '../domain/grid';
+import { DEFAULT_SEED_PANELS } from '../domain/defaultLayout';
 import type { PanelLinkChannel } from '../domain/channels';
 import { propagationTargets, type PanelLinkGraph } from '../domain/links';
 import type { Panel } from '../domain/panel';
@@ -106,23 +107,6 @@ export function loadWorkspace(workspaceId: string): WorkspaceInitResult {
 // ---------------------------------------------------------------------------
 // Default workspace seeding (T-1007-9)
 // ---------------------------------------------------------------------------
-
-interface SeedPanelSpec {
-	kind: string;
-	rect: GridRect;
-}
-
-// hotfix/empty-grid-canvas: reverses T-1015-12's six-panel full-tile seed
-// (filter_builder, chart, similar_opportunities, results_table, watchlist,
-// alert_draft) back down to a single panel. The default layout is now
-// deliberately minimal -- filter_builder, full-height on the left column --
-// so a fresh workspace starts with one working control and an obviously
-// empty grid, rather than a pre-populated research layout. See spec.md's
-// amended "Seed a new workspace with the default layout" for the product
-// intent behind the change.
-const DEFAULT_SEED_PANELS: readonly SeedPanelSpec[] = [
-	{ kind: 'filter_builder', rect: { col: 0, row: 0, colSpan: 2, rowSpan: 4 } }
-];
 
 // Uses the exact same createPanel use case every other panel-creation path
 // uses -- no bespoke construction. No `source` is passed, so each seeded
@@ -331,6 +315,14 @@ export function togglePanelCollapsed(
 // closing an agent-created panel takes this identical path (AC4).
 export function removePanelByHuman(deps: PanelUseCaseDeps, panelId: string): MutationEnvelope {
 	return removePanel(deps, { context: { actor: 'human' }, panelId });
+}
+
+// The header's Reset control's use case: same shape as removePanelByHuman
+// above (PanelContainer's own precedent for a human-triggered mutation) --
+// calls the exact same resetLayout an agent's reset_layout tool call would,
+// just tagged actor: 'human'.
+export function resetLayoutByHuman(deps: PanelUseCaseDeps): MutationEnvelope {
+	return resetLayout(deps, { context: { actor: 'human' } });
 }
 
 // Read-only access to the change log for the shell's action-log icon

@@ -2,7 +2,13 @@
 // revisioned geometry tools. maximize_panel lives here too since it's
 // geometry-shaped output (rendered rects) despite being the one tool that
 // consumes no revision (T-1007-4 AC10).
-import { applyLayoutTemplate, renderedRects, setPanelLayout, splitPanel } from '../application';
+import {
+	applyLayoutTemplate,
+	renderedRects,
+	resetLayout,
+	setPanelLayout,
+	splitPanel
+} from '../application';
 import type { PanelUseCaseDeps } from '../application';
 import { PanelOperationError } from '../application';
 import { readPanelState, emptyPanelState } from '../application';
@@ -11,6 +17,7 @@ import type { ToolResult, ToolSpec } from '../../webmcp/types';
 import {
 	applyLayoutTemplateSchema,
 	maximizePanelSchema,
+	resetLayoutSchema,
 	setPanelLayoutSchema,
 	splitPanelSchema
 } from './schemas';
@@ -129,6 +136,34 @@ function splitPanelTool(deps: PanelUseCaseDeps): ToolSpec {
 	};
 }
 
+interface ResetLayoutInput {
+	expected_revision?: unknown;
+	idempotency_key?: unknown;
+}
+
+// hotfix/panel-system: agent-invokable parity with the header's Reset
+// control (panelController.ts's resetLayoutByHuman) -- both call the same
+// resetLayout use case, tagged with different actors.
+function resetLayoutTool(deps: PanelUseCaseDeps): ToolSpec {
+	return {
+		name: 'reset_layout',
+		description:
+			"Replaces the workspace's current panel arrangement with the default seeded layout, " +
+			'atomically. Returns the mutation envelope.',
+		inputSchema: resetLayoutSchema(),
+		available: always,
+		execute: async (rawInput: unknown): Promise<ToolResult> => {
+			const input = (rawInput ?? {}) as ResetLayoutInput;
+			try {
+				const envelope = resetLayout(deps, { context: parseContext(input) });
+				return ok(toWireEnvelope(envelope));
+			} catch (err) {
+				return toErrorResult(err);
+			}
+		}
+	};
+}
+
 export interface MaximizedPanelHandle {
 	get(): string | null;
 	set(id: string | null): void;
@@ -181,6 +216,7 @@ export function buildLayoutTools(
 		setPanelLayoutTool(deps),
 		applyLayoutTemplateTool(deps),
 		splitPanelTool(deps),
-		maximizePanelTool(deps)
+		maximizePanelTool(deps),
+		resetLayoutTool(deps)
 	];
 }
