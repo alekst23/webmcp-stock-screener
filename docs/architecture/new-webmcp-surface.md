@@ -86,6 +86,38 @@ EPIC-1015's cutover — presupposing the _entire_ new surface assembled
 where the old 11-tool surface registers today — remains open and paused,
 unaffected by this work.
 
+(This section's "`/workbench`" predates EPIC-1015's later route migration,
+which retired that path and moved this same composition onto `/` —
+`src/routes/+page.svelte` is this composition's only call site as of
+T-1015-3/T-1015-9. Read "`/workbench`" below as "whichever path serves this
+composition", not literally that URL.)
+
+### Amendment (EPIC-0020, 2026-09-04): create-if-absent, recycling, and human-triggered runs
+
+The composition root resolved above wires the tool groups together; it does
+not by itself explain what a completed run does to the panel grid. A later
+ticket wave under this same epic (T-0020-10/T-0020-11) amended
+`run_screener`'s auto-bind behavior (`bindRunToResultsPanel`,
+`src/lib/webmcp/screener/runScreener.ts`) and added a human-facing
+equivalent (`runScreenerByHuman`, `src/lib/panels/shell/panelController.ts`):
+
+- if the workspace has no `results_table` panel when a run completes, one is
+  created (2x1, auto-placed) and bound to that run, rather than the bind
+  being a no-op;
+- rerunning the current screener — by an agent's `run_screener` call or a
+  human clicking the filter panel's Run control — recycles that same panel
+  in place instead of creating another one, regardless of which actor
+  created it or which actor reruns it;
+- a human can trigger a run directly from the filter panel without an agent
+  in the loop, going through the identical evaluate/pin/bind pipeline
+  `run_screener` uses, just attributed to the human actor in the action log.
+
+The full behavioral spec for this amendment — including the "Create-if-absent
+results panel", "Human-triggered run", and "Recycled results panel"
+scenarios — lives in `docs/design/workbench-composition-root/spec.md`; this
+section only records that the composition root's binding behavior changed
+and where to find the details, rather than duplicating them.
+
 ## References
 
 - `docs/reference/tool-spec.md` — the tool inventory and common contract
@@ -97,3 +129,6 @@ unaffected by this work.
 - `src/lib/workbench/composition/workbenchCompositionRoot.ts` — EPIC-0020's
   shared composition root for `/workbench`'s panel/workbench-core/screener
   tool groups
+- `docs/design/workbench-composition-root/spec.md` — the full behavioral
+  spec for the composition root and its create-if-absent/recycling/
+  human-triggered-run amendment

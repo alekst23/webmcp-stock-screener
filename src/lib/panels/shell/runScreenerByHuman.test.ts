@@ -19,11 +19,43 @@ import type { PinnedRunStore, ScreenerEvaluationPort } from '../../screener/port
 import { makeScreenerRun, type ScreenerMatch, type ScreenerRunOutcome } from '../../screener/run';
 import { makeProvenance, type MarketDataProvenance } from '../../workbench/domain/provenance';
 import { PROBLEM_CODES } from '../../screener/validation';
+import { createIdempotencyCache } from '../../workbench/application/idempotency';
+import { createOperationRegistry } from '../../workbench/application/operationRegistry';
+import type { WorkbenchDeps } from '../../workbench/tools/index';
+import { createRunScreenerTool } from '../../webmcp/screener/runScreener';
+import type { ToolResult } from '../../webmcp/types';
 import { initializeWorkspace, readActionLog, runScreenerByHuman } from './panelController';
 
 interface EvaluationInput {
 	definition: ScreenerDefinition;
 	runId: string;
+}
+
+function jsonOf(result: ToolResult): unknown {
+	const first = result.content[0];
+	if (!first) {
+		throw new Error('ToolResult carried no content.');
+	}
+	return JSON.parse(first.text);
+}
+
+// T-0020-14: run_screener.ts's own execute() needs the six WorkbenchDeps
+// fields PanelUseCaseDeps doesn't carry (registry/idempotency/provenance) --
+// built fresh here, sharing this harness's repository/revisions/history/
+// clock/ids, exactly like the composition root would share one set of
+// instances across the panel and screener tool groups (spec.md's "Shared
+// composition root").
+function toWorkbenchDeps(useCaseDeps: PanelUseCaseDeps): WorkbenchDeps {
+	return {
+		repository: useCaseDeps.repository,
+		revisions: useCaseDeps.revisions,
+		history: useCaseDeps.history,
+		registry: createOperationRegistry(),
+		provenance: { current: () => fixtureProvenance() },
+		clock: useCaseDeps.clock,
+		ids: useCaseDeps.ids,
+		idempotency: createIdempotencyCache()
+	};
 }
 
 function fixtureProvenance(): MarketDataProvenance {
@@ -304,5 +336,104 @@ describe('runScreenerByHuman: a refused screener', () => {
 			readPanelState(doc).panels.some((p) => p.kind === 'results_table'),
 			'a refused run must never create or bind a results panel'
 		).toBe(false);
+	});
+});
+
+// T-0020-14: the epic's closing integration test -- the amended pipeline
+// (T-0020-10's create-if-absent/recycle, T-0020-11's human-triggered run)
+// proven end to end across BOTH actors in one flow, not just within each
+// ticket's own unit tests. Mirrors T-0020-3's original role (one test tracing
+// the whole path) for this epic's amendment: docs/design/workbench-
+// composition-root/spec.md's "Create-if-absent results panel", "Human-
+// triggered run", and "Recycled results panel" scenarios, chained together.
+describe('runScreenerByHuman + run_screener: cross-actor recycling of the results panel (T-0020-14)', () => {
+	it('a human run creates the panel, an agent rerun recycles it, and a second human run recycles it again', async () => {
+		const useCaseDeps = setup();
+		const screenerId = seedCurrentScreener(useCaseDeps);
+
+		// Given: a workspace with a defined screener and no results_table panel.
+		const initialPanels = readPanelState(
+			useCaseDeps.repository.get(useCaseDeps.workspaceId)!
+		).panels.filter((p) => p.kind === 'results_table');
+		expect(initialPanels, 'no results_table panel exists yet').toHaveLength(0);
+
+		// When: a human triggers the first run (T-0020-11) ...
+		const humanRun1 = await runScreenerByHuman({
+			useCaseDeps,
+			evaluationPort: makeFakePort(completeRunFor).port,
+			runStore: createPinnedRunStore()
+		});
+		expect(humanRun1.status, `expected an ok result, got ${JSON.stringify(humanRun1)}`).toBe('ok');
+		if (humanRun1.status !== 'ok' || humanRun1.outcome.status !== 'complete') {
+			throw new Error('unreachable: asserted status above');
+		}
+
+		// Then: a 2x1 results_table panel is auto-created (T-0020-10) and bound
+		// to the human's run.
+		let doc = useCaseDeps.repository.get(useCaseDeps.workspaceId)!;
+		let resultsPanels = readPanelState(doc).panels.filter((p) => p.kind === 'results_table');
+		expect(resultsPanels, 'T-0020-10: exactly one panel is auto-created').toHaveLength(1);
+		const panelId = resultsPanels[0]!.id;
+		expect(resultsPanels[0]!.rect.colSpan, 'the auto-created panel is 2 columns wide').toBe(2);
+		expect(resultsPanels[0]!.rect.rowSpan, 'the auto-created panel is 1 row tall').toBe(1);
+		expect(resultsPanels[0]!.source, "the panel's source resolves to the human's run").toEqual({
+			type: 'screener_results',
+			ref: { run_id: humanRun1.outcome.runId }
+		});
+
+		// When: an agent reruns the same screener via run_screener, sharing this
+		// harness's repository/revisions/history/clock/ids (T-0020-1's shared
+		// composition root) so it sees the panel the human just created.
+		const agentTool = createRunScreenerTool(toWorkbenchDeps(useCaseDeps), {
+			evaluationPort: makeFakePort(completeRunFor).port,
+			panelBinding: {
+				kinds: useCaseDeps.kinds,
+				sourceRenderer: useCaseDeps.sourceRenderer,
+				templates: useCaseDeps.templates
+			}
+		});
+		const agentRun = jsonOf(
+			await agentTool.execute({ workspace_id: useCaseDeps.workspaceId, screener_id: screenerId })
+		) as { run_id: string };
+
+		// Then: the SAME panel is recycled (rebound), not a second one created.
+		doc = useCaseDeps.repository.get(useCaseDeps.workspaceId)!;
+		resultsPanels = readPanelState(doc).panels.filter((p) => p.kind === 'results_table');
+		expect(resultsPanels, "T-0020-14: the agent's rerun must never create a second panel").toHaveLength(
+			1
+		);
+		expect(resultsPanels[0]!.id, 'the same panel id is recycled across actors').toBe(panelId);
+		expect(resultsPanels[0]!.source, 'the recycled panel is rebound to the agent run').toEqual({
+			type: 'screener_results',
+			ref: { run_id: agentRun.run_id }
+		});
+
+		// When: the human reruns again (a second click), after an agent's own
+		// rerun already touched the panel.
+		const humanRun2 = await runScreenerByHuman({
+			useCaseDeps,
+			evaluationPort: makeFakePort(completeRunFor).port,
+			runStore: createPinnedRunStore()
+		});
+		expect(humanRun2.status, `expected an ok result, got ${JSON.stringify(humanRun2)}`).toBe('ok');
+		if (humanRun2.status !== 'ok' || humanRun2.outcome.status !== 'complete') {
+			throw new Error('unreachable: asserted status above');
+		}
+
+		// Then: the same panel id is recycled a second time, now rebound to the
+		// human's second run -- proving recycling works regardless of which
+		// actor created the panel or which actor reruns it.
+		doc = useCaseDeps.repository.get(useCaseDeps.workspaceId)!;
+		resultsPanels = readPanelState(doc).panels.filter((p) => p.kind === 'results_table');
+		expect(resultsPanels, "T-0020-14: the human's second run must never create a second panel").toHaveLength(
+			1
+		);
+		expect(resultsPanels[0]!.id, 'the same panel id is recycled once more').toBe(panelId);
+		expect(resultsPanels[0]!.source, "the recycled panel is rebound to the human's second run").toEqual(
+			{
+				type: 'screener_results',
+				ref: { run_id: humanRun2.outcome.runId }
+			}
+		);
 	});
 });
