@@ -36,12 +36,15 @@ from api.routes.chart import router as chart_router
 from api.routes.health import HEALTH_PATH
 from api.routes.health import router as health_router
 from api.routes.panel import router as panel_router
+from api.routes.screener import router as screener_router
 from api.routes.similarity import router as similarity_router
 from application.backtest_jobs import BacktestJobStore
 from application.load_panel import load_panel
 from domain.backtest_engine import PortBacktestEngine
 from domain.contracts.backtest_engine import BacktestEngine
+from domain.contracts.screener_run_engine import ScreenerRunEngine
 from domain.models.panel import PanelStatus
+from domain.screener_run_engine import PortScreenerRunEngine
 from infra.object_store import S3PanelStore, config_from_env
 from infra.panel_market_data import NoFundamentalsPort, PanelPriceSeriesPort, PanelReferenceDataPort
 from infra.similarity_engine import PandasSimilarityEngine
@@ -83,35 +86,46 @@ def _load_engine() -> (
         BacktestEngine | None,
         PanelStatus | None,
         PanelPriceSeriesPort | None,
+        ScreenerRunEngine | None,
     ]
 ):
     """Load the panel into memory once at startup (docs/plan.md: 'loaded into
     memory at startup for low-latency reads'), preferring the real
     object-store panel over T-0001-1's mock one.
 
-    Returns (None, None, None, None) when no panel exists anywhere --
-    api/routes/similarity.py's, api/routes/backtest.py's and
-    api/routes/chart.py's dependencies then surface a clear 503 instead of
-    crashing app startup, mirroring the liveness probe's own tolerance for a
-    missing panel (api/routes/health.py). That fallback is itself refused
-    when REQUIRE_REAL_PANEL is set and no object store is configured -- see
-    `_require_real_panel` and `load_panel`.
+    Returns (None, None, None, None, None) when no panel exists anywhere --
+    api/routes/similarity.py's, api/routes/backtest.py's,
+    api/routes/chart.py's and api/routes/screener.py's dependencies then
+    surface a clear 503 instead of crashing app startup, mirroring the
+    liveness probe's own tolerance for a missing panel (api/routes/health.py).
+    That fallback is itself refused when REQUIRE_REAL_PANEL is set and no
+    object store is configured -- see `_require_real_panel` and `load_panel`.
 
-    The same `PanelPriceSeriesPort` instance backs both the backtest
-    engine's price port and api/routes/chart.py's bar-serving endpoint
-    (T-1014-6 built it, this reuses it rather than constructing a second
-    wrapper over the same panel)."""
+    The same `PanelPriceSeriesPort` instance backs the backtest engine's
+    price port, api/routes/chart.py's bar-serving endpoint, and the screener
+    engine's price port (T-1014-6 built it, this reuses it rather than
+    constructing further wrappers over the same panel). Likewise, the same
+    `PanelReferenceDataPort` instance backs both the backtest engine's
+    reference port and the screener engine's reference port/sector catalog
+    -- it structurally satisfies `ReferenceDataPort` and T-0025-1's
+    `SectorCatalog` at once."""
     loaded = load_panel(_panel_store(), PANEL_PATH, require_object_store=_require_real_panel())
     if loaded is None:
-        return None, None, None, None
+        return None, None, None, None, None
     similarity_engine = PandasSimilarityEngine(loaded.panel, loaded.status)
     price_series_port = PanelPriceSeriesPort(loaded.panel, loaded.status)
+    reference_port = PanelReferenceDataPort(loaded.panel, loaded.universe)
     backtest_engine = PortBacktestEngine(
         price_port=price_series_port,
         fundamentals_port=NoFundamentalsPort(),
-        reference_port=PanelReferenceDataPort(loaded.panel, loaded.universe),
+        reference_port=reference_port,
     )
-    return similarity_engine, backtest_engine, loaded.status, price_series_port
+    screener_engine = PortScreenerRunEngine(
+        price_port=price_series_port,
+        reference_port=reference_port,
+        sector_catalog=reference_port,
+    )
+    return similarity_engine, backtest_engine, loaded.status, price_series_port, screener_engine
 
 
 @asynccontextmanager
@@ -121,6 +135,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.backtest_engine,
         app.state.panel_status,
         app.state.price_series_port,
+        app.state.screener_engine,
     ) = _load_engine()
     app.state.backtest_jobs = BacktestJobStore()
     yield
@@ -200,6 +215,7 @@ app.include_router(similarity_router)
 app.include_router(backtest_router)
 app.include_router(chart_router)
 app.include_router(panel_router)
+app.include_router(screener_router)
 
 
 def main() -> None:

@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-0025 (Server-Side Screener Evaluation Endpoint)
 **Design**: docs/design/screener-core/
-**Status**: Not started
+**Status**: Done
 **Depends on**: T-0025-1
 **Blocks**: —
 **Resolves**: #25
