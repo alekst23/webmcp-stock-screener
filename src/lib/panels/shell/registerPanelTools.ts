@@ -14,6 +14,7 @@ import { registerResultsTableRendererContract } from '../../results/tools/tableR
 import { registerResultsTablePanelKind } from '../../results/registry/resultsTablePanelKind';
 import { buildResultsTools } from '../../results/tools/resultsTools';
 import { registerWatchlistPanelKind } from '../../workbench/watchlist/registry/watchlistPanelKind';
+import { registerFilterBuilderPanelKind } from '../../screener/registry/filterBuilderPanelKind';
 import { registerAlertDraftPanelKind } from '../../workbench/alerts/registry/alertDraftPanelKind';
 import { similarOpportunitiesPanelKindDefinition } from '../../workbench/similarity/panel/domain/panelKind';
 import {
@@ -185,6 +186,13 @@ export function createPanelShellRuntime(
 	registerWatchlistPanelKind(kinds, { useCaseDeps: deps });
 	registerAlertDraftPanelKind(kinds, { useCaseDeps: deps });
 	kinds.register(similarOpportunitiesPanelKindDefinition);
+
+	// T-0027-1: the real filter_builder kind, replacing
+	// defaultPanelKinds.ts's placeholder -- before seedDefaultWorkspace below
+	// so a brand-new workspace's seeded filter_builder panel (the sole entry
+	// in DEFAULT_SEED_PANELS) already renders the real read-only screener
+	// view rather than the placeholder body.
+	registerFilterBuilderPanelKind(kinds, { useCaseDeps: deps });
 
 	// The real 'chart' kind plus its real 'instrument' source type / real
 	// 'chart_grid' renderer (bug fix, see git history) -- chart/registry/

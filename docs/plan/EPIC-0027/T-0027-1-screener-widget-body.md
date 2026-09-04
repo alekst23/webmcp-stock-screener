@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-0027 (Screener Widget and Drag-to-Chart)
 **Design**: docs/design/screener-core/
-**Status**: Not started
+**Status**: Done
 **Depends on**: —
 **Blocks**: —
 
@@ -39,3 +39,48 @@ so that I can verify what the agent did before it runs, without asking.
 - Any input control that lets a human edit the screener definition
   directly through this view — explicitly deferred; redefinition stays
   agent-driven only for MVP.
+
+## Solution Approach
+
+Real `filter_builder` `PanelKindDefinition`, replacing
+`defaultPanelKinds.ts`'s placeholder, following the exact
+`resultsTablePanelKind.ts` / `watchlistPanelKind.ts` precedent (real
+registration before the placeholder defaults, registration-time runtime-deps
+singleton for the lazily-loaded body, `defaultSize`/`minSize`/`linkChannels`
+reused verbatim from the placeholder's own KindSpec so the seeded layout
+never changes):
+
+- `src/lib/screener/panel/filterBuilderPanelContext.ts` — registration-time
+  singleton (`useCaseDeps`), mirrors `watchlistPanelContext.ts`.
+- `src/lib/screener/panel/filterTreeSummary.ts` — pure, unit-tested text
+  summarization of `UniverseSpec`, `FilterNode` (flattened depth-first
+  outline), and `RankingSpec | null`. No Svelte, no I/O.
+- `src/lib/screener/panel/FilterBuilderPanel.svelte` — the body. Reads
+  `deps.useCaseDeps.repository.get(workspaceId)` once per mount (not
+  reactively) and `readScreener(doc, doc.screenerId)`; renders the
+  `filterTreeSummary.ts` output. `screenerId === null` or `readScreener`
+  returning `null` both render the AC1 empty state ("No screener yet.").
+  Live update (AC3) relies on `PanelContainer.svelte`'s existing
+  remount-on-observer-notify cycle — the same mechanism every other panel
+  body already uses — not a bespoke subscription in this component.
+- `src/lib/screener/registry/filterBuilderPanelKind.ts` —
+  `createFilterBuilderPanelKindDefinition` / `registerFilterBuilderPanelKind`.
+  `validateConfig` stays permissive (this body never writes through
+  `panel.config`), matching the placeholder's own leniency.
+- Wired into the composition root
+  (`src/lib/panels/shell/registerPanelTools.ts`), before
+  `registerDefaultPanelKinds`/`seedDefaultWorkspace`, so a brand-new
+  workspace's seeded `filter_builder` panel (`DEFAULT_SEED_PANELS`'s sole
+  entry) renders the real body immediately.
+
+**Fixture/assumption (no EPIC-0026 landing yet):** `WorkspaceDocument`'s
+`screenerId` field and `screener/state.ts`'s `readScreener`/`writeScreener`
+already exist on `main` (EPIC-1009), independent of EPIC-0026's
+`define_screener` tool. Tests seed a current screener directly —
+`writeScreener(doc, screener)` then `repository.put({ ...doc, screenerId:
+screener.screenerId })` — exactly the shape `define_screener` will produce
+once EPIC-0026 lands, so no behavior here depends on that epic landing
+first, per the epic doc's own note.
+
+Tests: `filterTreeSummary.test.ts` (pure), `filterBuilderPanelKind.test.ts`
+(registration), `FilterBuilderPanel.test.ts` (component, one test per AC).
