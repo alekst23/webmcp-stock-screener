@@ -219,9 +219,17 @@ with the cell count already specified here; it is not a new behavior._
 
 ### Illustrate the empty grid
 
+_Amended by hotfix/grid-line-lighten — the outline shipped by
+hotfix/panel-default-width-grid-lines was tuned so dark it read as
+effectively invisible against the grid background rather than "faint."
+This amendment restates the "Happy path" row's outcome: the outline must
+be perceptible, not merely present in the DOM, while remaining visually
+secondary to `separator`'s panel-chrome dividers — it does not change
+which cells are outlined or when._
+
 | Scenario        | Given                                        | When                          | Then                                                                                                                  |
 | --------------- | -------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Happy path      | a workspace with some cells unoccupied       | the workspace is rendered     | every unoccupied cell shows a faint outline of its own grid boundaries, distinct from an occupied cell's panel chrome |
+| Happy path      | a workspace with some cells unoccupied       | the workspace is rendered     | every unoccupied cell shows a faint but perceptible outline of its own grid boundaries — visible against the grid background, yet visually secondary to an occupied cell's panel chrome |
 | Fully occupied  | every cell on the 6x4 grid is occupied       | the workspace is rendered     | no empty-cell outlines are shown                                                                                      |
 | Fully empty     | no panels exist yet                          | the workspace is rendered     | all 24 cells show the empty-cell outline                                                                              |
 | Non-interactive | an empty cell's outline                      | the human clicks or hovers it | nothing happens — the outline never intercepts pointer events or blocks interaction with panels above or beside it    |
@@ -308,5 +316,6 @@ that the grid has a hard capacity._
 
 _Implemented by: EPIC-1007, hotfix/empty-grid-canvas, hotfix/panel-system
 (reset-to-default feature), hotfix/panel-default-width-grid-lines (default
-seed column span, empty-grid outline style). Depends on the common workspace
-contract from EPIC-1006._
+seed column span, empty-grid outline style), hotfix/grid-line-lighten
+(empty-grid outline contrast). Depends on the common workspace contract
+from EPIC-1006._
