@@ -4,7 +4,11 @@
 // ScreenerEvaluationPort, stores the outcome in a PinnedRunStore, and shapes
 // the wire response. Every field a completed run reports (matches, warnings,
 // provenance, ranking) comes straight from run.ts's own contract; this file
-// never re-derives any of it.
+// never re-derives any of it. The post-run results-panel binding itself
+// (bindRunToResultsPanel) is pure application-layer logic with no wire
+// concerns, so as of EPIC-0020's post-review layering fix it lives in
+// panels/application/bindRunToResultsPanel.ts and is only called from here,
+// not defined here.
 //
 // The run does not advance the workspace revision the way a definition edit
 // does, so -- like save_workspace (workbench/tools/index.ts) -- it bypasses
@@ -14,16 +18,7 @@
 // must not change idempotency.ts's shared type to fit.
 
 import { builtinCatalogRegistry, type CatalogRegistry } from '../../catalog/registry';
-import {
-	bindPanelSource,
-	createPanel,
-	readPanelState,
-	type PanelUseCaseDeps
-} from '../../panels/application';
-import { resolveAutoRect, visibleOccupied } from '../../panels/application/support';
-import type { LayoutTemplateRegistry } from '../../panels/domain/layoutTemplates';
-import type { PanelRegistry } from '../../panels/registry/panelKindRegistry';
-import type { SourceRendererRegistry } from '../../panels/registry/sourceRendererRegistry';
+import { bindRunToResultsPanel, type PanelBindingDeps } from '../../panels/application';
 import { createScreenerEngine } from '../../screener/engine/engine';
 import { createUnavailableMarketData } from '../../screener/engine/unavailableMarketData';
 import { createPinnedRunStore } from '../../screener/runStore';
@@ -43,7 +38,6 @@ import {
 	OperationValidationError,
 	RevisionConflictError
 } from '../../workbench/domain/errors';
-import type { Actor } from '../../workbench/domain/mutation';
 import type { WorkspaceDocument } from '../../workbench/domain/workspace';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import type { WorkspaceRepository } from '../../workbench/domain/ports';
@@ -162,89 +156,6 @@ interface RunReplayCache {
 	// typed to MutationEnvelope and a ScreenerRun is not one.
 	lookup(key: string, fingerprint: string): ToolResult | null;
 	remember(key: string, fingerprint: string, result: ToolResult): void;
-}
-
-// T-0020-2: the three panel-only registries PanelUseCaseDeps needs besides
-// the six fields WorkbenchDeps already carries (repository/revisions/
-// history/clock/ids/idempotency) -- injected so this module never builds
-// its own registry instances, only reuses whichever ones the shared
-// composition root already built (T-0020-1).
-export interface PanelBindingDeps {
-	kinds: PanelRegistry;
-	sourceRenderer: SourceRendererRegistry;
-	templates: LayoutTemplateRegistry;
-}
-
-// AC1/AC3/AC4/AC5: binds the workspace's first results_table panel (by
-// existing panel order) to the just-completed run, via the exact same
-// bindPanelSource application function every other panel source change
-// uses -- so replacing a prior binding, and recording the change through
-// RevisionService/change-history, both come for free. Best-effort (AC2):
-// any failure here (a rejected source, a workspace that vanished between
-// the run and this call) is swallowed by the caller, never surfacing as a
-// run_screener failure.
-//
-// T-0020-10: when no results_table panel exists yet, one is created first
-// via the same createPanel() path an agent's create_panel call would use --
-// see spec.md's "Create-if-absent results panel" -- then bound exactly as
-// the existing-panel branch always has. Sized 2x1 (narrower than the kind's
-// own 4x2 defaultSize) and auto-placed by resolveAutoRect, the same
-// placement helper createPanel itself falls back to when no explicit rect
-// is given -- no new placement logic.
-//
-// T-0020-11: `actor` is threaded through (not hardcoded 'agent') so a
-// human-triggered run (panelController.ts's runScreenerByHuman) can record
-// the resulting create/bind as actor: 'human' in the action log, the same
-// way every other human-vs-agent mutation in this codebase is distinguished
-// -- execute() below still always passes 'agent', so run_screener's own
-// tool-call behavior is unchanged. Exported (and narrowed to only the
-// WorkbenchDeps fields this function actually reads) so runScreenerByHuman
-// can call the exact same binding logic directly instead of duplicating it.
-export function bindRunToResultsPanel(
-	deps: Pick<WorkbenchDeps, 'repository' | 'revisions' | 'history' | 'clock' | 'ids'>,
-	panelBinding: PanelBindingDeps,
-	workspaceId: string,
-	runId: string,
-	actor: Actor
-): void {
-	const doc = deps.repository.get(workspaceId);
-	if (!doc) {
-		return;
-	}
-	const panelDeps: PanelUseCaseDeps = {
-		workspaceId,
-		repository: deps.repository,
-		revisions: deps.revisions,
-		history: deps.history,
-		clock: deps.clock,
-		ids: deps.ids,
-		kinds: panelBinding.kinds,
-		sourceRenderer: panelBinding.sourceRenderer,
-		templates: panelBinding.templates
-	};
-	const state = readPanelState(doc);
-	const existing = state.panels.find((p) => p.kind === 'results_table');
-	let targetId: string;
-	if (existing) {
-		targetId = existing.id;
-	} else {
-		const rect = resolveAutoRect({ colSpan: 2, rowSpan: 1 }, visibleOccupied(state.panels));
-		const created = createPanel(panelDeps, {
-			context: { actor },
-			kind: 'results_table',
-			rect
-		});
-		const [newPanelId] = created.affectedIds;
-		if (!newPanelId) {
-			return;
-		}
-		targetId = newPanelId;
-	}
-	bindPanelSource(panelDeps, {
-		context: { actor },
-		panelId: targetId,
-		source: { type: 'screener_results', ref: { run_id: runId } }
-	});
 }
 
 function createRunReplayCache(): RunReplayCache {

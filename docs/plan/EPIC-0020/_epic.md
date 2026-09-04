@@ -46,6 +46,7 @@ actually usable end-to-end.
 | 12  | T-0020-12 | Disambiguate screener-revision vs. workspace-revision in the tool surface          | —                    | Done   |
 | 13  | T-0020-13 | State the data as-of date on chart "no data" refusals                             | —                    | Done   |
 | 14  | T-0020-14 | End-to-end integration test and doc update for the amended results-panel pipeline | T-0020-10, T-0020-11 | Done   |
+| 15  | T-0020-15 | Post-review fixes for tickets 10-14 (human-run wiring)                            | T-0020-10, T-0020-11 | Done   |
 
 Follow-up tickets 4-9 were filed by this epic's review (2026-09-02) and are
 now Done (their status here was previously stale — corrected during the
@@ -57,6 +58,13 @@ run when none existed yet, there was no human-triggerable run action, screener
 vs. workspace revision confusion, and unexplained chart "no data" refusals.
 See `docs/design/workbench-composition-root/spec.md`'s Features 4-8 for the
 full behavioral spec these tickets implement.
+
+T-0020-15 was filed by an epic review of the tickets-10-14 wave (2026-09-04):
+a dead single-flight guard and a silently-dropped human-run failure outcome
+(both blocking), plus a `panels/shell` -> `webmcp/*` layering violation,
+two functions modestly over this project's size guidance, and a disabled/
+tooltip drift nit. All five are Done — see that ticket for the full
+per-finding resolution.
 
 ## Dependency Graph
 

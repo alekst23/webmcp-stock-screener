@@ -17,6 +17,7 @@ import type { MutationEnvelope } from '../../workbench/domain/mutation';
 import { emptyWorkspace } from '../../workbench/domain/workspace';
 import {
 	bindPanelSource,
+	bindRunToResultsPanel,
 	createPanel,
 	configurePanelView,
 	emptyPanelState,
@@ -35,10 +36,10 @@ import type { GridPosition, GridRect } from '../domain/grid';
 import type { Panel, PanelSourceRef } from '../domain/panel';
 import type { PanelKindDefinition } from '../registry/panelKindRegistry';
 import type { ToolSpec } from '../../webmcp/types';
-import { bindRunToResultsPanel } from '../../webmcp/screener/runScreener';
 import type { ScreenerEvaluationPort, PinnedRunStore } from '../../screener/ports';
-import type { ScreenerRunOutcome } from '../../screener/run';
+import type { ScreenerRun, ScreenerRunOutcome } from '../../screener/run';
 import { readScreener } from '../../screener/state';
+import type { ScreenerDefinition } from '../../screener/definition';
 
 // T-0027-2: the chart panel kind's own name -- spec.md item 11 and
 // technical.md's "Amendment (EPIC-0027)" both specify that dropping a
@@ -417,24 +418,75 @@ export type RunScreenerByHumanResult =
 	| { status: 'error'; message: string }
 	| { status: 'ok'; outcome: ScreenerRunOutcome };
 
-// Keyed by the caller's own RunScreenerByHumanDeps object identity (the
-// filter_builder panel kind's one registered runtime-deps singleton, in
-// practice) so two activations of the same control while a run is still in
-// flight share one execution instead of racing a second -- the AC's "a
-// second activation during that window does not trigger a second concurrent
-// run" holds even if a click reaches this function before Svelte's own
-// disabled-state re-render lands, without this module reaching into any
-// component's local state to enforce it.
-const humanRunsInFlight = new WeakMap<
-	RunScreenerByHumanDeps,
-	Promise<RunScreenerByHumanResult>
->();
+// Keyed by workspaceId, not by the caller's RunScreenerByHumanDeps object
+// identity (post-review fix, EPIC-0020: the original WeakMap<deps, ...> was
+// dead in production -- FilterBuilderPanel.svelte's handleRun() builds a
+// fresh deps object literal on every call, so no two activations ever
+// shared a key; only Svelte's synchronous `running` state was actually
+// preventing a double-run). Concurrency is scoped per-workspace, which is
+// also the semantically correct unit here regardless of which object
+// happened to trigger the call -- a keyboard shortcut, a retry, or any
+// future caller without a stable deps reference now gets the same real
+// single-flight protection FilterBuilderPanel already relies on. A `Map`
+// (not `WeakMap`) is required since a workspaceId string can't be weakly
+// referenced; `.finally()` below still deletes the entry as soon as the run
+// settles, so this never leaks an entry per workspace that ever ran once.
+const humanRunsInFlight = new Map<string, Promise<RunScreenerByHumanResult>>();
+
+// The screener definition currently active for a workspace, or null when
+// none is defined -- split out of executeHumanRun so that function reads as
+// a linear read -> evaluate -> react pipeline.
+function resolveCurrentScreenerDefinition(
+	useCaseDeps: PanelUseCaseDeps
+): ScreenerDefinition | null {
+	const doc = useCaseDeps.repository.get(useCaseDeps.workspaceId);
+	const screenerId = doc?.screenerId;
+	return doc && screenerId ? readScreener(doc, screenerId) : null;
+}
+
+// Best-effort pin + bind for a completed run, split out of executeHumanRun
+// for the same reason as resolveCurrentScreenerDefinition above. Never
+// throws: a binding failure must never turn an otherwise successful human
+// run into a failure for the person who clicked Run.
+function pinAndBindCompletedRun(
+	useCaseDeps: PanelUseCaseDeps,
+	runId: string,
+	outcome: ScreenerRun,
+	runStore: PinnedRunStore
+): void {
+	runStore.putRun(outcome);
+	try {
+		// T-0020-11's own wrinkle: bindRunToResultsPanel used to hardcode
+		// actor: 'agent' -- now threaded through so this human-triggered
+		// create-or-rebind (T-0020-10) records in the action log as
+		// actor: 'human', matching every other human action in this module,
+		// while execute()'s own tool-call path (runScreener.ts) still always
+		// passes 'agent'.
+		bindRunToResultsPanel(
+			useCaseDeps,
+			{
+				kinds: useCaseDeps.kinds,
+				sourceRenderer: useCaseDeps.sourceRenderer,
+				templates: useCaseDeps.templates
+			},
+			useCaseDeps.workspaceId,
+			runId,
+			'human'
+		);
+	} catch (err) {
+		// Best-effort, mirroring run_screener's own binding failure
+		// handling (runScreener.ts): binding never turns an otherwise
+		// successful run into a failure for the human who clicked Run.
+		console.warn(
+			'runScreenerByHuman: auto-bind to results_table panel failed (best-effort, run itself still succeeded)',
+			err
+		);
+	}
+}
 
 async function executeHumanRun(deps: RunScreenerByHumanDeps): Promise<RunScreenerByHumanResult> {
 	const { useCaseDeps, evaluationPort, runStore } = deps;
-	const doc = useCaseDeps.repository.get(useCaseDeps.workspaceId);
-	const screenerId = doc?.screenerId;
-	const definition = doc && screenerId ? readScreener(doc, screenerId) : null;
+	const definition = resolveCurrentScreenerDefinition(useCaseDeps);
 	if (!definition) {
 		return { status: 'no_screener' };
 	}
@@ -448,34 +500,7 @@ async function executeHumanRun(deps: RunScreenerByHumanDeps): Promise<RunScreene
 	}
 
 	if (outcome.status === 'complete') {
-		runStore.putRun(outcome);
-		try {
-			// T-0020-11's own wrinkle: bindRunToResultsPanel used to hardcode
-			// actor: 'agent' -- now threaded through so this human-triggered
-			// create-or-rebind (T-0020-10) records in the action log as
-			// actor: 'human', matching every other human action in this module,
-			// while execute()'s own tool-call path (runScreener.ts) still always
-			// passes 'agent'.
-			bindRunToResultsPanel(
-				useCaseDeps,
-				{
-					kinds: useCaseDeps.kinds,
-					sourceRenderer: useCaseDeps.sourceRenderer,
-					templates: useCaseDeps.templates
-				},
-				useCaseDeps.workspaceId,
-				runId,
-				'human'
-			);
-		} catch (err) {
-			// Best-effort, mirroring run_screener's own binding failure
-			// handling (runScreener.ts): binding never turns an otherwise
-			// successful run into a failure for the human who clicked Run.
-			console.warn(
-				'runScreenerByHuman: auto-bind to results_table panel failed (best-effort, run itself still succeeded)',
-				err
-			);
-		}
+		pinAndBindCompletedRun(useCaseDeps, runId, outcome, runStore);
 	}
 	return { status: 'ok', outcome };
 }
@@ -490,12 +515,13 @@ async function executeHumanRun(deps: RunScreenerByHumanDeps): Promise<RunScreene
 export function runScreenerByHuman(
 	deps: RunScreenerByHumanDeps
 ): Promise<RunScreenerByHumanResult> {
-	const inFlight = humanRunsInFlight.get(deps);
+	const key = deps.useCaseDeps.workspaceId;
+	const inFlight = humanRunsInFlight.get(key);
 	if (inFlight) {
 		return inFlight;
 	}
-	const promise = executeHumanRun(deps).finally(() => humanRunsInFlight.delete(deps));
-	humanRunsInFlight.set(deps, promise);
+	const promise = executeHumanRun(deps).finally(() => humanRunsInFlight.delete(key));
+	humanRunsInFlight.set(key, promise);
 	return promise;
 }
 

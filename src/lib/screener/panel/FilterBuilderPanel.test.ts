@@ -16,9 +16,15 @@ import { createLayoutTemplateRegistry } from '../../panels/domain/layoutTemplate
 import { createPanelRegistry } from '../../panels/registry/panelKindRegistry';
 import { createSourceRendererRegistry } from '../../panels/registry/sourceRendererRegistry';
 import type { PanelUseCaseDeps } from '../../panels/application';
+import { createPanelWorkspaceObserver } from '../../panels/shell/panelController';
 import { createScreener } from '../definition';
 import { writeScreener } from '../state';
+import { createPinnedRunStore } from '../runStore';
+import type { ScreenerEvaluationPort } from '../ports';
+import type { ScreenerRunOutcome } from '../run';
+import { PROBLEM_CODES } from '../validation';
 import { resetFilterBuilderPanelRuntimeDeps } from './filterBuilderPanelContext';
+import type { FilterBuilderPanelRuntimeDeps } from './filterBuilderPanelContext';
 import FilterBuilderPanel from './FilterBuilderPanel.svelte';
 
 const WORKSPACE_ID = 'workspace_1';
@@ -95,6 +101,38 @@ function mountPanel(deps: PanelUseCaseDeps): Mounted {
 	return { target, instance };
 }
 
+// The Run-button variant of mountPanel above: takes the full runtime deps
+// (including `run`) rather than bare useCaseDeps, so a test can actually
+// click the button instead of only exercising it disabled.
+function mountPanelWithRunDeps(deps: FilterBuilderPanelRuntimeDeps): Mounted {
+	const target = document.createElement('div');
+	document.body.appendChild(target);
+	const instance = mount(FilterBuilderPanel, {
+		target,
+		props: {
+			panel: samplePanel(),
+			onBroadcast: () => false,
+			deps
+		}
+	});
+	flushSync();
+	return { target, instance };
+}
+
+// A fake evaluation port whose execute() always resolves to the given
+// outcome (a refusal, in the test below) -- mirrors runScreenerByHuman.
+// test.ts's own makeFakePort pattern.
+function makeFakePort(outcome: ScreenerRunOutcome): ScreenerEvaluationPort {
+	return {
+		async validate() {
+			throw new Error('not used by this test');
+		},
+		async execute() {
+			return outcome;
+		}
+	};
+}
+
 afterEach(() => {
 	resetFilterBuilderPanelRuntimeDeps();
 });
@@ -152,6 +190,57 @@ describe('FilterBuilderPanel', () => {
 		expect(controls[0]?.classList.contains('run-button'), 'expected the one control to be Run').toBe(
 			true
 		);
+		unmount(instance);
+	});
+
+	// Post-review fix (EPIC-0020, finding 2): runScreenerByHuman's result used
+	// to be discarded by handleRun() entirely, so a refused run left the
+	// button reverting to "Run" with no explanation. This clicks the real
+	// button (not just calling runScreenerByHuman directly) so the assertion
+	// covers the actual wiring between the DOM event and the message that
+	// appears from it.
+	it('surfaces a refusal inline after a real button click, from a real handleRun()-shaped call', async () => {
+		const deps = harness();
+		seedCurrentScreener(deps);
+		const port = makeFakePort({
+			status: 'refused',
+			screenerId: 'unused',
+			screenerRevision: 1,
+			problems: [
+				{
+					severity: 'blocking',
+					code: PROBLEM_CODES.invalidParameter,
+					nodeIds: [],
+					universeCriteria: [],
+					message: 'Fixture blocking problem.'
+				}
+			]
+		});
+		const { target, instance } = mountPanelWithRunDeps({
+			useCaseDeps: deps,
+			run: {
+				evaluationPort: port,
+				runStore: createPinnedRunStore(),
+				observer: createPanelWorkspaceObserver()
+			}
+		});
+
+		expect(target.textContent, 'no message before the first run').not.toContain('Fixture blocking');
+
+		const button = target.querySelector('.run-button') as HTMLButtonElement;
+		button.click();
+
+		// Draining the microtask queue with a macrotask boundary (see
+		// PanelFrame.test.ts's identical comment) is more robust than
+		// guessing how many Promise.resolve() hops handleRun's own await
+		// chain needs.
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		flushSync();
+
+		expect(
+			target.textContent,
+			'a refused run must explain itself inline, not just revert the button silently'
+		).toContain('Fixture blocking problem.');
 		unmount(instance);
 	});
 });

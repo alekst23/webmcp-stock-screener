@@ -126,6 +126,21 @@ mounts, since `+page.svelte` awaits the whole composition first. The
 and reused for both `run_screener` and the human Run control, instead of
 building two separate adapter instances.
 
+**Post-review amendment (T-0020-15, 2026-09-04).** An epic review of this
+ticket found the concurrency guard described above was dead in production:
+`FilterBuilderPanel.svelte`'s `handleRun()` constructs a fresh
+`RunScreenerByHumanDeps` object literal on every call, so the `WeakMap`'s
+object-identity keying never matched across activations (only Svelte's
+`running` state was actually preventing a double-run). The guard is now
+keyed on `deps.useCaseDeps.workspaceId` (a `Map`, not a `WeakMap`) instead —
+semantically the correct scope for this guarantee regardless of which
+object triggered the call. The same review also found `handleRun()`
+discarded `runScreenerByHuman`'s return value entirely, so a refused or
+errored run showed nothing to the user; it's now surfaced inline via a new
+`runOutcomeMessage()` helper. See T-0020-15 for the full list of findings
+and resolutions (five total, including a `panels/shell` -> `webmcp/*`
+layering fix and two function-size extractions).
+
 **Test coverage** (`src/lib/panels/shell/runScreenerByHuman.test.ts`):
 disabled-when-no-screener (function returns `no_screener`, engine never
 called), in-flight prevents a second concurrent evaluation (a deferred fake

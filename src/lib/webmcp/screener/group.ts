@@ -29,7 +29,8 @@ import type {
 } from '../../screener/ports';
 import type { ToolSpec } from '../types';
 import { createDefineScreenerTool } from './defineScreener';
-import { createRunScreenerTool, type PanelBindingDeps } from './runScreener';
+import { createRunScreenerTool } from './runScreener';
+import type { PanelBindingDeps } from '../../panels/application';
 import type { SetScreenerUniverseDeps } from './setScreenerUniverse';
 
 // Extends set_screener_universe's own deps (WorkbenchDeps + catalog +

@@ -32,7 +32,8 @@ import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceR
 import { memoryStorage } from '../../workbench/testSupport';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import { createCreateScreenerTool } from './createScreener';
-import { createRunScreenerTool, type PanelBindingDeps } from './runScreener';
+import { createRunScreenerTool } from './runScreener';
+import type { PanelBindingDeps } from '../../panels/application';
 import { createSetScreenerRankingTool } from './setScreenerRanking';
 import type { ToolResult } from '../types';
 

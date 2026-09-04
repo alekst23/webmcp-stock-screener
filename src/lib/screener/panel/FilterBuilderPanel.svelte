@@ -15,6 +15,7 @@
 	import { runScreenerByHuman } from '../../panels/shell/panelController';
 	import { readScreener } from '../state';
 	import { summarizeFilterTree, summarizeRanking, summarizeUniverse } from './filterTreeSummary';
+	import { runOutcomeMessage } from './runOutcomeMessage';
 	import {
 		getFilterBuilderPanelRuntimeDeps,
 		type FilterBuilderPanelRuntimeDeps
@@ -53,16 +54,33 @@
 	// disabled/spinner affordance the AC also asks for.
 	let running = $state(false);
 
+	// Transient, local-only feedback for a non-successful human run (post-
+	// review fix, EPIC-0020: runScreenerByHuman's return value used to be
+	// discarded entirely, so a refused or errored run left the button
+	// reverting to "Run" with zero explanation). Cleared at the start of
+	// every new run and left in place afterward until the next run attempt
+	// -- there is no other transient-message precedent elsewhere in this
+	// panel system to match (checked panels/shell/ and results/panel/), so
+	// this follows the same "local component state, never a workspace
+	// mutation" convention `running` above already uses.
+	let runMessage = $state<string | null>(null);
+
 	// Explains why the control is disabled, or null when it's enabled --
-	// covers both AC states (no screener defined; a run is already in
-	// flight) with one derived value the markup below reads for both the
-	// `disabled` attribute and the tooltip.
+	// covers all three AC states (no screener defined; a run is already in
+	// flight; the run deps were never wired up) with one derived value the
+	// markup below reads for both the `disabled` attribute and the tooltip,
+	// so the two can never drift apart. The `!deps.run` branch is defense in
+	// depth -- unreachable today because the composition root sets `run`
+	// synchronously before this panel ever mounts -- but folding it in here
+	// means the tooltip can never silently disagree with `disabled`.
 	let disabledReason = $derived(
 		!screener
 			? 'Define a screener before it can be run.'
 			: running
 				? 'A run is already in progress.'
-				: null
+				: !deps.run
+					? 'The run control is not available yet.'
+					: null
 	);
 
 	async function handleRun(): Promise<void> {
@@ -71,12 +89,14 @@
 		}
 		const run = deps.run;
 		running = true;
+		runMessage = null;
 		try {
-			await runScreenerByHuman({
+			const result = await runScreenerByHuman({
 				useCaseDeps: deps.useCaseDeps,
 				evaluationPort: run.evaluationPort,
 				runStore: run.runStore
 			});
+			runMessage = runOutcomeMessage(result);
 		} finally {
 			running = false;
 			// Notified regardless of outcome (success, refusal, or an
@@ -95,13 +115,16 @@
 		<button
 			type="button"
 			class="run-button"
-			disabled={disabledReason !== null || !deps.run}
+			disabled={disabledReason !== null}
 			title={disabledReason ?? undefined}
 			onclick={handleRun}
 		>
 			{running ? 'Running…' : 'Run'}
 		</button>
 	</div>
+	{#if runMessage !== null}
+		<p class="run-message">{runMessage}</p>
+	{/if}
 	{#if screener === null}
 		<p class="empty">No screener yet.</p>
 	{:else}
@@ -173,5 +196,14 @@
 	.empty {
 		color: var(--text-muted);
 		font-style: italic;
+	}
+
+	.run-message {
+		flex: 0 0 auto;
+		color: var(--error);
+		background: var(--error-bg);
+		border: 1px solid var(--error);
+		border-radius: var(--radius-sm);
+		padding: var(--space-xs) var(--space-sm);
 	}
 </style>

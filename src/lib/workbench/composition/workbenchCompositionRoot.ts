@@ -34,7 +34,7 @@ import {
 	registerScreenerTools
 } from '../../webmcp/screener/registerScreenerTools';
 import type { ScreenerToolDeps } from '../../webmcp/screener/group';
-import type { PanelBindingDeps } from '../../webmcp/screener/runScreener';
+import type { PanelBindingDeps } from '../../panels/application';
 import type { ScreenerEvaluationPort } from '../../screener/ports';
 import { createHttpScreenerEvaluationPort } from '../../screener/infra/httpEvaluationPort';
 import {

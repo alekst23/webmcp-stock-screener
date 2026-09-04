@@ -5,10 +5,21 @@
 // own harness pattern for removePanelByHuman/readActionLog, and
 // runScreener.test.ts's own fake-evaluation-port pattern for the
 // run-execution path. Per the ticket's own note, this repo has no Svelte
-// component-render harness -- so the disabled-when-undefined and
-// in-flight-disables-a-second-run ACs are proven at the function level (the
-// exact guard FilterBuilderPanel.svelte's button state defers to), not by
-// mounting FilterBuilderPanel.svelte and clicking it.
+// component-render harness -- so the disabled-when-undefined AC is proven
+// at the function level (the exact guard FilterBuilderPanel.svelte's button
+// state defers to), not by mounting FilterBuilderPanel.svelte and clicking
+// it (FilterBuilderPanel.test.ts covers the actual click/render wiring
+// separately).
+//
+// Post-review fix (EPIC-0020, finding 1): the in-flight single-flight test
+// below used to call runScreenerByHuman(deps) twice against the exact same
+// `deps` object -- which would have passed even under the *old*,
+// object-identity-keyed WeakMap guard, so it never actually proved the
+// guard worked from FilterBuilderPanel.svelte's real call pattern
+// (handleRun() builds a brand-new RunScreenerByHumanDeps object literal on
+// every call). The guard is now keyed on `useCaseDeps.workspaceId` instead
+// (a Map, not a WeakMap -- see panelController.ts's own comment), and the
+// test below constructs two independent object literals to match.
 import { describe, expect, it } from 'vitest';
 import { createPanelTestHarness } from '../application/testSupport';
 import { createPanel, readPanelState, type PanelUseCaseDeps } from '../application';
@@ -205,19 +216,26 @@ describe('runScreenerByHuman: disabled when no screener is defined', () => {
 });
 
 describe('runScreenerByHuman: a second activation while a run is in flight', () => {
-	it('does not trigger a second concurrent evaluation', async () => {
+	it('does not trigger a second concurrent evaluation, from two independent deps object literals (the real FilterBuilderPanel.svelte call pattern)', async () => {
 		const useCaseDeps = setup();
 		seedCurrentScreener(useCaseDeps);
 		const deferred = makeDeferredPort();
 		const runStore: PinnedRunStore = createPinnedRunStore();
-		const deps = { useCaseDeps, evaluationPort: deferred.port, runStore };
 
-		const first = runScreenerByHuman(deps);
-		const second = runScreenerByHuman(deps);
+		// Two separate object literals sharing the same underlying
+		// useCaseDeps/evaluationPort/runStore -- exactly how
+		// FilterBuilderPanel.svelte's handleRun() constructs its
+		// RunScreenerByHumanDeps argument on every call (never a stable
+		// reference). Deliberately NOT `const deps = {...}; call(deps) twice`
+		// -- that would still pass under the old, dead, object-identity-keyed
+		// WeakMap guard and prove nothing about the real wiring.
+		const first = runScreenerByHuman({ useCaseDeps, evaluationPort: deferred.port, runStore });
+		const second = runScreenerByHuman({ useCaseDeps, evaluationPort: deferred.port, runStore });
 
 		expect(
 			deferred.callCount(),
-			'AC: a second activation during an in-flight run must not start a second evaluation'
+			'AC: a second activation during an in-flight run must not start a second evaluation, ' +
+				'even when each call passes its own freshly-constructed deps object'
 		).toBe(1);
 
 		deferred.resolve(
