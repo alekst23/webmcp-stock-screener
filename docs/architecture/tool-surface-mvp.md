@@ -1,10 +1,9 @@
 # Tool Surface MVP
 
 The minimum set of WebMCP tools an agent needs to serve the MVP use case
-correctly. Derived from the use case forward — "what does the agent need to
+correctly, derived from the use case forward — "what does the agent need to
 do?" — not from the existing inventory backward. Overlap with existing tools
 is recorded per tool, but reuse is never the reason a tool is on the list.
-Where the existing tool and the correct tool differ, the correct one wins.
 
 Companion to [Tool Surface Status](tool-surface-status.md) (what's registered
 today).
@@ -12,183 +11,219 @@ today).
 ## The use case
 
 1. User: **"Find energy sector stocks with highest gains in the past 48 hrs."**
-   The agent builds and runs a screen and the user sees a ranked list.
-2. User: **"Show me details for X and Y."**
-   The agent opens a detail view per named instrument next to the list.
+   The agent builds a screener; the user sees its settings in a screener
+   widget and its results in a list.
+2. User: **"Make charts from the top 5"** / **"show me X and Y"** — or drags a
+   row from the list onto the canvas. Chart panels appear, one per instrument.
 
-Follow-ups the MVP must not fall over on, because they're the obvious next
-sentence: "make it top 20", "only ones above $10", "close those two",
-"what's on screen right now?".
+Follow-ups the MVP must not fall over on: "make it top 20" (re-run updates
+the same list), "only ones above $10", "close those charts", "what's on
+screen?".
+
+## How data travels
+
+```
+screener definition ──(live)──► results list ──(copy-out)──► charts
+      in the doc                  bound to run_id              each holds its own instrument ref
+```
+
+- **Screener → list is the only live link.** `define_screener` writes the
+  definition to the workspace document; `run_screener` pins a run and rebinds
+  the *same* `results_table` panel to the new `run_id`. Re-run → same panel,
+  new rows.
+- **List → chart is a copy-out, not a link.** A chart panel's source is
+  `{ type: 'instrument', ref }`: self-contained, durable in the document, and
+  independent of the list afterwards. Re-running the screener changes the
+  list and leaves every chart exactly as it was. A chart made from the list is
+  indistinguishable from one made any other way.
+- **Two ways to copy out, one use case.** Agent: `get_screener_results` → refs
+  → `create_panel(chart, instrument)` per instrument. Human: drag a row onto
+  an empty cell (creates a chart) or onto an empty chart box (binds it). Both
+  end in the same `createPanel`/`bindPanelSource` use case.
+- **Evaluation happens server-side; the browser owns the pin.** The
+  frontend's `ScreenerEvaluationPort.execute` becomes an HTTP call whose
+  response is shaped into a `ScreenerRun` and pinned in the in-memory
+  `PinnedRunStore` exactly as today. The server stays stateless; runs don't
+  survive a refresh (accepted for MVP).
 
 ## What the agent must be able to do
 
-Each capability below is a hard requirement of the use case. The tool list
-in the next section is the smallest set that delivers all of them.
-
 | # | Capability | Why it's required for correctness |
 |---|---|---|
-| A | Look up the engine's vocabulary (fields, operators, sectors, intervals) | "Energy sector" and "gains over 48 hrs" must map to ids the engine actually has. An agent that guesses `field.change_48h` produces a confident wrong answer, not an error. |
-| B | Define a screener — universe, conditions, ranking, limit — **atomically**, with validation in the same step | A screener half-built across four calls has intermediate states a run could observe. Validation must report *every* problem, not the first, or the agent loops. |
-| C | Execute the screener and get a pinned, immutable run with provenance | The user asked about "the past 48 hrs" — the answer is only correct alongside `as_of`, delayed/live status, and whether results were truncated. Later edits must never change what a run says. |
-| D | Read the run's rows: instrument id, symbol, name, and the ranking values | The agent has to say "XOM +4.2%" and, later, map "X" back to an instrument id. Ids come from here, never from re-typing the ticker. |
-| E | Put the results on the canvas | The user sees the list. If the agent claims a result the user can't see, that's a correctness failure. |
-| F | Resolve a name/ticker the user typed to an instrument id, honestly | "X" is normally a row from D. When it isn't ("show me Exxon"), the agent needs a lookup that either returns a real instrument or says it can't — never silently mints one. |
-| G | Open a detail view for an instrument | "Details" today means a chart panel (daily bars). `symbol_details` is a placeholder kind with no renderer. |
-| H | See the canvas: panel ids, kinds, sources, positions | Every follow-up ("close those two") needs panel ids. Also lets the agent verify its own action landed before telling the user it did. |
-| I | Remove a panel | "Close those two." |
-| J | Position panels | "Put the charts next to the list." Auto-placement covers the first render; explicit positioning covers the follow-up. |
+| A | Look up the engine's vocabulary (fields, operators, sector values, intervals) | "Energy sector" and "gains over 48 hrs" must map to ids the engine actually has. A guessed `field.change_48h` is a confident wrong answer, not an error. |
+| B | Define a screener — universe, conditions, ranking, limit — **atomically**, validated in the same step | A screener half-built across four calls has intermediate states a run could observe. Validation must report *every* problem or the agent loops. |
+| C | Execute and get a pinned, immutable run with provenance | "Past 48 hrs" is only a correct answer alongside `as_of`, delayed/live, and `truncated`. Later edits never change what a run says. |
+| D | Read the run's rows with a **full instrument ref** and the ranking values | The agent says "XOM +4.2%" and then creates a chart from the row. The ref must be complete enough to bind a chart without a second lookup. |
+| E | See results in the list, settings in the screener widget | If the agent claims a result or a setting the user can't see, that's a correctness failure. |
+| F | Create a chart panel for an instrument | "Make charts from the top 5." |
+| G | See the canvas: panel ids, kinds, sources, positions | Every follow-up needs panel ids; the agent verifies its own action landed before saying it did. |
+| H | Remove a panel | "Close those charts." |
 
-## The tools (9)
+## The tools
 
-### 1. `search_catalog`
-Capability A. Text/tag search over the catalog: fields, operators, studies,
-indicators, intervals, universes, and — **required addition** — the valid
-values of enumerated fields like `field.sector`. Returns ids and the
-parameter schema per item so the agent can compose a correct condition.
+### Core (7)
 
-- Must return: item id, kind, label, description, parameter schema, and
-  for enumerated fields the accepted values.
-- Overlap: `webmcp/discovery/searchCatalog.ts` exists and does most of this;
-  it is registered nowhere. It does not enumerate sector values today.
+**1. `search_catalog`** — Capability A. Text/tag search over fields,
+operators, studies, indicators, intervals, universes; returns id, kind,
+label, parameter schema, and — *required addition* — the accepted values of
+enumerated fields like `field.sector`.
+Overlap: `webmcp/discovery/searchCatalog.ts` exists, registered nowhere,
+does not enumerate sector values. **Register + extend.**
 
-### 2. `search_instruments`
-Capability F. Ticker or name → `instrument_id`, `symbol`, `name`,
-`exchange`. Returns an explicit "unavailable" result when no reference data
-source is wired.
+**2. `define_screener`** — Capability B. One payload: `universe` (asset
+class, sectors, exchanges, indexes, liquidity floors, exclusions),
+`conditions` (catalog-validated filter tree), `ranking` (fields, weights,
+direction, tie-break), `limit`. Creates the screener or, given
+`screener_id`, replaces its definition as a new revision. Full-replace, not
+patch. Rejects unknown catalog ids, out-of-range parameters, and an empty
+universe, reporting all problems together. States data granularity when a
+time-based request is approximated (daily bars → "48 hrs" ≈ 2 sessions).
+Overlap: replaces `create_screener`, `set_screener_universe`,
+`edit_filter_tree`, `set_screener_ranking`, `validate_screener`. Their
+domain logic is reusable; their tool boundaries are not. **New tool.**
 
-- Must never invent an instrument. If a provisional reference is the only
-  way to bind a chart (see blocker 4), the result must carry
-  `provisional: true` and the agent must relay that to the user.
-- Overlap: `webmcp/discovery/searchInstruments.ts` (honest-unavailable,
-  unregistered) and `chart/tools/resolveTicker.ts` (registered; mints
-  provisional refs with exchange "unknown"). These are one capability split
-  into two tools by circumstance. MVP wants one tool with the honest
-  behaviour and the provisional path flagged, not a separate minting tool.
+**3. `run_screener`** — Capability C + E. Executes one screener revision via
+the evaluation port, pins the result under a `run_id`, binds the workspace's
+results table panel to it (creating one if none exists), returns the
+`panel_id`. Response carries `as_of`, live/delayed, counts, `truncated`,
+`ranking_applied`. An empty universe is a refusal with reason, never an empty
+success.
+Overlap: `webmcp/screener/runScreener.ts` (commented out) already does the
+pin + auto-bind. **Reuse as-is.**
 
-### 3. `define_screener`
-Capability B. One call, one payload: `universe` (asset class, sectors,
-exchanges, indexes, liquidity floors, exclusions), `conditions` (a filter
-tree of catalog-validated nodes), `ranking` (fields + weights + direction +
-tie-break), `limit`. Creates the screener, or — given `screener_id` — replaces
-its definition as a new revision. Validates everything and returns either the
-new `screener_id`/`revision` or the complete list of problems.
+**4. `get_screener_results`** — Capability D. A page of rows for a `run_id`:
+full instrument ref (`instrument_id`, `symbol`, `exchange`, `asset_type`,
+`name`), every ranking value, provenance, cursor. Read-only.
+Overlap: `results/tools/resultsTools.ts` (active). `ScreenerMatch`
+(`screener/run.ts:80`) carries only `instrumentId` today. **Reuse; extend
+the row to a full ref** so a chart can be created from it directly.
 
-- Full-replace semantics, not patch. "Make it top 20" is the same payload
-  with `limit: 20`. This removes an entire class of node-id bookkeeping
-  errors the agent would otherwise have to get right across turns.
-- Must reject unknown catalog ids, out-of-range parameters, and an empty
-  universe, and must report *all* of them together.
-- Must state its data granularity in the response when a time-based request
-  is approximated (daily bars → "48 hrs" ≈ 2 sessions).
-- Overlap: replaces five existing tools — `create_screener`,
-  `set_screener_universe`, `edit_filter_tree`, `set_screener_ranking`,
-  `validate_screener`. Their domain logic (filter-tree validation, ranking
-  normalisation, universe resolution) is reusable; their tool boundaries are
-  not. **New tool.**
+**5. `create_panel`** — Capability F. Creates a panel of a kind with an
+initial source and renderer, auto-placed in the first free cell. For the use
+case: `kind: 'chart'`, `source: { type: 'instrument', ref }`.
+Overlap: `panels/tools/lifecycleTools.ts` (active). **Reuse as-is.**
 
-### 4. `run_screener`
-Capability C + E. Executes one screener revision, pins the result set under
-a `run_id`, and by default presents it: binds the workspace's results table
-panel to the run (creating one if none exists) and returns that `panel_id`.
+**6. `get_canvas_state`** — Capability G. Every panel: id, kind, title,
+source, renderer, rect; the active workspace id; pinned run ids.
+Overlap: `workbench/tools/index.ts` (commented out). **Reuse; verify** it
+reports sources and runs, not just geometry.
 
-- Response must include `as_of`, live/delayed, universe/matched/returned
-  counts, `truncated`, and `ranking_applied`. A run over an empty universe
-  is a refusal with reason, never an empty success.
-- Overlap: `webmcp/screener/runScreener.ts` (commented out) already does
-  the pin + auto-bind. **Reuse as-is.**
+**7. `remove_panel`** — Capability H. By stable panel id.
+Overlap: `panels/tools/lifecycleTools.ts` (active). **Reuse as-is.**
 
-### 5. `get_screener_results`
-Capability D. A page of rows for a `run_id`: `instrument_id`, `symbol`,
-`name`, every ranking field's value, and the run's provenance. Cursor for the
-next page. Read-only — never re-runs.
+### Optional (2)
 
-- Overlap: `results/tools/resultsTools.ts` (active). **Reuse as-is.** Confirm
-  `name` is in the projection; the agent needs it to resolve "Exxon" → row.
+**`set_panel_layout`** — tidy "top 5" into a row. Batch of `{ panel_id, rect }`
+applied atomically. Active today; harmless to leave registered.
 
-### 6. `create_panel`
-Capability G (and E's fallback). Creates a panel of a kind with an initial
-source and renderer, auto-placed in the first free cell. For the use case:
-`kind: 'chart'`, `source: { type: 'instrument', ref }`. Returns the panel id.
-
-- Overlap: `panels/tools/lifecycleTools.ts` (active). **Reuse as-is.** The
-  fact that it takes source + renderer at creation is what makes
-  `bind_panel_source` and `set_panel_renderer` unnecessary for MVP.
-
-### 7. `get_canvas_state`
-Capability H. Every panel: id, kind, title, source, renderer, rect. Plus the
-active workspace id and the currently pinned run ids.
-
-- Overlap: `workbench/tools/index.ts` (commented out). **Reuse; verify** it
-  reports sources and pinned runs, not just geometry.
-
-### 8. `remove_panel`
-Capability I. By stable panel id.
-
-- Overlap: `panels/tools/lifecycleTools.ts` (active). **Reuse as-is.**
-
-### 9. `set_panel_layout`
-Capability J. Applies a batch of `{ panel_id, rect }` atomically; panels not
-named keep their rect. The single layout primitive — split, templates,
-duplicate, and maximize are all expressible as this plus `create_panel`, or
-are UI-only.
-
-- Overlap: `panels/tools/layoutTools.ts` (active). **Reuse as-is.**
+**`search_instruments`** — only if "chart Exxon" (an instrument *not* in the
+list) is in scope. Must never invent an instrument; a provisional reference
+(no reference-data source exists) must carry `provisional: true`.
+Overlap: `webmcp/discovery/searchInstruments.ts` (honest-unavailable,
+unregistered) and `chart/tools/resolveTicker.ts` (registered; mints
+provisional refs). One capability split into two tools by circumstance —
+merge if kept.
 
 ## Deliberately absent
 
 | Existing tool | Why it's not needed |
 |---|---|
-| `create_screener`, `set_screener_universe`, `edit_filter_tree`, `set_screener_ranking`, `validate_screener` | Folded into `define_screener`. Four sequential mutations for one sentence is where correctness goes to die: partial definitions, stale revision numbers, node-id bookkeeping. |
-| `resolve_ticker` | Folded into `search_instruments` with an explicit provisional flag. A tool whose purpose is to mint an unverified reference should not be a standalone, unlabelled capability. |
-| `split_panel`, `apply_layout_template`, `duplicate_panel` | Expressible via `create_panel` + `set_panel_layout`. |
-| `maximize_panel` | Client-only state, no revision. A UI affordance, not an agent action. |
-| `bind_panel_source`, `set_panel_renderer`, `configure_chart_grid`, `configure_panel_view` | Mutate-in-place configuration. MVP creates panels with the right source/renderer and defaults; if they need to change, remove and recreate. |
-| `link_panels`, `unlink_panels`, `set_panel_selection` | The sync-channel model is a concept the use case never exercises. "Show X and Y" is two panels. |
-| `explain_result` | Correct and valuable, but "why is X in the list?" is not in the use case. First candidate to add after MVP. |
-| `describe_catalog_item` | `search_catalog` returns the schema inline; a second lookup isn't needed. |
-| `get_app_context`, `create_workspace`, `save_workspace`, `undo_change`, `get_change_history`, `restore_workspace_revision`, `preview_workspace_changes`, `apply_previewed_changes` | Workspace lifecycle and safety — not exercised by the use case. |
+| `create_screener`, `set_screener_universe`, `edit_filter_tree`, `set_screener_ranking`, `validate_screener` | Folded into `define_screener`. Four sequential mutations for one sentence is where correctness goes to die. |
+| `resolve_ticker` | Results rows carry a full ref, so the core loop never needs to mint one. Folds into `search_instruments` if that's kept. |
+| `set_panel_selection`, `link_panels`, `unlink_panels` | List → chart is a copy-out, not a live link. Selection stays a human UI affordance. |
+| `split_panel`, `apply_layout_template`, `duplicate_panel`, `maximize_panel` | Expressible via `create_panel` + `set_panel_layout`, or client-only UI state. |
+| `bind_panel_source`, `set_panel_renderer`, `configure_chart_grid`, `configure_panel_view` | Mutate-in-place config. MVP creates with the right source and defaults; recreate if it changes. (`bind_panel_source`'s *use case* is still what drag-onto-empty-chart calls — the tool isn't.) |
+| `explain_result` | Correct and valuable; "why is X in the list?" is not in the use case. First candidate after MVP. |
+| `describe_catalog_item` | `search_catalog` returns the schema inline. |
+| Workspace lifecycle/safety (`create_workspace`, `save_workspace`, `undo_change`, `get_change_history`, `restore_workspace_revision`, `preview_workspace_changes`, `apply_previewed_changes`), `get_app_context` | Not exercised by the use case. |
 | Chart authoring, similarity, follow-up, watchlist, alerts, backtest, export | Other features. |
 
-## Correctness blockers that no tool list fixes
+## Gaps no tool list fixes
 
-These stop step 1 from producing a true answer today regardless of which
-tools are registered. They are the actual MVP work.
-
-1. **No screener market-data adapter is wired.** Every real evaluation refuses
-   with `empty_universe` (`workbenchCompositionRoot.ts:108-112`). The backend
-   serves bars — the chart panel already reads them over HTTP — so this is an
-   adapter, not a data problem.
+1. **No screener evaluation is wired.** Every real evaluation refuses with
+   `empty_universe` (`workbenchCompositionRoot.ts:108-112`). Resolved by
+   evaluating server-side: the backend already has a filter-tree evaluator
+   (`backend/domain/filter_evaluation.py`, no caller) and the price panel; the
+   frontend already has the `ScreenerEvaluationPort { validate, execute }`
+   seam and an injection point (`WorkbenchCompositionOverrides.evaluationPort`).
+   Missing: one endpoint and one HTTP port implementation.
 2. **No "percent change over N sessions" field.** The catalog has
-   `field.price.close` and `indicator.gap_percent` (single session) but nothing
-   that expresses "gain over the past 48 hrs". Needs a ranking-capable field,
-   e.g. `field.price.change_pct` with a `lookback_sessions` parameter.
-   Without it the flagship sentence cannot be ranked.
-3. **Sector isn't plumbed to the frontend.** The backend already holds
-   `sector` and `market_cap` per ticker as static metadata
-   (`backend/domain/models/universe.py`, loaded by
-   `scripts/load_universe_metadata.py` from a Nasdaq screener CSV), but the
-   frontend's instrument directory is the honest-unavailable stub and
-   `InstrumentQuery` has no sector field (`setScreenerUniverse.ts:103-109`).
-   Wiring, not sourcing. Fundamentals (P/E, revenue) are a different story —
-   `NoFundamentalsPort` is the only implementation and there is no
-   point-in-time source — and are out of MVP scope.
-4. **No reference-data source.** `search_instruments` can't resolve names;
-   `resolve_ticker` mints provisional refs. Acceptable for MVP only if the
-   provisional status is surfaced to the user.
-5. **Daily bars only.** "48 hrs" is two trading sessions, not 48 wall-clock
-   hours. The agent must say so; `define_screener`'s response should carry
-   the granularity so it can.
+   `field.price.close` and `indicator.gap_percent` (single session), nothing
+   that ranks "gain over the past 48 hrs". Needs `field.price.change_pct`
+   with a `lookback_sessions` parameter — a window over the panel, computed
+   server-side.
+3. **Sector isn't plumbed to the frontend.** The backend holds `sector` and
+   `market_cap` per ticker as static metadata (`backend/domain/models/universe.py`,
+   loaded by `scripts/load_universe_metadata.py`); the frontend's instrument
+   directory is the honest-unavailable stub and `InstrumentQuery` has no
+   sector field. With server-side evaluation this becomes a backend universe
+   filter; the frontend only needs the sector *values* for `search_catalog`.
+   Fundamentals (P/E, revenue) have no source at all (`NoFundamentalsPort`)
+   and are out of MVP scope.
+4. **Results rows lack a full instrument ref** (see tool 4). Symbol and
+   exchange are derivable from `inst:<MIC>:<SYMBOL>`; `asset_type` is assumed
+   equity. Make the row carry the ref rather than every consumer deriving it.
+5. **The screener widget is a placeholder.** The default workspace seeds one
+   panel, `filter_builder` (`panelController.ts:124`), with no body. It needs a
+   read-only body rendering the definition from `readScreeners(doc)`.
+6. **No drag-and-drop exists in the shell.** The human copy-out path is new UI
+   work: drag a results row onto an empty cell (create chart) or an empty
+   chart panel (bind).
+7. **Daily bars only.** "48 hrs" is two trading sessions. `define_screener`'s
+   response carries the granularity so the agent can say so.
+
+## Work breakdown
+
+Three issues, independently buildable and testable, mergeable in any order.
+
+### Issue 1 — Server-side screener run (backend)
+
+`POST /screener/run` takes a screener definition, narrows the universe using
+the loaded metadata (sector, market cap), resolves fields over the price panel
+— including the new `field.price.change_pct(lookback_sessions)` — evaluates
+the filter tree with the existing evaluator, ranks, and returns a bounded
+result set: full instrument ref per row, ranking values, per-node pass/fail,
+`as_of`, provenance, counts, `truncated`. `dry_run: true` validates without
+executing, reporting every problem together. Stateless.
+Closes gaps 1 (server half), 2, 3 (backend half).
+
+### Issue 2 — Agent screener loop (frontend tools)
+
+- `HttpScreenerEvaluationPort` implementing the existing port against
+  Issue 1's endpoint, wired as the composition-root default. Tested through
+  the existing `evaluationPort` seam with a fake, so it doesn't wait on
+  Issue 1.
+- `define_screener` absorbing the five screener tools' domain logic.
+- `search_catalog` registered, with enumerated `field.sector` values.
+- `ScreenerMatch` / `get_screener_results` rows carry a full instrument ref.
+- Composition root registers exactly the core seven (plus optional two if
+  wanted); everything else removed from the root, not commented. Verify
+  `get_canvas_state` reports sources and runs. In-browser screener engine
+  deleted if nothing but tests still needs it. `tool-surface-status.md`
+  updated.
+Closes gaps 1 (frontend half), 3 (frontend half), 4, 7.
+
+### Issue 3 — Screener widget, seed layout, drag-to-chart (frontend UI)
+
+- Read-only `filter_builder` body rendering the active screener definition
+  (universe, conditions, ranking, limit) and re-rendering on notify.
+- Seed layout: screener widget left, results list right, empty grid below.
+- Drag a results row onto an empty cell → `createPanel(chart, instrument)`;
+  onto an empty chart panel → `bindPanelSource`. Same use cases the agent
+  tools call.
+Depends only on the document shape, which already exists (`readScreeners`),
+so it doesn't wait on Issue 1 or 2. Closes gaps 5, 6.
 
 ## Summary
 
 | Tool | Source | Verdict |
 |---|---|---|
-| `search_catalog` | `webmcp/discovery` (unregistered) | Register; add enumerated-value listing |
-| `search_instruments` | `webmcp/discovery` + `chart/tools/resolveTicker` | Merge; flag provisional results |
-| `define_screener` | — | New; absorbs 5 screener tools' domain logic |
+| `search_catalog` | `webmcp/discovery` (unregistered) | Register; add enumerated values |
+| `define_screener` | — | New; absorbs 5 screener tools |
 | `run_screener` | `webmcp/screener` (commented out) | Reuse |
-| `get_screener_results` | `results/tools` (active) | Reuse; confirm `name` in projection |
+| `get_screener_results` | `results/tools` (active) | Reuse; row carries full ref |
 | `create_panel` | `panels/tools` (active) | Reuse |
-| `get_canvas_state` | `workbench/tools` (commented out) | Reuse; verify sources + runs reported |
+| `get_canvas_state` | `workbench/tools` (commented out) | Reuse; verify sources + runs |
 | `remove_panel` | `panels/tools` (active) | Reuse |
-| `set_panel_layout` | `panels/tools` (active) | Reuse |
+| `set_panel_layout` (optional) | `panels/tools` (active) | Reuse |
+| `search_instruments` (optional) | `webmcp/discovery` + `resolveTicker` | Merge; flag provisional |

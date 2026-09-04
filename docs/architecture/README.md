@@ -11,4 +11,4 @@ elsewhere (ticket files under `docs/plan/`, behavioral specs under
 | [Workspace, Revisions & the Common Tool Contract](workspace-revisions.md) | The mutation envelope, stable-ID scheme, optimistic concurrency, idempotency replay, change history/undo, and the extensible operation registry every mutating tool in the new WebMCP surface builds on |
 | [Discovery & Catalog](discovery-and-catalog.md) | The catalog registry, instrument resolution, and the three read-only discovery tools |
 | [Tool Surface Status](tool-surface-status.md) | Which tools are actually registered on `/` today vs. commented out or unwired, and how to restore them |
-| [Tool Surface MVP](tool-surface-mvp.md) | The 9-tool set derived from the MVP use case forward, overlap with existing tools, and the data/adapter blockers that no tool list fixes |
+| [Tool Surface MVP](tool-surface-mvp.md) | The 7-tool core set derived from the MVP use case forward, how data travels (screener → list live, list → chart copy-out), gaps no tool list fixes, and the three-issue work breakdown |
