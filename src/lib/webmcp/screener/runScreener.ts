@@ -14,7 +14,13 @@
 // must not change idempotency.ts's shared type to fit.
 
 import { builtinCatalogRegistry, type CatalogRegistry } from '../../catalog/registry';
-import { bindPanelSource, readPanelState, type PanelUseCaseDeps } from '../../panels/application';
+import {
+	bindPanelSource,
+	createPanel,
+	readPanelState,
+	type PanelUseCaseDeps
+} from '../../panels/application';
+import { resolveAutoRect, visibleOccupied } from '../../panels/application/support';
 import type { LayoutTemplateRegistry } from '../../panels/domain/layoutTemplates';
 import type { PanelRegistry } from '../../panels/registry/panelKindRegistry';
 import type { SourceRendererRegistry } from '../../panels/registry/sourceRendererRegistry';
@@ -163,9 +169,17 @@ export interface PanelBindingDeps {
 // bindPanelSource application function every other panel source change
 // uses -- so replacing a prior binding, and recording the change through
 // RevisionService/change-history, both come for free. Best-effort (AC2):
-// any failure here (no results_table panel, a rejected source, a workspace
-// that vanished between the run and this call) is swallowed by the caller,
-// never surfacing as a run_screener failure.
+// any failure here (a rejected source, a workspace that vanished between
+// the run and this call) is swallowed by the caller, never surfacing as a
+// run_screener failure.
+//
+// T-0020-10: when no results_table panel exists yet, one is created first
+// via the same createPanel() path an agent's create_panel call would use --
+// see spec.md's "Create-if-absent results panel" -- then bound exactly as
+// the existing-panel branch always has. Sized 2x1 (narrower than the kind's
+// own 4x2 defaultSize) and auto-placed by resolveAutoRect, the same
+// placement helper createPanel itself falls back to when no explicit rect
+// is given -- no new placement logic.
 function bindRunToResultsPanel(
 	deps: WorkbenchDeps,
 	panelBinding: PanelBindingDeps,
@@ -174,10 +188,6 @@ function bindRunToResultsPanel(
 ): void {
 	const doc = deps.repository.get(workspaceId);
 	if (!doc) {
-		return;
-	}
-	const target = readPanelState(doc).panels.find((p) => p.kind === 'results_table');
-	if (!target) {
 		return;
 	}
 	const panelDeps: PanelUseCaseDeps = {
@@ -191,9 +201,27 @@ function bindRunToResultsPanel(
 		sourceRenderer: panelBinding.sourceRenderer,
 		templates: panelBinding.templates
 	};
+	const state = readPanelState(doc);
+	const existing = state.panels.find((p) => p.kind === 'results_table');
+	let targetId: string;
+	if (existing) {
+		targetId = existing.id;
+	} else {
+		const rect = resolveAutoRect({ colSpan: 2, rowSpan: 1 }, visibleOccupied(state.panels));
+		const created = createPanel(panelDeps, {
+			context: { actor: 'agent' },
+			kind: 'results_table',
+			rect
+		});
+		const [newPanelId] = created.affectedIds;
+		if (!newPanelId) {
+			return;
+		}
+		targetId = newPanelId;
+	}
 	bindPanelSource(panelDeps, {
 		context: { actor: 'agent' },
-		panelId: target.id,
+		panelId: targetId,
 		source: { type: 'screener_results', ref: { run_id: runId } }
 	});
 }

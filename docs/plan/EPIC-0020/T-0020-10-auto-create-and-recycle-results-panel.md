@@ -1,7 +1,7 @@
 # T-0020-10: Auto-create the results_table panel when absent, and recycle it on every rerun
 
 **Epic:** EPIC-0020
-**Status:** Open
+**Status:** Done
 
 ## Goal
 
@@ -73,3 +73,17 @@ no new domain contracts.
 
 None — no new domain models or Protocols. This is new control flow inside an
 existing function using an existing sibling use case (`createPanel`).
+
+## Implementation Notes
+
+`bindRunToResultsPanel()` (`src/lib/webmcp/screener/runScreener.ts`) now computes an
+auto-placed 2x1 rect via `resolveAutoRect({ colSpan: 2, rowSpan: 1 },
+visibleOccupied(state.panels))` (both re-exported from
+`../../panels/application/support`) and passes that full `GridRect` to `createPanel()`
+when no `results_table` panel is found, then binds the newly created panel's id
+(`created.affectedIds[0]`) exactly as the existing-panel branch already did. The
+existing-panel branch is unchanged apart from being folded into the same `targetId`
+variable. Mutation-checked per the AC: temporarily forced the `if (existing)` branch to
+`if (false && existing)` so the create path always ran, reran the suite, and confirmed
+`test_runScreener_rerunAfterAutoCreate_recyclesSamePanelRatherThanCreatingAnother` (and
+several sibling rebind tests) failed as expected, then reverted.
