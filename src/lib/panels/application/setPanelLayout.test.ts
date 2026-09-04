@@ -45,14 +45,16 @@ describe('setPanelLayout', () => {
 		const deps = createPanelTestHarness();
 		createPanel(deps, {
 			context: ctx(),
-			kind: 'chart',
-			rect: { col: 0, row: 0, colSpan: 3, rowSpan: 2 }
-		}); // minSize 2x2
+			kind: 'results_table',
+			rect: { col: 0, row: 0, colSpan: 4, rowSpan: 2 }
+		}); // minSize 2x1
 
 		try {
 			setPanelLayout(deps, {
 				context: ctx(),
-				placements: [{ panelId: 'panel_chart_1', rect: { col: 0, row: 0, colSpan: 1, rowSpan: 1 } }]
+				placements: [
+					{ panelId: 'panel_results_table_1', rect: { col: 0, row: 0, colSpan: 1, rowSpan: 1 } }
+				]
 			});
 			expect.fail('expected a below_minimum error');
 		} catch (err) {
@@ -60,7 +62,7 @@ describe('setPanelLayout', () => {
 			expect((err as PanelOperationError).code).toBe('below_minimum');
 		}
 		const state = readPanelState(deps.repository.get(deps.workspaceId)!);
-		expect(state.panels[0]!.rect).toEqual({ col: 0, row: 0, colSpan: 3, rowSpan: 2 });
+		expect(state.panels[0]!.rect).toEqual({ col: 0, row: 0, colSpan: 4, rowSpan: 2 });
 	});
 
 	it('AC7: out of bounds fails naming the grid bounds, and no panel moves', () => {

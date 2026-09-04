@@ -32,8 +32,8 @@ describe('duplicatePanel', () => {
 		expect(original.rect, 'the original must be untouched').toEqual({
 			col: 0,
 			row: 0,
-			colSpan: 3,
-			rowSpan: 2
+			colSpan: 1,
+			rowSpan: 1
 		});
 	});
 

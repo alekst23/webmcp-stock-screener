@@ -36,15 +36,15 @@ describe('splitPanel', () => {
 
 	it('AC7: a split that would leave a half below the minimum size fails, and no panel is split or resized', () => {
 		const deps = createPanelTestHarness();
-		// chart minSize is 2x2; a 3x2 footprint split vertically yields 2x2/1x2 -- the created half is below minimum.
+		// results_table minSize is 2x1; a 3x2 footprint split vertically yields 2x2/1x2 -- the created half is below minimum.
 		createPanel(deps, {
 			context: ctx(),
-			kind: 'chart',
+			kind: 'results_table',
 			rect: { col: 0, row: 0, colSpan: 3, rowSpan: 2 }
 		});
 
 		try {
-			splitPanel(deps, { context: ctx(), panelId: 'panel_chart_1', direction: 'vertical' });
+			splitPanel(deps, { context: ctx(), panelId: 'panel_results_table_1', direction: 'vertical' });
 			expect.fail('expected a below_minimum error');
 		} catch (err) {
 			expect(err).toBeInstanceOf(PanelOperationError);

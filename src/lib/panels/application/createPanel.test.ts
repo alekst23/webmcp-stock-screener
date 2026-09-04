@@ -29,7 +29,7 @@ describe('createPanel', () => {
 		expect(panel.id).toBe('panel_chart_1');
 		expect(panel.title).toBe('Chart');
 		expect(panel.renderer).toBe('chart_grid');
-		expect(panel.rect).toEqual({ col: 0, row: 0, colSpan: 3, rowSpan: 2 });
+		expect(panel.rect).toEqual({ col: 0, row: 0, colSpan: 1, rowSpan: 1 });
 	});
 
 	it('AC1: explicit placement is honored exactly when valid and unoccupied', () => {

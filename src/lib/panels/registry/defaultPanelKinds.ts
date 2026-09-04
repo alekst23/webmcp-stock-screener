@@ -75,8 +75,8 @@ const KIND_SPECS: KindSpec[] = [
 	{
 		kind: 'chart',
 		defaultTitle: 'Chart',
-		defaultSize: { colSpan: 3, rowSpan: 2 },
-		minSize: { colSpan: 2, rowSpan: 2 },
+		defaultSize: { colSpan: 1, rowSpan: 1 },
+		minSize: { colSpan: 1, rowSpan: 1 },
 		linkChannels: ['symbol', 'timeframe', 'result_selection', 'crosshair'],
 		bindingTypes: ['screener_results', 'watchlist', 'symbol_list', 'panel_reference'],
 		defaultRenderer: 'chart_grid',

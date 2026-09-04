@@ -168,8 +168,8 @@ describe('createChartPanelKindDefinition', () => {
 
 		expect(definition.kind).toBe(CHART_PANEL_KIND);
 		expect(definition.defaultTitle).toBe('Chart');
-		expect(definition.defaultSize).toEqual({ colSpan: 3, rowSpan: 2 });
-		expect(definition.minSize).toEqual({ colSpan: 2, rowSpan: 2 });
+		expect(definition.defaultSize).toEqual({ colSpan: 1, rowSpan: 1 });
+		expect(definition.minSize).toEqual({ colSpan: 1, rowSpan: 1 });
 		expect(definition.linkChannels).toEqual([
 			'symbol',
 			'timeframe',

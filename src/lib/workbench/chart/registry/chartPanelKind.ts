@@ -62,8 +62,8 @@ import { setChartPanelRuntimeDeps, type ChartPanelRuntimeDeps } from './chartPan
 // Matches defaultPanelKinds.ts's own KIND_SPECS entry for 'chart' -- kept
 // identical here so replacing the placeholder changes nothing about layout
 // or linking, only rendering, validation, and the source/renderer contract.
-const DEFAULT_SIZE: GridSize = { colSpan: 3, rowSpan: 2 };
-const MIN_SIZE: GridSize = { colSpan: 2, rowSpan: 2 };
+const DEFAULT_SIZE: GridSize = { colSpan: 1, rowSpan: 1 };
+const MIN_SIZE: GridSize = { colSpan: 1, rowSpan: 1 };
 const LINK_CHANNELS: PanelLinkChannel[] = ['symbol', 'timeframe', 'result_selection', 'crosshair'];
 
 function adaptToConfigValidation<T extends Record<string, unknown>>(

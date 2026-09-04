@@ -107,9 +107,8 @@ describe('createChartFromDrop (AC1)', () => {
 		const state = readPanelState(deps.repository.get(deps.workspaceId)!);
 		const panel = state.panels.find((p) => p.id === panelId)!;
 		expect(panel.kind).toBe(CHART_PANEL_KIND);
-		// The chart kind's own defaultSize (3x2), anchored at the dropped-on
-		// cell -- not a bare 1x1, which would fail chart's 2x2 minSize.
-		expect(panel.rect).toEqual({ col: 2, row: 1, colSpan: 3, rowSpan: 2 });
+		// The chart kind's own defaultSize (1x1), anchored at the dropped-on cell.
+		expect(panel.rect).toEqual({ col: 2, row: 1, colSpan: 1, rowSpan: 1 });
 		expect(panel.source?.type).toBe(CHART_SOURCE_TYPE);
 	});
 
