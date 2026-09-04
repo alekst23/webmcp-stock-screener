@@ -3,10 +3,12 @@
 // A dedicated GET rather than a field on getWorkspace: getWorkspace runs
 // purely client-side and never touches the network (docs/plan.md's
 // "Sessions" section), so it has nothing to say about server-side data.
-// backend/api/routes/panel.py serves this (bug fix, see git history:
-// T-1015-4 deleted the original backend/api/routes/research.py's
-// GET /api/research/panel without noticing this live new-surface caller;
-// panel.py is the new-surface replacement).
+// backend/api/routes/panel.py serves this at GET /api/panel/status (bug
+// fix, see git history: T-1015-4 deleted the original
+// backend/api/routes/research.py's GET /api/research/panel without
+// noticing this live new-surface caller; panel.py is the new-surface
+// replacement, but this file's fetch call kept pointing at the old,
+// deleted URL until hotfix/panel-status-route repointed it here).
 
 // T-1015-5: used to be shared with apiEngine.ts's networked tool calls via
 // webmcp/types.ts's ApiClientConfig, which also carried an
@@ -44,9 +46,9 @@ export interface PanelStatus {
 }
 
 export async function fetchPanelStatus(config: ApiClientConfig): Promise<PanelStatus> {
-	const response = await fetch(`${config.baseUrl}/api/research/panel`);
+	const response = await fetch(`${config.baseUrl}/api/panel/status`);
 	if (!response.ok) {
-		throw new Error(`research backend returned ${response.status}: ${response.statusText}`);
+		throw new Error(`panel status endpoint returned ${response.status}: ${response.statusText}`);
 	}
 	const body = (await response.json()) as BackendPanelStatus;
 	return {
