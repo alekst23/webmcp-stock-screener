@@ -206,6 +206,36 @@ describe('createHttpChartSeries failures', () => {
 		expect(error.reason).toBe('unknown_instrument');
 	});
 
+	it('states the panel data as-of date on a 404 when the backend reports one', async () => {
+		const { impl } = stubFetch(() =>
+			jsonResponse(
+				{
+					detail: {
+						message: 'Unknown ticker "NVDA": no bars for it in the loaded panel.',
+						as_of: '2026-08-30'
+					}
+				},
+				{ status: 404, statusText: 'Not Found' }
+			)
+		);
+		const error = await expectChartSeriesError(
+			createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request())
+		);
+		expect(error.reason).toBe('unknown_instrument');
+		expect(error.message).toContain('instrument_nvda');
+		expect(error.message).toContain('2026-08-30');
+	});
+
+	it('omits any as-of statement on a 404 when the backend does not report one', async () => {
+		const { impl } = stubFetch(() =>
+			jsonResponse({ detail: 'Unknown ticker' }, { status: 404, statusText: 'Not Found' })
+		);
+		const error = await expectChartSeriesError(
+			createHttpChartSeries(config({ fetchImpl: impl })).fetchSeries(request())
+		);
+		expect(error.message).toBe('This price source carries no data for instrument "instrument_nvda".');
+	});
+
 	it('wraps a non-OK, non-404 response, keeping the status reachable through the cause', async () => {
 		const { impl } = stubFetch(() =>
 			jsonResponse({ detail: 'no panel' }, { status: 503, statusText: 'Service Unavailable' })
