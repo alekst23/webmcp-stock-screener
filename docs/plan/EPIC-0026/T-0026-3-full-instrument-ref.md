@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-0026 (Agent Screener Loop)
 **Design**: docs/design/screener-core/
-**Status**: Not started
+**Status**: Done
 **Depends on**: T-0026-1, T-0026-2
 **Blocks**: T-0026-5 (composition root wires this shape into the registered `get_screener_results`)
 **Resolves**: #26
@@ -59,6 +59,50 @@ fabricating a placeholder ref.
    typecheck errors is required evidence, not merely a passing test file.
 5. No change to `run_screener`'s port wiring, retention behavior, or the
    composition root — those are T-0026-4/5/6.
+
+## Solution Approach
+
+**Type widening (`src/lib/screener/run.ts`)**: `ScreenerMatch` gains
+`symbol: string`, `exchange: string`, `assetType: string`, `name: string`
+right after `instrumentId`. `toWireScreenerMatch` emits them as
+`instrument_id, symbol, exchange, asset_type, name` (matching AC2's field
+order), before `rank`/`composite_score`/etc.
+
+**New shared parser (`src/lib/surface/ids.ts`)**: `makeInstrumentId` already
+owns the `inst:<MIC>:<SYMBOL>` grammar; add its inverse,
+`parseInstrumentId(value): { exchangeMic, symbol } | null`, returning `null`
+for anything that doesn't match `INSTRUMENT_ID` rather than throwing. Domain
+layer, so `screener/engine` (infra) may import it without a layering
+violation (`catalog/types.ts` already does).
+
+**In-browser engine (`src/lib/screener/engine/engine.ts`)**: a small
+`deriveInstrumentRef(instrumentId)` helper calls `parseInstrumentId`; when it
+parses, `symbol`/`exchange` come from the id, otherwise `symbol` falls back
+to the raw instrumentId and `exchange` to `'XUNK'` (mirrors
+`resolveTicker.ts`'s provisional-unknown-exchange convention, needed because
+`engine.test.ts`'s fixtures use bare ids like `I1`, not the `inst:` shape).
+`assetType` is always `'equity'` and `name` always equals `symbol` -- both
+honest placeholders, since this project has no reference-data source
+anywhere (`src/lib/discovery/ports.ts`, `resolveTicker.ts`) to source a real
+asset classification or company name from. `execute()`'s match-building map
+spreads this helper's result into each `ScreenerMatch` literal.
+
+**`get_screener_results` wire rows (`src/lib/results/domain/page.ts`)**:
+`ResultRow` gains the same four fields, sourced directly from the
+`ScreenerMatch` passed into `buildRow` (not through the existing
+`TickerResolver`/`ticker` mechanism, which stays untouched -- it is a
+separate, already-shipped display-ticker lookup this ticket does not touch
+or remove). `toWireResultRow` emits `symbol, exchange, asset_type, name`
+alongside the existing fields. `ProjectedRow` (`projection.ts`) inherits them
+for free since it extends `ResultRow`.
+
+**Fixture/caller updates**: every literal that constructs a `ScreenerMatch`
+or a `ResultRow`/`ProjectedRow` across production and test code gets the new
+fields. Enumerated by grepping for `ScreenerMatch`, `nodeEvaluations:`,
+`compositeScore:`, and `resultId:` repo-wide (not just files that mention
+`ScreenerMatch` by name, since several test files build the shape inline
+without importing the type) -- this is the exact gap the reverted first
+attempt left open (see Description).
 
 ## Out of Scope
 

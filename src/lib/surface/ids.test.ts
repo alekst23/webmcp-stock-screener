@@ -4,7 +4,8 @@ import {
 	isCatalogItemId,
 	isInstrumentId,
 	makeCatalogItemId,
-	makeInstrumentId
+	makeInstrumentId,
+	parseInstrumentId
 } from './ids';
 
 describe('instrument IDs', () => {
@@ -49,6 +50,22 @@ describe('instrument IDs', () => {
 			() => makeInstrumentId('NASDAQ', 'AAPL'),
 			'a non-MIC exchange code was accepted'
 		).toThrow(/MIC/);
+	});
+
+	it('test_parseInstrumentId_recovers_the_mic_and_symbol_it_was_built_from', () => {
+		const parsed = parseInstrumentId(makeInstrumentId('XNAS', 'AAPL'));
+		expect(parsed, 'expected a well-formed instrument ID to parse').not.toBeNull();
+		expect(parsed?.exchangeMic, 'expected the MIC recovered verbatim').toBe('XNAS');
+		expect(parsed?.symbol, 'expected the symbol recovered verbatim').toBe('AAPL');
+	});
+
+	it('test_parseInstrumentId_returns_null_rather_than_throwing_for_a_non_instrument_id', () => {
+		for (const value of ['AAPL', 'I1', 'inst:XNAS:', '']) {
+			expect(
+				parseInstrumentId(value),
+				`expected "${value}" to parse as null, not throw or fabricate parts`
+			).toBeNull();
+		}
 	});
 });
 

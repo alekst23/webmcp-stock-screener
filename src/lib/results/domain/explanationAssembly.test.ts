@@ -157,6 +157,10 @@ describe('assembleRanking', () => {
 			[
 				{
 					instrumentId: 'inst_1',
+					symbol: 'SYM1',
+					exchange: 'XNAS',
+					assetType: 'equity',
+					name: 'Test Instrument 1',
 					rank: 1,
 					compositeScore: null,
 					rankingValues: { f: 100 },
@@ -164,6 +168,10 @@ describe('assembleRanking', () => {
 				},
 				{
 					instrumentId: 'inst_2',
+					symbol: 'SYM2',
+					exchange: 'XNAS',
+					assetType: 'equity',
+					name: 'Test Instrument 2',
 					rank: 2,
 					compositeScore: null,
 					rankingValues: { f: 50 },
@@ -191,6 +199,10 @@ describe('assembleRanking', () => {
 		const run = withRun({ rankingSpec }, [
 			{
 				instrumentId: 'inst_1',
+				symbol: 'SYM1',
+				exchange: 'XNAS',
+				assetType: 'equity',
+				name: 'Test Instrument 1',
 				rank: 1,
 				compositeScore: null,
 				rankingValues: { f: null },

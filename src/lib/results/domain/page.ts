@@ -35,6 +35,14 @@ export interface ResultRow {
 	// of, an identifier. `null` when the caller's ticker lookup could not
 	// resolve one; an honest absence, not a fabricated symbol.
 	ticker: string | null;
+	// The full instrument reference (T-0026-3), carried straight off the
+	// match rather than through the ticker resolver above: ScreenerMatch now
+	// sources these itself (screener/run.ts), so a row needs no second
+	// lookup to expose them on the wire.
+	symbol: string;
+	exchange: string;
+	assetType: string;
+	name: string;
 	rank: number;
 	compositeScore: number | null;
 }
@@ -85,6 +93,10 @@ export function buildRow(
 		resultId: mintResultId(runId, match.rank),
 		instrumentId: match.instrumentId,
 		ticker: resolveTicker(match.instrumentId),
+		symbol: match.symbol,
+		exchange: match.exchange,
+		assetType: match.assetType,
+		name: match.name,
 		rank: match.rank,
 		compositeScore: match.compositeScore
 	};
@@ -242,6 +254,10 @@ export function toWireResultRow(row: ResultRow): Record<string, unknown> {
 		result_id: row.resultId,
 		instrument_id: row.instrumentId,
 		ticker: row.ticker,
+		symbol: row.symbol,
+		exchange: row.exchange,
+		asset_type: row.assetType,
+		name: row.name,
 		rank: row.rank,
 		composite_score: row.compositeScore
 	};

@@ -380,6 +380,10 @@ describe('ResultsTablePanel: explain view (AC9)', () => {
 			matches: [
 				{
 					instrumentId: 'inst_1',
+					symbol: 'SYM1',
+					exchange: 'XNAS',
+					assetType: 'equity',
+					name: 'Test Instrument 1',
 					rank: 1,
 					compositeScore: 1,
 					rankingValues: {},

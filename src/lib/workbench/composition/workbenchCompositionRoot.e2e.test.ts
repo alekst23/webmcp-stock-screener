@@ -50,6 +50,10 @@ function fixtureProvenance(): MarketDataProvenance {
 function testMatch(instrumentId: string, rank: number): ScreenerMatch {
 	return {
 		instrumentId,
+		symbol: instrumentId,
+		exchange: 'XNAS',
+		assetType: 'equity',
+		name: instrumentId,
 		rank,
 		compositeScore: null,
 		rankingValues: {},

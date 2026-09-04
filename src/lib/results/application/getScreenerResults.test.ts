@@ -55,12 +55,31 @@ describe('getScreenerResults: paging (AC1, AC8)', () => {
 	});
 });
 
+describe('getScreenerResults: rows carry the full instrument reference (T-0026-3, AC2)', () => {
+	it('exposes symbol, exchange, assetType and name on every row', () => {
+		const store = testPinnedRunStore(testRun('run_1', 1));
+		const outcome = getScreenerResults(store, { runId: 'run_1' });
+		if ('available' in outcome || 'rejected' in outcome) {
+			throw new Error(`unexpected outcome: ${JSON.stringify(outcome)}`);
+		}
+		const [row] = outcome.rows;
+		expect(row?.symbol, 'expected symbol on the row').toBe('SYM1');
+		expect(row?.exchange, 'expected exchange on the row').toBe('XNAS');
+		expect(row?.assetType, 'expected assetType on the row').toBe('equity');
+		expect(row?.name, 'expected name on the row').toBe('Test Instrument 1');
+	});
+});
+
 describe('getScreenerResults: sort applied before the page is cut (AC2, AC3)', () => {
 	it('a page boundary never resets the global sort order', () => {
 		const run = {
 			...testRun('run_1', 5),
 			matches: [1, 2, 3, 4, 5].map((rank) => ({
 				instrumentId: `inst_${rank}`,
+				symbol: `SYM${rank}`,
+				exchange: 'XNAS',
+				assetType: 'equity',
+				name: `Test Instrument ${rank}`,
 				rank,
 				compositeScore: null,
 				rankingValues: { 'field.score': 100 - rank }, // inverse of rank
@@ -112,6 +131,10 @@ describe('getScreenerResults: grouping is reflected in the page (AC4)', () => {
 			matches: [
 				{
 					instrumentId: 'inst_1',
+					symbol: 'SYM1',
+					exchange: 'XNAS',
+					assetType: 'equity',
+					name: 'Test Instrument 1',
 					rank: 1,
 					compositeScore: null,
 					rankingValues: { 'field.sector': 1 },
@@ -119,6 +142,10 @@ describe('getScreenerResults: grouping is reflected in the page (AC4)', () => {
 				},
 				{
 					instrumentId: 'inst_2',
+					symbol: 'SYM2',
+					exchange: 'XNAS',
+					assetType: 'equity',
+					name: 'Test Instrument 2',
 					rank: 2,
 					compositeScore: null,
 					rankingValues: { 'field.sector': 2 },

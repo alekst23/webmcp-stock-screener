@@ -18,6 +18,10 @@ function provenance(): MarketDataProvenance {
 function match(instrumentId: string, rank: number): ScreenerMatch {
 	return {
 		instrumentId,
+		symbol: instrumentId,
+		exchange: 'XNAS',
+		assetType: 'equity',
+		name: instrumentId,
 		rank,
 		compositeScore: 1 / rank,
 		rankingValues: { 'field.price': 100 },

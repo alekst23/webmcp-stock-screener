@@ -79,6 +79,19 @@ export interface ScreenerWarning {
 // `explain_result` a lookup.
 export interface ScreenerMatch {
 	instrumentId: string;
+	// The full instrument reference (T-0026-3), alongside instrumentId, so a
+	// consumer (get_screener_results -> create_panel, or a human dragging a
+	// result row onto a chart) can act on a row without a second lookup.
+	// EPIC-0025's server-side endpoint sources these from a real
+	// InstrumentRef; the in-browser engine derives them from instrumentId's
+	// own `inst:<MIC>:<SYMBOL>` shape (surface/ids.ts's parseInstrumentId) --
+	// assetType assumed 'equity' and name falling back to symbol, since this
+	// project has no reference-data source anywhere (same documented
+	// limitation as resolveTicker.ts, not a new gap).
+	symbol: string;
+	exchange: string;
+	assetType: string;
+	name: string;
 	// 1-based: rank 1 is the best match, matching how a person reads a
 	// leaderboard rather than an array index.
 	rank: number;
@@ -283,6 +296,10 @@ function toWireWarning(warning: ScreenerWarning): Record<string, unknown> {
 export function toWireScreenerMatch(match: ScreenerMatch): Record<string, unknown> {
 	return {
 		instrument_id: match.instrumentId,
+		symbol: match.symbol,
+		exchange: match.exchange,
+		asset_type: match.assetType,
+		name: match.name,
 		rank: match.rank,
 		composite_score: match.compositeScore,
 		ranking_values: match.rankingValues,
