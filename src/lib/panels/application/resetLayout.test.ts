@@ -16,7 +16,11 @@ function ctx() {
 describe('resetLayout', () => {
 	it('spec.md "Reset the workspace layout to the default seed" / happy path: restores the default seed from a modified arrangement', () => {
 		const deps = createPanelTestHarness();
-		createPanel(deps, { context: ctx(), kind: 'chart', rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 } });
+		createPanel(deps, {
+			context: ctx(),
+			kind: 'chart',
+			rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 }
+		});
 
 		const envelope = resetLayout(deps, { context: ctx() });
 
@@ -28,9 +32,10 @@ describe('resetLayout', () => {
 		const expected = DEFAULT_SEED_PANELS.map((s) => ({ kind: s.kind, rect: s.rect })).sort((a, b) =>
 			a.kind.localeCompare(b.kind)
 		);
-		expect(kindsAndRects, `expected the default seed arrangement, got ${JSON.stringify(kindsAndRects)}`).toEqual(
-			expected
-		);
+		expect(
+			kindsAndRects,
+			`expected the default seed arrangement, got ${JSON.stringify(kindsAndRects)}`
+		).toEqual(expected);
 		expect(
 			envelope.affectedIds.sort(),
 			'expected every newly-created panel named as affected'
@@ -42,7 +47,11 @@ describe('resetLayout', () => {
 	// fails if the seed constant regresses back to two columns.
 	it('resets filter_builder to a one-column, full-height footprint', () => {
 		const deps = createPanelTestHarness();
-		createPanel(deps, { context: ctx(), kind: 'chart', rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 } });
+		createPanel(deps, {
+			context: ctx(),
+			kind: 'chart',
+			rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 }
+		});
 
 		resetLayout(deps, { context: ctx() });
 
@@ -113,9 +122,6 @@ describe('resetLayout', () => {
 			afterSecondReset.map((p) => p.id).sort(),
 			'expected panel ids to be literally unchanged on a no-op reset, not newly minted'
 		).toEqual(afterFirstReset.map((p) => p.id).sort());
-		expect(
-			envelope.affectedIds,
-			'expected no affected ids reported for a no-op reset'
-		).toEqual([]);
+		expect(envelope.affectedIds, 'expected no affected ids reported for a no-op reset').toEqual([]);
 	});
 });
