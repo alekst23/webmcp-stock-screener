@@ -155,6 +155,62 @@ makes EPIC-1010's `explain_result` a lookup rather than a re-evaluation.
   and `backend/infra/pandas_engine.py`. EPIC-1015 retires the old surface
   later.
 
+## Amendment (EPIC-0025 / EPIC-0026)
+
+### `WorkspaceDocument.screenerId` becomes the current-screener pointer
+
+The field has existed since EPIC-1006 (`screenerId: ResourceId | null`,
+seeded `null`) but was never written by any tool. `define_screener`
+(replacing `create_screener` as the `scr_` minter) reads and writes it:
+
+| Behavior | Detail |
+|---|---|
+| No `screener_id` in the call, field is `null` | mint a new screener, write its id here |
+| No `screener_id` in the call, field is set | that screener's id is the target — full-replace its definition as a new revision |
+| Explicit `screener_id` in the call | that id is the target regardless of the pointer; rejected if unknown |
+
+The pointer is never cleared by `define_screener` — only a future
+multi-screener management tool (not part of this program) would need to
+repoint or clear it.
+
+### `PinnedRunStore` default retention policy
+
+`RunRetentionPolicy.shouldEvict(run, now, index)` (`index` = position from
+most recent, 0-based) is already pluggable — EPIC-1009 wired the default
+to `keepAllRuns` (`shouldEvict` always `false`) as an explicit, named
+placeholder pending this decision. EPIC-0026 changes the default to evict
+at `index >= 1`: only the most recently pinned run per store survives a
+new `putRun`. No interface change — the seam was already correctly
+shaped for this.
+
+### `HttpScreenerEvaluationPort`
+
+Implements the existing `ScreenerEvaluationPort` (`validate`/`execute`)
+against EPIC-0025's `POST /screener/run`:
+
+| Port method | Request | Response mapping |
+|---|---|---|
+| `execute({definition, runId})` | `{universe, conditions, ranking, limit}`, `dry_run: false` | endpoint response reshaped into `ScreenerRun` (see "Pinned run" above); `run_id` is still minted client-side and never sent to the endpoint — the endpoint is stateless |
+| `validate(definition)` | same body, `dry_run: true` | endpoint's collected problem list reshaped into the existing validation report type |
+
+Wired as the composition root's default `evaluationPort`, replacing the
+honest-unavailable in-browser engine. The `evaluationPort` override seam
+(`WorkbenchCompositionOverrides`) is unchanged — tests keep substituting a
+fake without touching this port.
+
+### `ScreenerMatch` row extended
+
+| Field | Type | Description |
+|---|---|---|
+| `instrument_id` | `string` | unchanged |
+| `symbol` | `string` | **new** |
+| `exchange` | `string` | **new** |
+| `asset_type` | `string` | **new** |
+| `name` | `string \| null` | **new** |
+
+Added so a chart panel can be created directly from a `get_screener_results`
+row (`create_panel`'s `instrument` source shape) without a second lookup.
+
 ---
 
 *Product design: [spec.md](spec.md)*
