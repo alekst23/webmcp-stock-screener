@@ -32,6 +32,10 @@ function provenance(): MarketDataProvenance {
 function match(instrumentId: string, rank: number): ScreenerMatch {
 	return {
 		instrumentId,
+		symbol: instrumentId,
+		exchange: 'XNAS',
+		assetType: 'equity',
+		name: instrumentId,
 		rank,
 		compositeScore: 1 / rank,
 		rankingValues: { 'field.price': 100 },
@@ -195,6 +199,10 @@ describe('toWireScreenerRun / toWireScreenerMatch', () => {
 	it('test_toWireScreenerMatch_emits_snake_case_keys_including_node_evaluations', () => {
 		const wire = toWireScreenerMatch(match('inst:XNAS:AAPL', 1));
 		expect(wire.instrument_id, 'instrument_id must be present').toBe('inst:XNAS:AAPL');
+		expect(wire.symbol, 'symbol must be present').toBe('inst:XNAS:AAPL');
+		expect(wire.exchange, 'exchange must be present').toBe('XNAS');
+		expect(wire.asset_type, 'asset_type must be present').toBe('equity');
+		expect(wire.name, 'name must be present').toBe('inst:XNAS:AAPL');
 		expect(wire.composite_score, 'composite_score must be present').toBe(1);
 		expect(wire.ranking_values, 'ranking_values must be present').toEqual({ 'field.price': 100 });
 		const nodeEvaluations = wire.node_evaluations as Record<string, Record<string, unknown>>;

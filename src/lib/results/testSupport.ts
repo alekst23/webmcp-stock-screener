@@ -29,6 +29,10 @@ export function testProvenance(overrides: { asOf?: string } = {}): MarketDataPro
 export function testMatch(rank: number, overrides: Partial<ScreenerMatch> = {}): ScreenerMatch {
 	return {
 		instrumentId: `inst_${rank}`,
+		symbol: `SYM${rank}`,
+		exchange: 'XNAS',
+		assetType: 'equity',
+		name: `Test Instrument ${rank}`,
 		rank,
 		compositeScore: 1 / rank,
 		rankingValues: { 'field.price': 100 },

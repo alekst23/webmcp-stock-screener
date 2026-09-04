@@ -9,7 +9,7 @@
 
 import type { ResourceId } from '../workbench/domain/ids';
 import {
-	keepAllRuns,
+	keepMostRecentRun,
 	type PinnedRunStore,
 	type RunNotAvailable,
 	type RunRetentionPolicy
@@ -18,11 +18,13 @@ import type { ScreenerMatch, ScreenerRun } from './run';
 
 export interface PinnedRunStoreOptions {
 	// Decides whether a stored run may be reclaimed. Defaults to ports.ts's
-	// keepAllRuns -- the working assumption from spec.md Open Question 1:
-	// runs are retained for the life of the workspace session and eviction
-	// is an explicit, observable error (AC5/AC11) rather than a TTL. A
-	// constructor parameter, not a hard-coded rule, so the cross-epic
-	// retention decision can change later without touching a call site.
+	// keepMostRecentRun (T-0026-6): only one panel is ever bound to a run in
+	// this surface, so keeping anything behind the most recently pinned run
+	// serves nothing and just accumulates for the life of the session.
+	// Eviction is an explicit, observable error (AC5/AC11), not a silent
+	// drop. A constructor parameter, not a hard-coded rule, so a caller that
+	// legitimately wants different retention (e.g. keepAllRuns) can still
+	// opt in without a PinnedRunStore change.
 	policy?: RunRetentionPolicy;
 	// Injectable for deterministic eviction-order tests; defaults to the
 	// wall clock, matching engine.ts's `now` convention.
@@ -46,7 +48,7 @@ function isRunNotAvailable(value: ScreenerRun | RunNotAvailable): value is RunNo
 }
 
 export function createPinnedRunStore(options: PinnedRunStoreOptions = {}): PinnedRunStore {
-	const policy = options.policy ?? keepAllRuns;
+	const policy = options.policy ?? keepMostRecentRun;
 	const now = options.now ?? (() => new Date());
 	// Map insertion order doubles as retention order (oldest first); reversed
 	// below to give the most-recently-stored run index 0, matching

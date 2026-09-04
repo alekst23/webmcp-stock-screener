@@ -1,7 +1,8 @@
-// End-to-end coverage of the screener group (T-1009-10 AC1): the six tools
-// are built from one builder, exercised through the built specs, and
-// asserted not to collide with any of the new-surface tool groups they
-// coexist with. Follows webmcp/discovery/group.test.ts's pattern.
+// End-to-end coverage of the screener group (T-1009-10 AC1, narrowed to
+// define_screener + run_screener by T-0026-5): the two tools are built
+// from one builder, exercised through the built specs, and asserted not to
+// collide with any of the new-surface tool groups they coexist with.
+// Follows webmcp/discovery/group.test.ts's pattern.
 //
 // T-1015-5: this used to also assert no collision with the legacy 11-tool
 // surface, built via `buildTools({} as ResearchEngine)`. That coexistence
@@ -16,6 +17,7 @@ import { createRevisionService } from '../../workbench/application/revisionServi
 import { createIdSequencer } from '../../workbench/domain/ids';
 import type { Clock } from '../../workbench/domain/ports';
 import { makeProvenance } from '../../workbench/domain/provenance';
+import { emptyWorkspace } from '../../workbench/domain/workspace';
 import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceRepository';
 import { memoryStorage } from '../../workbench/testSupport';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
@@ -65,7 +67,7 @@ function group(): ToolSpec[] {
 }
 
 describe('buildScreenerTools', () => {
-	it('test_the_builder_exposes_exactly_the_six_canonical_tool_names', () => {
+	it('test_the_builder_exposes_exactly_the_two_canonical_tool_names', () => {
 		const names = group()
 			.map((t) => t.name)
 			.sort();
@@ -149,9 +151,22 @@ describe('buildScreenerTools', () => {
 
 	it('test_dependencies_are_parameters_so_a_real_catalog_drops_in_unedited', async () => {
 		const deps = testDeps();
+		const workspaceId = deps.ids.next('workspace');
+		deps.repository.put(emptyWorkspace(workspaceId, 'My Screener', deps.clock.now()));
+		deps.repository.setActiveId(workspaceId);
 		const created = await buildScreenerTools(deps)
-			.find((t) => t.name === 'create_screener')!
-			.execute({ workspace_id: 'workspace_1', name: 'My Screener' });
-		expect(created.isError, `create_screener failed: ${JSON.stringify(created)}`).toBeFalsy();
+			.find((t) => t.name === 'define_screener')!
+			.execute({
+				workspace_id: workspaceId,
+				universe: { asset_class: 'equity' },
+				conditions: {
+					type: 'scalar',
+					fieldId: 'field.price.close',
+					operator: 'op.greater_than',
+					value: 10,
+					unit: null
+				}
+			});
+		expect(created.isError, `define_screener failed: ${JSON.stringify(created)}`).toBeFalsy();
 	});
 });

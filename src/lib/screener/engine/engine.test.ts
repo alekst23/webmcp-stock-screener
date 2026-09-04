@@ -171,6 +171,45 @@ describe('createScreenerEngine execute end-to-end', () => {
 		expect(outcome.matches[1]?.rank).toBe(2);
 	});
 
+	it('test_execute_derivesFullInstrumentRef_fromInstAndUnknownIdsAlike_T0026_3', async () => {
+		// This fixture's bare ids ('I1'..'I6') don't parse as this app's own
+		// `inst:<MIC>:<SYMBOL>` grammar, so the fallback path is exercised
+		// here; a second engine below proves the real-parse path.
+		const engine = makeEngine();
+		const outcome = await engine.execute({
+			definition: buildDefinition(descendingCloseRanking),
+			runId: 'run_ref_fallback'
+		});
+		if (outcome.status !== 'complete') throw new Error('Expected a complete run');
+		const match = outcome.matches.find((m) => m.instrumentId === 'I1');
+		expect(match, 'Expected I1 among the returned matches').toBeDefined();
+		expect(match?.symbol, 'expected symbol to fall back to the bare instrumentId').toBe('I1');
+		expect(match?.exchange, 'expected the provisional-unknown-exchange marker').toBe('XUNK');
+		expect(match?.assetType, "expected assetType to be assumed 'equity'").toBe('equity');
+		expect(match?.name, 'expected name to fall back to symbol').toBe('I1');
+
+		const instEngine = createScreenerEngine({
+			marketData: makeMarketData(
+				{
+					closeByInstrument: { 'inst:XNAS:AAPL': 100 },
+					volumeByInstrument: { 'inst:XNAS:AAPL': 2_000_000 }
+				},
+				['inst:XNAS:AAPL']
+			),
+			now: fixedNow
+		});
+		const instOutcome = await instEngine.execute({
+			definition: buildDefinition(null),
+			runId: 'run_ref_parsed'
+		});
+		if (instOutcome.status !== 'complete') throw new Error('Expected a complete run');
+		const [instMatch] = instOutcome.matches;
+		expect(instMatch?.symbol, 'expected symbol parsed from the instrument id').toBe('AAPL');
+		expect(instMatch?.exchange, 'expected the MIC parsed from the instrument id').toBe('XNAS');
+		expect(instMatch?.assetType, "expected assetType to be assumed 'equity'").toBe('equity');
+		expect(instMatch?.name, 'expected name to fall back to the parsed symbol').toBe('AAPL');
+	});
+
 	it('test_execute_everyReturnedMatch_hasNodeEvaluationsForEveryEnabledNode_groupsIncluded', async () => {
 		const engine = makeEngine();
 		const outcome = await engine.execute({

@@ -7,7 +7,7 @@
 // get_canvas_state) against the live, registered tool surface, not
 // hand-built fixtures.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ToolSpec } from '../../webmcp/types';
+import type { ToolResult, ToolSpec } from '../../webmcp/types';
 import { createPanelShellRuntime } from '../../panels/shell/registerPanelTools';
 import { RESOLVE_TICKER_TOOL_NAME } from '../../workbench/chart/tools/resolveTicker';
 import { GET_CHART_DATA_TOOL_NAME } from '../../workbench/chart/tools/getChartData';
@@ -31,16 +31,17 @@ import {
 } from './workbenchCompositionRoot';
 
 // Chart-demo trim (see plan: "Trim the WebMCP tool surface to a chart-only
-// demo set"): registerWorkbenchComposition() now registers only the panel
-// tool group plus resolve_ticker -- workbench-core, screener,
-// chart-authoring, similarity, and follow-up-authoring are commented out at
-// their call sites (workbenchCompositionRoot.ts) rather than deleted, so this
-// list moved from IN_SCOPE to OUT_OF_SCOPE below rather than being deleted
-// itself; restoring the full surface there is the counterpart to reverting
-// this file.
+// demo set"), narrowed by T-0026-5: registerWorkbenchComposition() now
+// registers the MVP core tools (tool-surface-mvp.md) -- panel tools,
+// get_canvas_state, define_screener, run_screener, resolve_ticker,
+// search_catalog -- but chart-authoring, similarity, and follow-up-authoring
+// stay commented out at their call sites (workbenchCompositionRoot.ts), and
+// get_app_context/create_screener stay deliberately unregistered (the
+// former is "Deliberately absent" per tool-surface-mvp.md; the latter was
+// deleted from the screener group, replaced by define_screener) -- these
+// names stay out of scope below.
 const OUT_OF_SCOPE_TOOL_NAMES_TRIMMED_FOR_DEMO = [
 	'get_app_context',
-	'run_screener',
 	'create_screener',
 	GET_CHART_DATA_TOOL_NAME,
 	FIND_SIMILAR_SETUPS_TOOL_NAME,
@@ -71,11 +72,9 @@ beforeEach(() => {
 	localStorage.clear();
 });
 
-// Only used by the workbench-core round-trip test above, currently
-// commented out alongside the composition calls it exercised.
-// async function textOf(result: ToolResult): Promise<unknown> {
-// 	return JSON.parse(result.content[0]!.text);
-// }
+async function textOf(result: ToolResult): Promise<unknown> {
+	return JSON.parse(result.content[0]!.text);
+}
 
 describe('createWorkbenchSharedInfra + per-group deps builders', () => {
 	it('threads the exact same repository/revisions/idempotency/runs instances into every group', () => {
@@ -159,94 +158,64 @@ describe('createWorkbenchSharedInfra + per-group deps builders', () => {
 });
 
 describe('registerWorkbenchComposition', () => {
-	// Chart-demo trim: workbench-core/screener/chart-authoring/similarity/
-	// follow-up-authoring are commented out at their call sites
-	// (workbenchCompositionRoot.ts), so the three tests below that exercised
-	// them are commented out too rather than deleted -- both sides restore
-	// together. See 'registers only the trimmed-down chart-demo tool set'
-	// further down for what registerWorkbenchComposition() actually does now.
-	//
-	// it('a panel created through the panel tool group is visible through the workbench-core get_canvas_state read', async () => {
-	// 	const registerTool = vi.fn();
-	// 	vi.stubGlobal('document', { modelContext: { registerTool } });
-	// 	try {
-	// 		await registerWorkbenchComposition();
-	// 		const specs = new Map<string, ToolSpec>(
-	// 			registerTool.mock.calls.map((args: unknown[]) => {
-	// 				const tool = args[0] as ToolSpec;
-	// 				return [tool.name, tool];
-	// 			})
-	// 		);
-	//
-	// 		// The seeded default layout already fills the grid (T-1007-9), so a
-	// 		// free rect must be made first -- remove one seeded panel through the
-	// 		// same panel tool group before creating a new one.
-	// 		const initialCanvas = (await textOf(await specs.get('get_canvas_state')!.execute({}))) as {
-	// 			panels: { id: string }[];
-	// 		};
-	// 		const removed = await specs
-	// 			.get('remove_panel')!
-	// 			.execute({ panel_id: initialCanvas.panels[0]!.id });
-	// 		expect(
-	// 			removed.isError,
-	// 			'removing the seeded panel to make room for the new one must succeed'
-	// 		).toBeFalsy();
-	//
-	// 		const createPanelSpec = specs.get('create_panel')!;
-	// 		const created = await createPanelSpec.execute({
-	// 			kind: 'chart',
-	// 			rect: { col: 0, row: 0, col_span: 2, row_span: 4 }
-	// 		});
-	// 		expect(
-	// 			created.isError,
-	// 			'creating a chart panel through the panel tool group must succeed'
-	// 		).toBeFalsy();
-	// 		const envelope = (await textOf(created)) as { affected_ids: string[] };
-	// 		const newPanelId = envelope.affected_ids[0]!;
-	//
-	// 		const getCanvasStateSpec = specs.get('get_canvas_state')!;
-	// 		const canvasResult = await getCanvasStateSpec.execute({});
-	// 		expect(
-	// 			canvasResult.isError,
-	// 			'reading canvas state back through the workbench-core tool group must succeed'
-	// 		).toBeFalsy();
-	// 		const canvas = (await textOf(canvasResult)) as { panels: { id: string }[] };
-	// 		expect(canvas.panels.map((p) => p.id)).toContain(newPanelId);
-	// 	} finally {
-	// 		vi.unstubAllGlobals();
-	// 	}
-	// });
-	//
-	// it('registers the panel, workbench-core, and screener tool groups together', async () => {
-	// 	const registerTool = vi.fn();
-	// 	vi.stubGlobal('document', { modelContext: { registerTool } });
-	// 	try {
-	// 		await registerWorkbenchComposition();
-	// 		const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
-	// 		expect(names).toContain('create_panel');
-	// 		expect(names).toContain('get_canvas_state');
-	// 		expect(names).toContain('run_screener');
-	// 		expect(names).toContain('create_screener');
-	// 	} finally {
-	// 		vi.unstubAllGlobals();
-	// 	}
-	// });
-	//
-	// it('registers the chart, similarity, and follow-up-authoring tool groups too (T-1015-3)', async () => {
-	// 	const registerTool = vi.fn();
-	// 	vi.stubGlobal('document', { modelContext: { registerTool } });
-	// 	try {
-	// 		await registerWorkbenchComposition();
-	// 		const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
-	// 		for (const inScopeName of IN_SCOPE_TOOL_NAMES) {
-	// 			expect(names).toContain(inScopeName);
-	// 		}
-	// 	} finally {
-	// 		vi.unstubAllGlobals();
-	// 	}
-	// });
+	// T-0026-5: get_canvas_state (workbench-core) is now registered too --
+	// narrowly, via registerCanvasStateTool, not the whole registerWorkbenchTools
+	// group (see that module's own comment for why). This proves the
+	// cross-group wiring the old commented-out test below asserted, against
+	// the real composition root rather than a hand-reconstruction.
+	it('a panel created through the panel tool group is visible through the workbench-core get_canvas_state read', async () => {
+		const registerTool = vi.fn();
+		vi.stubGlobal('document', { modelContext: { registerTool } });
+		try {
+			await registerWorkbenchComposition();
+			const specs = new Map<string, ToolSpec>(
+				registerTool.mock.calls.map((args: unknown[]) => {
+					const tool = args[0] as ToolSpec;
+					return [tool.name, tool];
+				})
+			);
 
-	it('registers only the trimmed-down chart-demo tool set: the panel tool group plus resolve_ticker and search_catalog', async () => {
+			// hotfix/empty-grid-canvas: the default seed layout is now a single
+			// sparse filter_builder panel (defaultLayout.ts), leaving room for a
+			// new panel without first removing anything.
+			const createPanelSpec = specs.get('create_panel')!;
+			const created = await createPanelSpec.execute({ kind: 'chart' });
+			expect(
+				created.isError,
+				`creating a chart panel through the panel tool group must succeed: ${JSON.stringify(created)}`
+			).toBeFalsy();
+			const envelope = (await textOf(created)) as { affected_ids: string[] };
+			const newPanelId = envelope.affected_ids[0]!;
+
+			const getCanvasStateSpec = specs.get('get_canvas_state')!;
+			const canvasResult = await getCanvasStateSpec.execute({});
+			expect(
+				canvasResult.isError,
+				'reading canvas state back through the workbench-core tool group must succeed'
+			).toBeFalsy();
+			const canvas = (await textOf(canvasResult)) as { panels: { id: string }[] };
+			expect(canvas.panels.map((p) => p.id)).toContain(newPanelId);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it('registers the panel, workbench-core, and screener tool groups together', async () => {
+		const registerTool = vi.fn();
+		vi.stubGlobal('document', { modelContext: { registerTool } });
+		try {
+			await registerWorkbenchComposition();
+			const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
+			expect(names).toContain('create_panel');
+			expect(names).toContain('get_canvas_state');
+			expect(names).toContain('define_screener');
+			expect(names).toContain('run_screener');
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it('registers only the MVP core tool set (tool-surface-mvp.md): panel tools, get_canvas_state, define_screener, run_screener, resolve_ticker, and search_catalog', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		try {
@@ -254,6 +223,9 @@ describe('registerWorkbenchComposition', () => {
 			const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
 			expect(names).toContain('create_panel');
 			expect(names).toContain('bind_panel_source');
+			expect(names).toContain('get_canvas_state');
+			expect(names).toContain('define_screener');
+			expect(names).toContain('run_screener');
 			expect(names).toContain(RESOLVE_TICKER_TOOL_NAME);
 			// T-0026-2 AC1: search_catalog existed but was never reachable through
 			// this route's real registration path before this ticket.
@@ -261,7 +233,7 @@ describe('registerWorkbenchComposition', () => {
 			for (const trimmedName of OUT_OF_SCOPE_TOOL_NAMES_TRIMMED_FOR_DEMO) {
 				expect(
 					names,
-					`"${trimmedName}" belongs to a tool group commented out for the chart demo -- ` +
+					`"${trimmedName}" is deliberately absent from the MVP surface -- ` +
 						'registerWorkbenchComposition() must not register it'
 				).not.toContain(trimmedName);
 			}

@@ -38,6 +38,10 @@ function testProvenance(overrides: { asOf?: string } = {}): MarketDataProvenance
 function testMatch(rank: number, overrides: Partial<ScreenerMatch> = {}): ScreenerMatch {
 	return {
 		instrumentId: `inst_${rank}`,
+		symbol: `SYM${rank}`,
+		exchange: 'XNAS',
+		assetType: 'equity',
+		name: `Test Instrument ${rank}`,
 		rank,
 		compositeScore: 1 / rank,
 		rankingValues: {},
@@ -105,6 +109,21 @@ describe('buildRow', () => {
 		const row = buildRow('run_1', testMatch(1), () => null);
 		expect(row.ticker, 'expected null when the resolver has no ticker').toBeNull();
 	});
+
+	it('carries the full instrument reference straight off the match (T-0026-3)', () => {
+		const match = testMatch(1, {
+			instrumentId: 'inst_aapl',
+			symbol: 'AAPL',
+			exchange: 'XNAS',
+			assetType: 'equity',
+			name: 'Apple Inc.'
+		});
+		const row = buildRow('run_1', match, () => null);
+		expect(row.symbol, 'expected symbol carried from the match').toBe('AAPL');
+		expect(row.exchange, 'expected exchange carried from the match').toBe('XNAS');
+		expect(row.assetType, 'expected assetType carried from the match').toBe('equity');
+		expect(row.name, 'expected name carried from the match').toBe('Apple Inc.');
+	});
 });
 
 describe('resolvePageSize', () => {
@@ -154,6 +173,10 @@ describe('makeResultsPage (the page model enforces its own bound)', () => {
 			resultId: mintResultId('run_1', i + 1),
 			instrumentId: `inst_${i + 1}`,
 			ticker: null,
+			symbol: `SYM${i + 1}`,
+			exchange: 'XNAS',
+			assetType: 'equity',
+			name: `Test Instrument ${i + 1}`,
 			rank: i + 1,
 			compositeScore: null
 		}));
@@ -300,5 +323,11 @@ describe('toWireResultsPage', () => {
 		expect(wire.run_id, 'expected run_id on the wire').toBe('run_1');
 		expect(Array.isArray(wire.rows), 'expected rows to serialize as an array').toBe(true);
 		expect(wire.next_cursor, 'expected next_cursor null on the last page').toBeNull();
+		const rows = wire.rows as Record<string, unknown>[];
+		const firstRow = rows[0];
+		expect(firstRow?.symbol, 'expected symbol on the wire row').toBe('SYM1');
+		expect(firstRow?.exchange, 'expected exchange on the wire row').toBe('XNAS');
+		expect(firstRow?.asset_type, 'expected asset_type on the wire row').toBe('equity');
+		expect(firstRow?.name, 'expected name on the wire row').toBe('Test Instrument 1');
 	});
 });

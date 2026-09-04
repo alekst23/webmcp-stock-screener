@@ -19,25 +19,30 @@ import {
 	type PanelShellRuntime,
 	type WorkbenchSharedInfra
 } from '../../panels/shell/registerPanelTools';
-// Chart-demo trim (see plan: "Trim the WebMCP tool surface to a chart-only
-// demo set"): registerWorkbenchTools/registerScreenerTools/registerChartTools/
-// registerSimilarityTools/registerFollowupAuthoringTools have no caller below
-// any more -- only their own createXDeps builders survive as live imports,
-// still exercised directly by workbenchCompositionRoot.test.ts. Restoring the
-// full surface means uncommenting the register* imports below alongside their
-// call sites in registerWorkbenchComposition.
+// T-0026-5: registers exactly tool-surface-mvp.md's core seven/eight --
+// search_catalog, define_screener, run_screener, get_screener_results,
+// create_panel, get_canvas_state, remove_panel, set_panel_layout -- not the
+// ~39-tool surface EPIC-1015's "chart-demo trim" originally left commented
+// out here. registerScreenerTools now registers define_screener +
+// run_screener only (group.ts); registerCanvasStateTool (not the whole
+// registerWorkbenchTools group -- see that module's own comment) registers
+// just get_canvas_state, the MVP's one workbench-core tool. Chart,
+// similarity, and follow-up-authoring stay exactly as EPIC-1015 left them
+// (commented, no caller) -- out of this ticket's scope.
 import {
-	createScreenerDeps
-	// registerScreenerTools
+	createScreenerDeps,
+	registerScreenerTools
 } from '../../webmcp/screener/registerScreenerTools';
 import type { ScreenerToolDeps } from '../../webmcp/screener/group';
 import type { PanelBindingDeps } from '../../webmcp/screener/runScreener';
 import type { ScreenerEvaluationPort } from '../../screener/ports';
+import { createHttpScreenerEvaluationPort } from '../../screener/infra/httpEvaluationPort';
 import {
 	createWorkbenchDeps,
-	// registerWorkbenchTools,
+	registerCanvasStateTool,
 	type DefaultWorkbenchDeps
 } from '../tools/registerWorkbenchTools';
+import { resolveApiBaseUrl } from '../../workspace/apiConfig';
 // T-1015-3: the chart, similarity, and follow-up-authoring tool groups were
 // merged, tested, and flag-gated off pending exactly this -- a route that
 // calls them. Each one still builds its own default deps (its own
@@ -59,8 +64,8 @@ import { registerResolveTickerTool } from '../chart/tools/resolveTicker';
 // T-0026-2: search_catalog existed but was never registered on this route --
 // the one live composition root /workbench's real entry point drives. Added
 // standalone (registerSearchCatalogTool, not the three-tool discovery group)
-// so this stays the minimal additive change; T-0026-3 folds it into the
-// exact-seven-tool MVP registration this file settles into.
+// so this stayed the minimal additive change; T-0026-5 folds it into the
+// exact core-tool MVP registration this file settles into.
 import { registerSearchCatalogTool } from '../../webmcp/discovery/searchCatalog';
 
 // T-0020-9: only `createWorkbenchSharedInfra` (the value) is ever imported
@@ -90,6 +95,15 @@ export function buildWorkbenchDeps(shared: WorkbenchSharedInfra): DefaultWorkben
 // constructor (T-0020-6); only the cross-group extras this route's
 // composition alone knows about (runStore, panelBinding, evaluationPort
 // override) are added here.
+//
+// T-0026-4: `evaluationPort` now defaults to HttpScreenerEvaluationPort,
+// pointed at the same backend base URL the chart tool group already
+// resolves (`overrides?.chartBaseUrl`, itself `resolveApiBaseUrl(env....)`
+// from +page.svelte -- not a second, independent URL resolution), rather
+// than leaving the default to fall through to run_screener.ts's own
+// in-browser-engine fallback. `overrides?.evaluationPort` still substitutes
+// cleanly ahead of this default -- workbenchCompositionRoot.test.ts's fake
+// evaluation port seam is unchanged.
 export function buildScreenerDeps(
 	shared: WorkbenchSharedInfra,
 	panelDeps: Pick<PanelToolDeps, 'kinds' | 'sourceRenderer' | 'templates'>,
@@ -104,18 +118,18 @@ export function buildScreenerDeps(
 		...createScreenerDeps(shared),
 		runStore: shared.runs,
 		panelBinding,
-		evaluationPort: overrides?.evaluationPort
+		evaluationPort:
+			overrides?.evaluationPort ??
+			createHttpScreenerEvaluationPort({ baseUrl: resolveApiBaseUrl(overrides?.chartBaseUrl) })
 	};
 }
 
-// Injection seam for tests only: `+page.svelte`'s real call site never
-// passes this, so the shipped default behavior (createScreenerEngine wired
-// to the honest-unavailable ScreenerMarketData, per createRunScreenerTool's
-// own default in runScreener.ts) is unchanged. Exists so a test can call
-// the REAL registerWorkbenchComposition() -- not a hand-reconstruction of
-// its internals -- while still substituting a fake evaluation port (no real
-// ScreenerMarketData adapter exists anywhere in this codebase yet, so every
-// real evaluation refuses with empty_universe).
+// Injection seam for tests: `+page.svelte`'s real call site never passes
+// `evaluationPort`, so the shipped default (T-0026-4: HttpScreenerEvaluationPort
+// against the real backend, see buildScreenerDeps above) applies. Exists so
+// a test can call the REAL registerWorkbenchComposition() -- not a
+// hand-reconstruction of its internals -- while still substituting a fake
+// evaluation port instead of making real network calls.
 export interface WorkbenchCompositionOverrides {
 	evaluationPort?: ScreenerEvaluationPort;
 	// The chart tool group's own backend base URL (bug fix, see git history):
@@ -139,23 +153,29 @@ export async function registerWorkbenchComposition(
 
 	await registerPanelTools(panelRuntime);
 
-	// Chart-demo trim (see plan: "Trim the WebMCP tool surface to a
-	// chart-only demo set"): the workbench-core/screener/chart-authoring/
-	// similarity/follow-up-authoring groups below are commented out, not
-	// deleted, so restoring the full ~39-tool surface later is a straight
-	// uncomment -- buildWorkbenchDeps/buildScreenerDeps above still exist and
-	// are still exercised directly by workbenchCompositionRoot.test.ts, they
-	// just have no caller here for now. registerResolveTickerTool() is the
-	// one new tool this trim adds -- see resolveTicker.ts for why a chart
-	// panel needs it (bind_panel_source's 'instrument' source type requires
-	// a resolved instrument_id/symbol/exchange/asset_type, and nothing else
-	// in this codebase can mint one; see that file's own header for why this
-	// isn't routed through webmcp/discovery instead).
+	// T-0026-5: get_canvas_state (workbench-core) and define_screener +
+	// run_screener (screener) are the MVP's remaining core tools --
+	// registered narrowly (see registerCanvasStateTool's and group.ts's own
+	// comments for why the whole workbench-core/screener groups aren't
+	// registered wholesale). create_panel/remove_panel/set_panel_layout
+	// already come from registerPanelTools above; get_screener_results from
+	// that same call (results/tools/resultsTools.ts, folded into panel
+	// tools); search_catalog and resolve_ticker below.
+	const workbenchDeps = buildWorkbenchDeps(shared);
+	const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps, overrides);
+	await registerCanvasStateTool(workbenchDeps);
+	await registerScreenerTools(screenerDeps);
+
+	// Chart-authoring, similarity, and follow-up-authoring groups below stay
+	// commented out (see plan: "Trim the WebMCP tool surface to a chart-only
+	// demo set") -- explicitly out of this ticket's scope (T-0026-5's
+	// Solution Approach). registerResolveTickerTool() is the one non-MVP
+	// tool this composition still registers -- see resolveTicker.ts for why
+	// a chart panel needs it (bind_panel_source's 'instrument' source type
+	// requires a resolved instrument_id/symbol/exchange/asset_type, and
+	// nothing else in this codebase can mint one; see that file's own header
+	// for why this isn't routed through webmcp/discovery instead).
 	//
-	// const workbenchDeps = buildWorkbenchDeps(shared);
-	// const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps, overrides);
-	// await registerWorkbenchTools(workbenchDeps);
-	// await registerScreenerTools(screenerDeps);
 	// await registerChartTools(createChartDeps(shared, overrides?.chartBaseUrl));
 	// await registerSimilarityTools(
 	// 	createSimilarityDeps(shared, panelRuntime.deps, overrides?.chartBaseUrl)

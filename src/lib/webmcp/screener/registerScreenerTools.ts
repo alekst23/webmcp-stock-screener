@@ -1,7 +1,8 @@
 // Composition root that wires real infrastructure to buildScreenerTools and
-// registers the six-tool screener surface against document.modelContext
-// (T-1009-10), mirroring workbench/tools/registerWorkbenchTools.ts's
-// createDefault*Deps() + gated register-function shape.
+// registers the screener surface against document.modelContext (T-1009-10;
+// narrowed to define_screener + run_screener by T-0026-5), mirroring
+// workbench/tools/registerWorkbenchTools.ts's createDefault*Deps() + gated
+// register-function shape.
 //
 // Gated behind SCREENER_TOOLS_ENABLED per the project's dead-code policy:
 // registering a second tool group alongside the shipping 11-tool surface

@@ -30,7 +30,7 @@ describe('registerScreenerTools', () => {
 		expect(deps.provenance.current('prices').sourceId).toBe('not_configured');
 	});
 
-	it('would register exactly the six screener tools if the flag were on', async () => {
+	it('would register exactly SCREENER_TOOL_NAMES if the flag were on', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		const { createDefaultScreenerToolDeps } = await import('./registerScreenerTools');

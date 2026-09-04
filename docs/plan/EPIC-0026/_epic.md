@@ -41,9 +41,12 @@ sequence.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-0026-1 | `define_screener` tool | — | Not started |
-| 2 | T-0026-2 | `search_catalog` registration + sector enumeration | — | Not started |
-| 3 | T-0026-3 | Evaluation port, result rows, retention, composition root | T-0026-1, T-0026-2 | Not started |
+| 1 | T-0026-1 | `define_screener` tool | — | Done |
+| 2 | T-0026-2 | `search_catalog` registration + sector enumeration | — | Done |
+| 3 | T-0026-3 | Full instrument ref on screener result rows | T-0026-1, T-0026-2 | Done |
+| 4 | T-0026-4 | `HttpScreenerEvaluationPort` | T-0026-1, T-0026-2 | Done |
+| 5 | T-0026-5 | Register the MVP tool set in the composition root | T-0026-3, T-0026-4 | Done |
+| 6 | T-0026-6 | Run retention, dead-engine cleanup, status doc | T-0026-5 | Done |
 
 ## Notes
 
@@ -56,4 +59,17 @@ sequence.
   (the current default, `keepAllRuns`) to "keep only the most recently
   pinned run." Only one panel is ever bound to a run in this surface, so
   older runs serve nothing — re-running a screener after a dozen tweaks
-  should not accumulate a dozen full match lists in memory.
+  should not accumulate a dozen full match lists in memory. (Now T-0026-6.)
+- **2026-09-04: T-0026-3 was originally "Evaluation port, result rows,
+  retention, composition root" — one ticket bundling four independent
+  changes. A first implementation attempt widened `ScreenerMatch` without
+  updating its callers/fixtures/composition-root wiring (17 typecheck
+  errors) and was reverted rather than merged. Split into T-0026-3
+  (result-row shape only) through T-0026-6 (retention/cleanup/docs, last)
+  so each lands independently and reviewably.** T-0026-1/T-0026-2 landed
+  cleanly beforehand and are unaffected by the split.
+- Gap audit against `docs/architecture/tool-surface-mvp.md` (2026-09-04):
+  EPIC-0025 (backend) and EPIC-0027 (widget/drag-to-chart UI) are both
+  functionally complete per the doc. This epic's T-0026-3 through T-0026-6
+  are what's left to make the MVP loop reachable end to end by an agent —
+  see each ticket's Description for the specific gap it closes.
