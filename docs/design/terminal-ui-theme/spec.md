@@ -117,4 +117,4 @@ still legible at a glance.
 - A general notification/toast system. The freshness pill is the one
   status indicator this feature adds.
 
-*Implemented by:* hotfix/terminal-ui-theme, hotfix/marketpane-rebrand
+*Implemented by:* hotfix/terminal-ui-theme, hotfix/marketpane-rebrand, hotfix/panel-status-route
