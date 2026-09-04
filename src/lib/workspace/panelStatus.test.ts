@@ -40,7 +40,7 @@ describe('panel status', () => {
 
 		await fetchPanelStatus({ baseUrl: 'http://api.test' });
 
-		expect(fetch).toHaveBeenCalledWith('http://api.test/api/research/panel');
+		expect(fetch).toHaveBeenCalledWith('http://api.test/api/panel/status');
 	});
 
 	it('throws when the backend has no panel loaded', async () => {

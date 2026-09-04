@@ -57,6 +57,21 @@ most of the components being restyled here. The token and contrast modules
 survive that cutover; the per-component CSS does not. Styling the surface
 that exists today is worth that, but it should not be a surprise later.
 
+### hotfix/panel-status-route: data-freshness pill's fetch was pointed at a dead route
+
+`legacy-surface-cutover`'s T-1015-4 deleted `backend/api/routes/research.py`,
+including `GET /api/research/panel`, without noticing that
+`src/lib/workspace/panelStatus.ts`'s `fetchPanelStatus` (which feeds this
+spec's Data-freshness pill) still called it by URL string rather than
+import, so the import-graph check used to find callers missed it. A later
+fix restored the endpoint's logic under `backend/api/routes/panel.py`, but
+at a new path (`GET /api/panel/status`, matching that route module's own
+`/api/panel` prefix convention) — the frontend caller was never repointed,
+so the pill kept silently 404ing. This hotfix is the repoint: no new
+behavior, no new contract, `panelStatus.ts`'s fetch URL and its
+now-inaccurate header comment are corrected to match the route that
+actually exists.
+
 ## Contracts
 
 ### `src/lib/theme/tokens.ts`

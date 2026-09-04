@@ -44,7 +44,7 @@ config: only the bucket is unconditionally required.
 | Rate limiting | Exempt, so a frequent probe cannot exhaust the per-address budget or be throttled into a false negative |
 
 Panel provenance and staleness stay where they already are, on
-`GET /api/research/panel`. Two questions, two endpoints: "is this process
+`GET /api/panel/status`. Two questions, two endpoints: "is this process
 alive" is the platform's, "is this data real and current" is the
 researcher's. Conflating them makes a degraded-but-serving deployment
 unroutable — which is the opposite of what T-0013-5 chose when it decided to
