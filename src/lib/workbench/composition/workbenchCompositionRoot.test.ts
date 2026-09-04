@@ -40,13 +40,33 @@ import {
 // former is "Deliberately absent" per tool-surface-mvp.md; the latter was
 // deleted from the screener group, replaced by define_screener) -- these
 // names stay out of scope below.
+//
+// The panel/results tool names below (duplicate_panel through
+// explain_result) match TOOLS_OFF_MVP_SURFACE in registerPanelTools.ts --
+// present in buildPanelTools()/buildResultsTools()'s own full roster
+// (unchanged, still exercised by panelTools.test.ts/resultsTools.test.ts)
+// but filtered out at that registration boundary per tool-surface-mvp.md's
+// "deliberately absent" table, so they must never reach this route either.
 const OUT_OF_SCOPE_TOOL_NAMES_TRIMMED_FOR_DEMO = [
 	'get_app_context',
 	'create_screener',
 	GET_CHART_DATA_TOOL_NAME,
 	FIND_SIMILAR_SETUPS_TOOL_NAME,
 	CREATE_CUSTOM_STUDY_TOOL_NAME,
-	CREATE_COMPUTED_FIELD_TOOL_NAME
+	CREATE_COMPUTED_FIELD_TOOL_NAME,
+	'duplicate_panel',
+	'apply_layout_template',
+	'split_panel',
+	'maximize_panel',
+	'reset_layout',
+	'bind_panel_source',
+	'set_panel_renderer',
+	'configure_chart_grid',
+	'configure_panel_view',
+	'link_panels',
+	'unlink_panels',
+	'set_panel_selection',
+	'explain_result'
 ] as const;
 
 // T-0020-5, narrowed by T-1015-3: backtest/alert/watchlist stay behind a
@@ -222,7 +242,6 @@ describe('registerWorkbenchComposition', () => {
 			await registerWorkbenchComposition();
 			const names = registerTool.mock.calls.map((args: unknown[]) => (args[0] as ToolSpec).name);
 			expect(names).toContain('create_panel');
-			expect(names).toContain('bind_panel_source');
 			expect(names).toContain('get_canvas_state');
 			expect(names).toContain('define_screener');
 			expect(names).toContain('run_screener');

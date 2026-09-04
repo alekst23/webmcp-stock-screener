@@ -27,14 +27,14 @@ export const RESOLVE_TICKER_TOOL_NAME = 'resolve_ticker';
 const UNKNOWN_EXCHANGE = 'XUNK';
 
 const DESCRIPTION =
-	"Turns a bare ticker into the instrument reference bind_panel_source's chart " +
-	'source requires. This project has no live reference-data source (no company ' +
+	"Turns a bare ticker into the instrument reference a chart panel's source " +
+	'requires. This project has no live reference-data source (no company ' +
 	'name, exchange, or asset-classification service), so this mints a provisional ' +
 	'reference from the ticker text alone -- asset type is assumed "equity", the ' +
 	`exchange is reported as "${UNKNOWN_EXCHANGE}" (unknown) -- and does not confirm ` +
 	'the ticker actually has data. Whether it does is discovered only once the chart ' +
-	'is bound and rendered. Pass this result directly as bind_panel_source\'s ' +
-	'source.ref, with source.type "instrument".';
+	"is bound and rendered. Pass this result directly as create_panel's source.ref, " +
+	'with source.type "instrument".';
 
 const INPUT_SCHEMA = {
 	type: 'object',
