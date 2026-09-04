@@ -167,12 +167,13 @@ carrying the provenance that says what data produced it.
 
 ## Open Questions
 
-1. **Run retention.** How long a completed run's stored results are kept,
-   and how many runs a workspace retains, is not stated in
-   `docs/reference/tool-spec.md`. *Assumption:* runs are retained for the
-   life of the workspace session, and asking for a page of an evicted run
-   returns an explicit "run no longer available" rather than silently
-   re-running. To be confirmed with EPIC-1010.
+1. _Resolved (EPIC-0026) — Run retention: only the most recently pinned
+   run per workspace is kept; an older run is evicted immediately on the
+   next `putRun`, not retained for the session. Narrower than the
+   original "life of the session" assumption: only one panel is ever
+   bound to a run in this surface, so an older run served nothing but
+   memory growth across repeated tweak-and-rerun cycles. Revisit if a
+   feature needs to compare two runs._
 2. **Expensive-query threshold.** The point above which a query is
    "expensive" is not specified. *Assumption:* a configurable estimated
    instrument-days budget with a documented default, surfaced as a
@@ -182,6 +183,74 @@ carrying the provenance that says what data produced it.
    percentile-rank normalization within the matched set before weighting,
    stated in the run's output so it stays inspectable.
 
+## Amendment (EPIC-0025 / EPIC-0026): atomic definition, server-side execution, current-screener view
+
+The MVP use case ("find energy sector stocks with the highest gains in
+the past 48 hrs, then show me details for some of them") exposed two
+problems with the surface as originally specified: building a screener
+across five sequential calls (Create / Set the universe / Edit the filter
+tree / Set ranking / Validate) leaves intermediate states a run could
+observe, and "Run a screener" had no real data to execute against — every
+real evaluation refused with an empty-universe error, since no
+market-data adapter existed. This amendment replaces the five-call
+editing surface with one atomic call, and moves execution against real
+universe/price data server-side (EPIC-0025). It does not change what a
+screener *is* — the definition, universe spec, eight condition types,
+and ranking model are unchanged; only how a screener is edited and where
+it executes changes.
+
+### Superseded features
+
+Features 1–3, 5, and 6 above ("Create a screener," "Set the universe,"
+"Edit the filter tree," "Set ranking," "Validate a screener") are
+superseded by:
+
+- **Define a screener**: given a complete universe, filter tree, ranking,
+  and result limit, mint a new screener or replace an existing one's
+  definition as a new revision, validating everything together and
+  reporting every problem at once. Targets the workspace's current
+  screener by default (see "Current screener" below) — the caller never
+  needs to track or pass a screener ID for the common case; an explicit
+  ID is only required to address a second, concurrent screener, which no
+  tool surfaces a way to list or pick between.
+
+Feature 4 ("Express eight condition types") and feature 7 ("Run a
+screener") are unchanged in shape; "Run a screener" gains: it executes
+against real universe and price data (server-side, EPIC-0025), not a
+refusal.
+
+### Current screener
+
+Every workspace already carries a `screenerId` pointer (delivered by
+EPIC-1006) that no tool has ever written. This amendment starts using it:
+it names the workspace's "current" screener, and "Define a screener"
+reads and writes it by default.
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| First definition | a workspace with no current screener | the agent defines a screener with no screener ID given | a screener is created at revision 1 and becomes the workspace's current screener |
+| Redefinition | a workspace with a current screener | the agent defines a screener again with no screener ID given | that screener's definition is replaced as a new revision (full-replace, not a patch); any run already pinned against a prior revision stays valid and bound as-is |
+| Explicit unknown ID | a screener ID that doesn't match any screener in the workspace | the agent defines a screener naming it | the call is rejected naming the unrecognized ID; nothing is created or changed |
+| Grouped validation | any definition with more than one problem (unknown catalog ID, out-of-range parameter, empty-resolving universe) | the agent defines a screener | every problem is reported together in one response, not just the first |
+| Approximated granularity | a time-based request the data can only approximate (e.g. an hours-based lookback against a daily-bars-only pipeline) | the agent defines a screener | the response states the actual granularity used |
+| Unresolvable lookback | a condition needs more session history than a given instrument has | the screener runs | that instrument's condition resolves not-evaluable and fails closed, per the existing group-folding rule — it does not error the whole run |
+
+### Amendment (EPIC-0027): view the current screener
+
+A new, read-only feature: **View the current screener** — the workspace's
+current screener definition is rendered wherever it's displayed (the
+`filter_builder` panel), staying current as the agent redefines it, with
+no separate read tool — the same document read every panel body already
+performs on notify.
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| No screener yet | a workspace with no current screener | its view is rendered | an explicit empty state is shown, never blank or an error |
+| Live update | a workspace with a current screener, being viewed | the agent redefines it | the displayed universe, conditions, ranking, and limit update without a manual refresh |
+
+**Non-Goal (added):** human editing of the screener definition through
+this view — out of scope for MVP; redefinition is agent-driven only.
+
 ---
 
-*Implemented by: EPIC-1009*
+*Implemented by: EPIC-1009, EPIC-0025, EPIC-0026, EPIC-0027*
