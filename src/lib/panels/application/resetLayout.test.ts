@@ -16,7 +16,11 @@ function ctx() {
 describe('resetLayout', () => {
 	it('spec.md "Reset the workspace layout to the default seed" / happy path: restores the default seed from a modified arrangement', () => {
 		const deps = createPanelTestHarness();
-		createPanel(deps, { context: ctx(), kind: 'chart', rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 } });
+		createPanel(deps, {
+			context: ctx(),
+			kind: 'chart',
+			rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 }
+		});
 
 		const envelope = resetLayout(deps, { context: ctx() });
 
@@ -28,13 +32,35 @@ describe('resetLayout', () => {
 		const expected = DEFAULT_SEED_PANELS.map((s) => ({ kind: s.kind, rect: s.rect })).sort((a, b) =>
 			a.kind.localeCompare(b.kind)
 		);
-		expect(kindsAndRects, `expected the default seed arrangement, got ${JSON.stringify(kindsAndRects)}`).toEqual(
-			expected
-		);
+		expect(
+			kindsAndRects,
+			`expected the default seed arrangement, got ${JSON.stringify(kindsAndRects)}`
+		).toEqual(expected);
 		expect(
 			envelope.affectedIds.sort(),
 			'expected every newly-created panel named as affected'
 		).toEqual(state.panels.map((p) => p.id).sort());
+	});
+
+	// hotfix/panel-default-width-grid-lines: pins the actual column span
+	// rather than deriving it from DEFAULT_SEED_PANELS itself, so this test
+	// fails if the seed constant regresses back to two columns.
+	it('resets filter_builder to a one-column, full-height footprint', () => {
+		const deps = createPanelTestHarness();
+		createPanel(deps, {
+			context: ctx(),
+			kind: 'chart',
+			rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 }
+		});
+
+		resetLayout(deps, { context: ctx() });
+
+		const state = readPanelState(deps.repository.get(deps.workspaceId)!);
+		const filterBuilder = state.panels.find((p) => p.kind === 'filter_builder')!;
+		expect(
+			filterBuilder.rect,
+			'expected the reset filter_builder to be one column wide, full height'
+		).toEqual({ col: 0, row: 0, colSpan: 1, rowSpan: 4 });
 	});
 
 	it('drops link groups and selections that referenced the pre-reset panels', () => {
@@ -96,9 +122,6 @@ describe('resetLayout', () => {
 			afterSecondReset.map((p) => p.id).sort(),
 			'expected panel ids to be literally unchanged on a no-op reset, not newly minted'
 		).toEqual(afterFirstReset.map((p) => p.id).sort());
-		expect(
-			envelope.affectedIds,
-			'expected no affected ids reported for a no-op reset'
-		).toEqual([]);
+		expect(envelope.affectedIds, 'expected no affected ids reported for a no-op reset').toEqual([]);
 	});
 });

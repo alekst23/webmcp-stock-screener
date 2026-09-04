@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 
 describe('PanelContainer renders an outline for every unoccupied cell', () => {
-	it('shows 16 empty-cell outlines around the seeded filter_builder panel', () => {
+	it('shows 20 empty-cell outlines around the seeded filter_builder panel', () => {
 		const { deps, observer } = createDefaultPanelShellRuntime();
 
 		const target = document.createElement('div');
@@ -38,8 +38,8 @@ describe('PanelContainer renders an outline for every unoccupied cell', () => {
 		const emptyCells = target.querySelectorAll('[data-testid="empty-cell"]');
 		expect(
 			emptyCells.length,
-			`expected 16 empty-cell outlines (24 - 8 occupied), got ${emptyCells.length}`
-		).toBe(GRID_COLUMNS * GRID_ROWS - 8);
+			`expected 20 empty-cell outlines (24 - 4 occupied), got ${emptyCells.length}`
+		).toBe(GRID_COLUMNS * GRID_ROWS - 4);
 
 		unmount(instance);
 	});
@@ -49,7 +49,7 @@ describe('PanelContainer renders an outline for every unoccupied cell', () => {
 		createPanel(deps, {
 			context: { actor: 'agent' },
 			kind: 'chart',
-			rect: { col: 2, row: 0, colSpan: 4, rowSpan: 4 }
+			rect: { col: 1, row: 0, colSpan: 5, rowSpan: 4 }
 		});
 
 		const target = document.createElement('div');

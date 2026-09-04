@@ -210,9 +210,16 @@ This also reverses the more-populated-default-layout intent stated in
 docs/design/legacy-surface-cutover/spec.md's route migration feature — that
 intent is superseded by this change._
 
+_Amended by hotfix/panel-default-width-grid-lines — the row below already
+implied a single-column seed (20 of 24 cells empty only holds if the seeded
+panel occupies 1 column across all 4 rows, not 2), but the column span was
+never stated explicitly and shipping code had drifted to 2. This amendment
+makes the column span explicit and brings the implementation back in line
+with the cell count already specified here; it is not a new behavior._
+
 | Scenario                            | Given                                                                   | When                                   | Then                                                                                                                                                                                                                                                   |
 | ----------------------------------- | ----------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Happy path                          | a newly created, otherwise-empty workspace                              | the workspace finishes creating        | it already contains one panel — `filter_builder`, full-height on the left column (col 0, rowSpan 4) — with no additional agent or user action required; the remaining 20 cells are empty                                                               |
+| Happy path                          | a newly created, otherwise-empty workspace                              | the workspace finishes creating        | it already contains one panel — `filter_builder`, full-height and one column wide on the left column (col 0, colSpan 1, rowSpan 4) — with no additional agent or user action required; the remaining 20 cells are empty                                                               |
 | Unbound source                      | the seeded panel has nothing to show yet                                | the workspace is opened                | the seeded panel renders its kind's normal empty/not-yet-bound state (e.g. "no filters yet") rather than an error; binding a source to it behaves exactly as it would for a panel added by `create_panel`                                              |
 | Not a template a caller can request | the default layout                                                      | an agent calls `apply_layout_template` | it is not registered under any template name — it is create-time-only behavior, not a template the agent can re-apply later; an agent that wants this arrangement again after rearranging the workspace lays it out explicitly or via a named template |
 | Restored/duplicated workspace       | a workspace loaded from an existing revision, or a duplicated workspace | it is opened                           | the default layout is never applied — seeding happens only once, at creation of a genuinely new, empty workspace                                                                                                                                       |
@@ -318,5 +325,6 @@ that the grid has a hard capacity._
 ---
 
 _Implemented by: EPIC-1007, hotfix/empty-grid-canvas, hotfix/panel-system
-(reset-to-default feature), EPIC-0027 (drag a result onto the canvas).
-Depends on the common workspace contract from EPIC-1006._
+(reset-to-default feature), EPIC-0027 (drag a result onto the canvas),
+hotfix/panel-default-width-grid-lines (default seed column span, empty-grid
+outline style). Depends on the common workspace contract from EPIC-1006._

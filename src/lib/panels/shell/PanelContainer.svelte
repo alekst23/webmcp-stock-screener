@@ -7,7 +7,7 @@
 	// an agent-driven tool call and a human click on the collapse affordance
 	// take the exact same re-render path (AC5).
 	import { onMount, untrack } from 'svelte';
-	import { containerGridStyle, panelFrameStyle } from './gridStyle';
+	import { containerGridStyle, emptyCellBorderStyle, panelFrameStyle } from './gridStyle';
 	import {
 		bindPanelSourceFromDrop,
 		createChartFromDrop,
@@ -186,7 +186,7 @@
 	{#each emptyCells as cell (`${cell.col},${cell.row}`)}
 		<div
 			class="empty-cell"
-			style={`${panelFrameStyle(cell)} pointer-events: none;`}
+			style={`${panelFrameStyle(cell)} ${emptyCellBorderStyle()} pointer-events: none;`}
 			data-testid="empty-cell"
 		></div>
 	{/each}
@@ -200,7 +200,6 @@
 	}
 
 	.empty-cell {
-		border: 1px solid var(--separator);
 		pointer-events: none;
 	}
 </style>

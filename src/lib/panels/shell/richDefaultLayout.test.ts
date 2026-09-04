@@ -87,14 +87,14 @@ describe('a brand-new workspace seeds only filter_builder', () => {
 
 		const filterBuilder = panels[0]!;
 		expect(filterBuilder.kind).toBe('filter_builder');
-		expect(filterBuilder.rect).toEqual({ col: 0, row: 0, colSpan: 2, rowSpan: 4 });
+		expect(filterBuilder.rect).toEqual({ col: 0, row: 0, colSpan: 1, rowSpan: 4 });
 
 		const occupiedCells = filterBuilder.rect.colSpan * filterBuilder.rect.rowSpan;
-		expect(occupiedCells, 'expected filter_builder to occupy 8 of the 24 cells').toBe(8);
+		expect(occupiedCells, 'expected filter_builder to occupy 4 of the 24 cells').toBe(4);
 		expect(
 			GRID_COLUMNS * GRID_ROWS - occupiedCells,
-			'expected the remaining 16 cells to start empty'
-		).toBe(16);
+			'expected the remaining 20 cells to start empty'
+		).toBe(20);
 
 		expect(filterBuilder.source, 'expected the seeded panel to start unbound').toBeNull();
 	});
