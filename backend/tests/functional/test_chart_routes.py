@@ -56,6 +56,29 @@ class TestGetBarsEndToEnd:
 
         assert response.status_code == 404, response.text
 
+    def test_unknown_ticker_404_states_the_panel_data_as_of_date(self) -> None:
+        # T-0020-13: the 404 must carry the loaded panel's as-of date so the
+        # frontend can tell "never covered" apart from "not ingested that
+        # far yet" -- not just name the unknown ticker.
+        bars = generate_panel()
+        write_panel(bars, output_path=PANEL_PATH)
+        expected_as_of = max(bar.date for bar in bars)
+
+        with TestClient(app) as client:
+            response = client.get(
+                "/api/chart/bars",
+                params={"ticker": "NOT_A_REAL_TICKER", "start": "2023-03-01", "end": "2023-03-10"},
+            )
+
+        assert response.status_code == 404, response.text
+        detail = response.json()["detail"]
+        assert (
+            detail["as_of"] == expected_as_of.isoformat()
+        ), f"expected the panel's own as-of date {expected_as_of.isoformat()}, got {detail}"
+        assert (
+            "NOT_A_REAL_TICKER" in detail["message"]
+        ), f"expected the ticker still named in the message, got {detail}"
+
     def test_end_before_start_returns_422(self) -> None:
         write_panel(generate_panel(), output_path=PANEL_PATH)
 

@@ -125,10 +125,30 @@ function readBarsResponse(payload: unknown, instrumentId: string): BackendBarsRe
 	return payload as BackendBarsResponse;
 }
 
-async function toTransportError(response: Response): Promise<Error> {
-	const detail = await response.text().catch(() => '');
-	const suffix = detail ? `: ${detail}` : '';
+function toTransportError(response: Response, rawBody: string): Error {
+	const suffix = rawBody ? `: ${rawBody}` : '';
 	return new Error(`price source returned ${response.status} ${response.statusText}${suffix}`);
+}
+
+// The backend's 404 body carries the loaded panel's as-of date alongside its
+// message (api/routes/chart.py, T-0020-13) -- the same provenance concept
+// PanelPriceSeriesPort.provenance() already surfaces on every successful
+// read. Reading it here is what lets a refusal say "this panel's data runs
+// through <date>" instead of just naming the instrument, so a caller can
+// tell "never covered" apart from "not ingested that far yet." Absent or
+// unparseable is silent, not an error: the instrument-naming half of the
+// message still stands on its own.
+function asOfDateFromBody(rawBody: string): string | null {
+	if (!rawBody) {
+		return null;
+	}
+	try {
+		const payload = JSON.parse(rawBody) as { detail?: { as_of?: unknown }; as_of?: unknown };
+		const asOf = payload.detail?.as_of ?? payload.as_of;
+		return typeof asOf === 'string' ? asOf : null;
+	} catch {
+		return null;
+	}
 }
 
 export function createHttpChartSeries(config: HttpChartSeriesConfig): ChartSeriesPort {
@@ -180,17 +200,21 @@ export function createHttpChartSeries(config: HttpChartSeriesConfig): ChartSerie
 			);
 		}
 		if (response.status === 404) {
+			const rawBody = await response.text().catch(() => '');
+			const asOf = asOfDateFromBody(rawBody);
+			const coverage = asOf ? ` This price source's data runs through ${asOf}.` : '';
 			throw new ChartSeriesError(
 				'unknown_instrument',
-				`This price source carries no data for instrument "${instrumentId}".`,
-				{ cause: await toTransportError(response), instrumentId }
+				`This price source carries no data for instrument "${instrumentId}".${coverage}`,
+				{ cause: toTransportError(response, rawBody), instrumentId }
 			);
 		}
 		if (!response.ok) {
+			const rawBody = await response.text().catch(() => '');
 			throw new ChartSeriesError(
 				'source_unavailable',
 				`The price source rejected the request for instrument "${instrumentId}".`,
-				{ cause: await toTransportError(response), instrumentId }
+				{ cause: toTransportError(response, rawBody), instrumentId }
 			);
 		}
 		try {

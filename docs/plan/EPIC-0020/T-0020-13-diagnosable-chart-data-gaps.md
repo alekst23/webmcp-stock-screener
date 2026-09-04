@@ -1,7 +1,7 @@
 # T-0020-13: State the data as-of date on chart "no data" refusals
 
 **Epic:** EPIC-0020
-**Status:** Open
+**Status:** Done
 
 ## Goal
 
@@ -70,3 +70,54 @@ Implements the "Diagnosable chart data gaps" scenario from
 
 None — message content only, using data the backend likely already tracks for
 provenance elsewhere.
+
+## Implementation Notes
+
+Backend already tracked the exact data needed, one layer down from where
+this ticket first looked. `backend/api/routes/chart.py`'s `GET /api/chart/bars`
+404 body did **not** carry an as-of date before this change, but
+`PanelPriceSeriesPort.provenance()` (`backend/infra/panel_market_data.py`,
+already built and tested for the backtest engine and `similarity`'s
+provenance passthrough) already exposes the loaded panel's `as_of` — the
+newest bar date in the panel (`PanelStatus.as_of`, the same field
+`/api/panel/status` surfaces to the UI). No new metadata source was
+invented; the 404 handler just calls the port it already depends on.
+
+Changes:
+- `backend/api/routes/chart.py` (`get_bars`, ~line 59-69): the 404 raised
+  when `port.has_ticker(ticker)` is false now includes
+  `"as_of": port.provenance().as_of.date().isoformat()` in the `detail` dict
+  alongside the existing `message`.
+- `src/lib/workbench/chart/infra/httpChartSeries.ts` (~line 128-220):
+  `toTransportError` now takes the already-read response body instead of
+  reading it itself (a body can only be consumed once, and the 404 path now
+  needs to read it twice for two different purposes); a new
+  `asOfDateFromBody()` helper parses the JSON body's `detail.as_of` (or
+  `as_of`) field, returning `null` on any absence or parse failure so the
+  instrument-naming message never regresses when no date is available. The
+  `unknown_instrument` throw on a 404 appends
+  `" This price source's data runs through <date>."` to its message only
+  when a date was found.
+- `src/lib/workbench/chart/application/chartData.ts`: no change — its
+  `series_unavailable` refusal already forwards `error.message` verbatim, so
+  the as-of date reaches the caller unchanged once httpChartSeries.ts states
+  it.
+
+Tests:
+- `src/lib/workbench/chart/infra/httpChartSeries.test.ts`: two new cases —
+  a 404 whose body carries `detail.as_of` produces a message containing that
+  date, and a 404 without it produces the original, unchanged message.
+- `src/lib/workbench/chart/application/chartData.test.ts`: one new case
+  proving the `series_unavailable` refusal forwards an as-of date embedded
+  in an underlying error's message unchanged (via a bespoke `ChartSeriesPort`
+  double, since the existing in-memory fixture's `failure` option wraps the
+  given error as `cause` behind its own fixed message rather than forwarding
+  it — not what this pass-through test needed).
+- `backend/tests/functional/test_chart_routes.py`: one new case asserting
+  the 404 for an unknown ticker states the generated mock panel's actual
+  max bar date as `as_of`, and still names the ticker in `message`.
+
+Results: frontend `npx vitest run src/lib/workbench/chart` — 731 passed (32
+files). Backend `uv run pytest tests/functional/test_chart_routes.py
+tests/unit/test_panel_market_data.py` — 34 passed. `npm run typecheck` —
+0 errors.
