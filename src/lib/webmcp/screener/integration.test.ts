@@ -1,7 +1,17 @@
-// End-to-end coverage of the six screener tools driven entirely through
+// End-to-end coverage of the screener group driven entirely through
 // buildScreenerTools' built specs, exactly as an agent would call them
-// (T-1009-10 AC3, AC4, AC5). Follows webmcp/integration.test.ts's pattern:
-// call by tool name, parse the JSON payload, assert on the wire shape.
+// (T-1009-10 AC3, AC4, AC5; narrowed to define_screener + run_screener by
+// T-0026-5). Follows webmcp/integration.test.ts's pattern: call by tool
+// name, parse the JSON payload, assert on the wire shape.
+//
+// T-0026-5: this used to drive create_screener -> set_screener_universe ->
+// edit_filter_tree (x3) -> set_screener_ranking -> validate_screener, none
+// of which the screener group builds any more (define_screener absorbs all
+// of it in one call -- see group.ts's own comment). "Further edits after a
+// run" (AC4) and "undo" (AC5) are now a second define_screener call
+// (full-replace) rather than an edit_filter_tree node mutation, but the
+// guarantee under test -- a run never changes after later edits, and a
+// screener mutation is undoable -- is unchanged.
 //
 // AC3's in-test fake ScreenerMarketData is a small fixed fixture (five
 // instruments, two fields) -- not a fixture dataset module -- matching
@@ -16,6 +26,7 @@ import { createRevisionService } from '../../workbench/application/revisionServi
 import { createIdSequencer } from '../../workbench/domain/ids';
 import type { Clock } from '../../workbench/domain/ports';
 import { makeProvenance } from '../../workbench/domain/provenance';
+import { emptyWorkspace } from '../../workbench/domain/workspace';
 import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceRepository';
 import { memoryStorage } from '../../workbench/testSupport';
 import { buildWorkbenchTools } from '../../workbench/tools/index';
@@ -107,7 +118,7 @@ function jsonOf(result: ToolResult): Record<string, unknown> {
 	return JSON.parse(first.text) as Record<string, unknown>;
 }
 
-describe('the six screener tools, driven end to end', () => {
+describe('define_screener + run_screener, driven end to end', () => {
 	let deps: WorkbenchDeps;
 	let workspaceId: string;
 	let tools: ToolSpec[];
@@ -138,6 +149,9 @@ describe('the six screener tools, driven end to end', () => {
 			idempotency
 		};
 		workspaceId = ids.next('workspace');
+		// define_screener (unlike the old create_screener) requires an existing
+		// workspace document -- it fails "not_found" rather than minting one.
+		deps.repository.put(emptyWorkspace(workspaceId, 'Test Workspace', clock.now()));
 		deps.repository.setActiveId(workspaceId);
 		runStore = createPinnedRunStore();
 		tools = buildScreenerTools({ ...deps, marketData: fixtureMarketData(), runStore });
@@ -158,72 +172,46 @@ describe('the six screener tools, driven end to end', () => {
 		return jsonOf(result);
 	}
 
-	// Runs the full create -> universe -> filters -> ranking -> validate
-	// sequence and returns the ids an AC3/AC4/AC5 test needs, without
-	// executing the run itself (each test below decides when to run).
-	async function buildValidatedScreener(): Promise<{
-		screenerId: string;
-		nodeA: string;
-		groupNode: string;
-	}> {
-		const created = await call('create_screener', { name: 'Momentum Screener' });
-		const screenerId = (created.affected_ids as string[])[0];
-		if (!screenerId) {
-			throw new Error('create_screener returned no screener id.');
-		}
-
-		await call('set_screener_universe', { screener_id: screenerId, asset_class: 'equity' });
-
-		const addA = await call('edit_filter_tree', {
-			screener_id: screenerId,
-			operation: 'add',
-			condition: scalarCondition('field.price.close', 'op.greater_than', 50)
-		});
-		const nodeA = (addA.affected_ids as string[])[0];
-		const addB = await call('edit_filter_tree', {
-			screener_id: screenerId,
-			operation: 'add',
-			condition: rangeCondition('field.volume', 1_000_000, 10_000_000)
-		});
-		const nodeB = (addB.affected_ids as string[])[0];
-		const addC = await call('edit_filter_tree', {
-			screener_id: screenerId,
-			operation: 'add',
-			condition: scalarCondition('field.price.close', 'op.greater_than', 95)
-		});
-		const nodeC = (addC.affected_ids as string[])[0];
-		if (!nodeA || !nodeB || !nodeC) {
-			throw new Error('edit_filter_tree did not return the expected node ids.');
-		}
-
-		const grouped = await call('edit_filter_tree', {
-			screener_id: screenerId,
-			operation: 'group',
-			node_ids: [nodeB, nodeC],
-			group_op: 'or'
-		});
-		const groupNode = (grouped.affected_ids as string[])[0];
-		if (!groupNode) {
-			throw new Error('edit_filter_tree group did not return a group node id.');
-		}
-
-		await call('set_screener_ranking', {
-			screener_id: screenerId,
-			fields: [{ field_id: 'field.price.close', direction: 'desc' }],
+	// One define_screener call: universe, the same nested filter tree the
+	// old five-call sequence built (A: close > 50, AND a group OR [B: volume
+	// in range, C: close > 95]), ranking, and limit, all together --
+	// define_screener validates in the same step (AC1/AC4), so the result
+	// is already the "clean screener" the old separate validate_screener
+	// call used to confirm.
+	async function buildValidatedScreener(): Promise<{ screenerId: string }> {
+		const defined = await call('define_screener', {
+			name: 'Momentum Screener',
+			universe: { asset_class: 'equity' },
+			conditions: {
+				kind: 'group',
+				op: 'and',
+				children: [
+					scalarCondition('field.price.close', 'op.greater_than', 50),
+					{
+						kind: 'group',
+						op: 'or',
+						children: [
+							rangeCondition('field.volume', 1_000_000, 10_000_000),
+							scalarCondition('field.price.close', 'op.greater_than', 95)
+						]
+					}
+				]
+			},
+			ranking: { fields: [{ field_id: 'field.price.close', direction: 'desc' }] },
 			limit: 2
 		});
-
-		const validation = await call('validate_screener', { screener_id: screenerId });
 		expect(
-			validation.valid,
-			`expected a clean screener to validate: ${JSON.stringify(validation)}`
+			defined.valid,
+			`expected a clean screener definition to validate: ${JSON.stringify(defined)}`
 		).toBe(true);
-		expect(validation.problems, 'a clean screener should report no problems at all').toEqual([]);
-
-		return { screenerId, nodeA, groupNode };
+		const screenerId = defined.screener_id as string;
+		if (!screenerId) {
+			throw new Error('define_screener returned no screener id.');
+		}
+		return { screenerId };
 	}
 
-	it('test_fullSequence_createUniverseFiltersRankingValidateRun_returnsPinnedRunWithProvenance', async () => {
+	it('test_fullSequence_defineUniverseFiltersRankingRun_returnsPinnedRunWithProvenance', async () => {
 		const { screenerId } = await buildValidatedScreener();
 
 		const run = await call('run_screener', { screener_id: screenerId });
@@ -251,23 +239,34 @@ describe('the six screener tools, driven end to end', () => {
 		}
 	});
 
-	it('test_runReadBack_afterFurtherScreenerEdits_stillDescribesExecutedRevision', async () => {
-		const { screenerId, nodeA } = await buildValidatedScreener();
+	it('test_runReadBack_afterFurtherScreenerRedefinition_stillDescribesExecutedRevision', async () => {
+		const { screenerId } = await buildValidatedScreener();
 		const run = await call('run_screener', { screener_id: screenerId });
 		const runId = run.run_id as string;
 		const executedRevision = run.screener_revision;
 
-		// AC4: edit the screener again after the run.
-		const disable = await call('edit_filter_tree', {
+		// AC4: redefine the screener again after the run -- define_screener's
+		// full-replace semantics (drop condition A, keep only the OR group) --
+		// the counterpart to the old edit_filter_tree mutation this test used
+		// to make.
+		const redefined = await call('define_screener', {
 			screener_id: screenerId,
-			operation: 'set_enabled',
-			node_id: nodeA,
-			enabled: false
+			universe: { asset_class: 'equity' },
+			conditions: {
+				kind: 'group',
+				op: 'or',
+				children: [
+					rangeCondition('field.volume', 1_000_000, 10_000_000),
+					scalarCondition('field.price.close', 'op.greater_than', 95)
+				]
+			},
+			ranking: { fields: [{ field_id: 'field.price.close', direction: 'desc' }] },
+			limit: 2
 		});
 		expect(
-			(disable.affected_ids as string[])[0],
-			'the follow-up edit should have actually changed the screener'
-		).toBe(nodeA);
+			redefined.screener_revision,
+			'the redefinition should have actually advanced the screener revision'
+		).not.toBe(executedRevision);
 
 		// AC4's read-back tool is EPIC-1010's get_screener_results, out of
 		// scope here; PinnedRunStore.getRun is the same read that tool would
@@ -288,33 +287,29 @@ describe('the six screener tools, driven end to end', () => {
 		).toEqual((run.matches as { instrument_id: string }[]).map((m) => m.instrument_id));
 	});
 
-	it('test_undoScreenerMutation_withReturnedUndoToken_restoresPriorScreenerState', async () => {
-		const { screenerId, nodeA } = await buildValidatedScreener();
+	it('test_undoScreenerRedefinition_withReturnedUndoToken_restoresPriorScreenerDefinition', async () => {
+		const { screenerId } = await buildValidatedScreener();
 
 		const before = readScreener(deps.repository.get(workspaceId)!, screenerId);
 		expect(before, 'the screener must exist before the mutation under test').toBeTruthy();
-		const beforeNode = before!.filterTree.kind === 'group' ? before!.filterTree.children[0] : null;
-		expect(
-			beforeNode?.nodeId,
-			'expected nodeA to be the first root child before the mutation'
-		).toBe(nodeA);
-		expect(beforeNode?.enabled, 'nodeA must start enabled').toBe(true);
+		const beforeRevision = before!.revision;
 
-		const disable = await call('edit_filter_tree', {
+		// A drastically different redefinition -- the counterpart to the old
+		// edit_filter_tree "disable a node" mutation this test used to make.
+		const redefined = await call('define_screener', {
 			screener_id: screenerId,
-			operation: 'set_enabled',
-			node_id: nodeA,
-			enabled: false
+			universe: { asset_class: 'equity' },
+			conditions: scalarCondition('field.price.close', 'op.greater_than', 999),
+			limit: 1
 		});
-		const undoToken = disable.undo_token as string;
+		const undoToken = redefined.undo_token as string;
 		expect(undoToken, 'AC5: a screener mutation must return an undo_token').toBeTruthy();
 
-		const afterDisable = readScreener(deps.repository.get(workspaceId)!, screenerId);
-		const disabledNode =
-			afterDisable!.filterTree.kind === 'group' ? afterDisable!.filterTree.children[0] : null;
-		expect(disabledNode?.enabled, 'the mutation under test must actually have disabled nodeA').toBe(
-			false
-		);
+		const afterRedefine = readScreener(deps.repository.get(workspaceId)!, screenerId);
+		expect(
+			afterRedefine?.revision,
+			'the mutation under test must actually have advanced the screener revision'
+		).toBe(beforeRevision + 1);
 
 		const undoTool = buildWorkbenchTools(deps).find((t) => t.name === 'undo_change');
 		expect(undoTool, 'the workbench undo_change tool should be registered').toBeDefined();
@@ -322,11 +317,9 @@ describe('the six screener tools, driven end to end', () => {
 		expect(undoResult.isError, `undo_change failed: ${JSON.stringify(undoResult)}`).toBeFalsy();
 
 		const afterUndo = readScreener(deps.repository.get(workspaceId)!, screenerId);
-		const restoredNode =
-			afterUndo!.filterTree.kind === 'group' ? afterUndo!.filterTree.children[0] : null;
-		expect(restoredNode?.nodeId, 'AC5: undo must restore the same node, not a new one').toBe(nodeA);
-		expect(restoredNode?.enabled, 'AC5: undoing the disable must restore nodeA to enabled').toBe(
-			true
-		);
+		expect(
+			afterUndo?.revision,
+			'AC5: undo must restore the prior definition, at the prior revision'
+		).toBe(beforeRevision);
 	});
 });

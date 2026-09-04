@@ -8,6 +8,7 @@
 // file (ports.ts declares the boundary the other direction).
 
 import { builtinCatalogRegistry, type CatalogRegistry } from '../../catalog/registry';
+import { parseInstrumentId } from '../../surface/ids';
 import type { ResourceId } from '../../workbench/domain/ids';
 import { validateCondition } from '../conditionValidation';
 import type { FilterNode, ScreenerDefinition } from '../definition';
@@ -53,6 +54,34 @@ interface ResolvedDeps {
 	validateDefinition: (
 		definition: ScreenerDefinition
 	) => Promise<ScreenerValidationReport> | ScreenerValidationReport;
+}
+
+// Mirrors resolveTicker.ts's provisional-unknown-exchange marker: never
+// collides with a real MIC (four alphanumerics), used only when
+// instrumentId doesn't parse as this application's own `inst:<MIC>:<SYMBOL>`
+// shape (e.g. a test fixture using bare ids like "I1").
+const UNKNOWN_EXCHANGE = 'XUNK';
+
+// T-0026-3: derives ScreenerMatch's full instrument reference from the bare
+// instrumentId the rest of this engine already works with. This project has
+// no reference-data source anywhere (resolveTicker.ts, discovery/ports.ts),
+// so assetType is assumed 'equity' and name honestly falls back to symbol
+// rather than fabricating a company name -- the same documented limitation
+// resolveTicker.ts already carries, not a new one.
+function deriveInstrumentRef(instrumentId: string): {
+	symbol: string;
+	exchange: string;
+	assetType: string;
+	name: string;
+} {
+	const parsed = parseInstrumentId(instrumentId);
+	const symbol = parsed?.symbol ?? instrumentId;
+	return {
+		symbol,
+		exchange: parsed?.exchangeMic ?? UNKNOWN_EXCHANGE,
+		assetType: 'equity',
+		name: symbol
+	};
 }
 
 // A non-PROBLEM_CODES warning: "the universe had members but none matched"
@@ -252,6 +281,7 @@ async function execute(
 	const returnedRanked = ranking.ranked.slice(0, ranking.limit);
 	const matches: ScreenerMatch[] = returnedRanked.map((ranked, index) => ({
 		instrumentId: ranked.instrumentId,
+		...deriveInstrumentRef(ranked.instrumentId),
 		rank: index + 1,
 		compositeScore: ranked.compositeScore,
 		rankingValues: ranked.rankingValues,

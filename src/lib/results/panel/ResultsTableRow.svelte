@@ -10,6 +10,8 @@
 	import type { RenderColumn } from './defaultColumns';
 	import { formatColumnValue } from './formatColumnValue';
 	import { resolveCellStyle } from './cellFormatting';
+	import { resultRowToPanelSource } from './resultRowDrag';
+	import { PANEL_SOURCE_DRAG_MIME, serializePanelSourceDrag } from '../../panels/domain/dragSource';
 
 	let {
 		row,
@@ -26,9 +28,23 @@
 		onToggle: (resultId: string) => void;
 		onExplain: (instrumentId: string) => void;
 	} = $props();
+
+	// T-0027-2: lets a human drag this row onto the canvas to create or
+	// rebind a chart. The payload is the exact PanelSourceRef
+	// createPanel/bindPanelSource accept as `request.source` -- see
+	// panels/domain/dragSource.ts's own header for why the drop side (panel-
+	// system) never needs to know this came from a results row.
+	function handleDragStart(event: DragEvent): void {
+		if (!event.dataTransfer) {
+			return;
+		}
+		const source = resultRowToPanelSource(row);
+		event.dataTransfer.setData(PANEL_SOURCE_DRAG_MIME, serializePanelSourceDrag(source));
+		event.dataTransfer.effectAllowed = 'copy';
+	}
 </script>
 
-<tr class="row" class:selected>
+<tr class="row" class:selected draggable="true" ondragstart={handleDragStart}>
 	<td class="select-cell">
 		<input
 			type="checkbox"

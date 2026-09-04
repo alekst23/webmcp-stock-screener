@@ -95,13 +95,28 @@ export interface RunRetentionPolicy {
 	shouldEvict(run: ScreenerRun, now: string, index: number): boolean;
 }
 
-// The working assumption from spec.md Open Question 1: runs are retained
-// for the life of the workspace session and nothing is evicted. T-1009-9
-// wires this in by default; swapping in a different RunRetentionPolicy
-// later is a call-site change, not a PinnedRunStore change.
+// Retains every run for the life of the workspace session -- the working
+// assumption from spec.md Open Question 1 before T-0026-6 settled the
+// cross-epic retention decision (see keepMostRecentRun below, the actual
+// default as of T-0026-6). Still available for a caller that legitimately
+// wants every run kept (e.g. testSupport.ts's testPinnedRunStore, which
+// seeds several runs a test then reads back), just not the default.
 export const keepAllRuns: RunRetentionPolicy = {
 	shouldEvict(): boolean {
 		return false;
+	}
+};
+
+// T-0026-6: the PinnedRunStore construction default. Only one panel is
+// ever bound to a run in this surface (the results_table panel rebinds to
+// whatever run_screener most recently produced), so every run behind the
+// most recent one serves nothing and would otherwise accumulate for the
+// life of the session. `index` 0 is the most-recently-stored run
+// (RunRetentionPolicy's own documented convention); evicting every other
+// index keeps exactly one.
+export const keepMostRecentRun: RunRetentionPolicy = {
+	shouldEvict(_run, _now, index): boolean {
+		return index > 0;
 	}
 };
 

@@ -78,7 +78,7 @@ export const theme: ThemeTokens = {
 		border: '#202b3b',
 		borderStrong: '#8293a9',
 		separator: '#18202c',
-		gridLine: '#0c1119',
+		gridLine: '#192231',
 
 		textPrimary: '#e6edf5',
 		textSecondary: '#aebbcd',

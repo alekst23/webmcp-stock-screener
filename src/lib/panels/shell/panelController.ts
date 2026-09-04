@@ -16,6 +16,7 @@ import type { IdSequencer } from '../../workbench/domain/ids';
 import type { MutationEnvelope } from '../../workbench/domain/mutation';
 import { emptyWorkspace } from '../../workbench/domain/workspace';
 import {
+	bindPanelSource,
 	createPanel,
 	configurePanelView,
 	emptyPanelState,
@@ -26,13 +27,21 @@ import {
 	type PanelSystemState,
 	type PanelUseCaseDeps
 } from '../application';
-import type { OccupiedRect } from '../domain/layout';
+import { computeEmptyCells, type OccupiedRect } from '../domain/layout';
 import { DEFAULT_SEED_PANELS } from '../domain/defaultLayout';
 import type { PanelLinkChannel } from '../domain/channels';
 import { propagationTargets, type PanelLinkGraph } from '../domain/links';
-import type { Panel } from '../domain/panel';
+import type { GridPosition, GridRect } from '../domain/grid';
+import type { Panel, PanelSourceRef } from '../domain/panel';
 import type { PanelKindDefinition } from '../registry/panelKindRegistry';
 import type { ToolSpec } from '../../webmcp/types';
+
+// T-0027-2: the chart panel kind's own name -- spec.md item 11 and
+// technical.md's "Amendment (EPIC-0027)" both specify that dropping a
+// results row on an empty cell creates a *chart* panel, never a caller-
+// chosen kind, so this is deliberately hardcoded rather than threaded
+// through as a parameter.
+const DROP_TARGET_PANEL_KIND = 'chart';
 
 // ---------------------------------------------------------------------------
 // Workspace initialization (T-1007-9's gate lives here)
@@ -323,6 +332,64 @@ export function removePanelByHuman(deps: PanelUseCaseDeps, panelId: string): Mut
 // just tagged actor: 'human'.
 export function resetLayoutByHuman(deps: PanelUseCaseDeps): MutationEnvelope {
 	return resetLayout(deps, { context: { actor: 'human' } });
+}
+
+// ---------------------------------------------------------------------------
+// Drag a result onto the canvas (T-0027-2)
+// ---------------------------------------------------------------------------
+
+// Rebinding an existing panel dropped onto -- calls the exact same
+// bindPanelSource an agent's bind_panel_source tool call would (AC2, AC5),
+// tagged actor: 'human' like every other human-triggered mutation in this
+// module. Rejection (AC3: an incompatible target) is validateSource's own
+// job inside bindPanelSource -- this throws the identical PanelOperationError
+// a rejected agent call would, for the caller (PanelContainer.svelte) to
+// catch and treat as "nothing changes."
+export function bindPanelSourceFromDrop(
+	deps: PanelUseCaseDeps,
+	panelId: string,
+	source: PanelSourceRef
+): MutationEnvelope {
+	return bindPanelSource(deps, { context: { actor: 'human' }, panelId, source });
+}
+
+// Creating a chart anchored at the dropped-on cell (AC1) -- calls the exact
+// same createPanel an agent's create_panel tool call would, with one
+// difference from every other createPanel call site in this module
+// (seedDefaultWorkspace above): an explicit `rect`, anchored at the cell
+// the human actually dropped onto rather than auto-placement
+// (technical.md's own "Amendment (EPIC-0027)"). The rect's footprint is
+// the chart kind's own `defaultSize` -- a bare 1x1 rect at the drop point
+// would fail createPanel's own below_minimum check for a kind (chart) whose
+// minSize is 2x2, and "the exact cell dropped on" means the panel's
+// top-left corner lands there, not that the panel becomes 1x1.
+//
+// When the grid has no free cell anywhere (`occupied` covers every cell),
+// `rect` is omitted instead of passed through, so this reuses createPanel's
+// own auto-placement grid_full throw (support.ts's resolveAutoRect) rather
+// than reporting the dropped-on cell as a mere overlap or out-of-bounds --
+// the exact "grid is full" rejection AC4 documents, reused rather than
+// reimplemented. A placement that fails only because the anchored footprint
+// itself overlaps a panel or runs past the grid edge (while free space
+// exists elsewhere) is rejected the same way an agent's out-of-bounds/
+// overlapping create_panel call would be -- not silently relocated.
+export function createChartFromDrop(
+	deps: PanelUseCaseDeps,
+	source: PanelSourceRef,
+	anchor: GridPosition,
+	occupied: OccupiedRect[]
+): MutationEnvelope {
+	// deps.kinds.require throws UnknownPanelKindError if 'chart' were somehow
+	// never registered -- a wiring bug (every real composition root registers
+	// it), not a state a human dragging a row can otherwise reach.
+	const rect: GridRect = { ...anchor, ...deps.kinds.require(DROP_TARGET_PANEL_KIND).defaultSize };
+	const gridIsFull = computeEmptyCells(occupied).length === 0;
+	return createPanel(deps, {
+		context: { actor: 'human' },
+		kind: DROP_TARGET_PANEL_KIND,
+		source,
+		...(gridIsFull ? {} : { rect })
+	});
 }
 
 // Read-only access to the change log for the shell's action-log icon

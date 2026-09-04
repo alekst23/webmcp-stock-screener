@@ -6,9 +6,12 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import pytest
+
+from domain.filter_evaluation import FieldResolver, evaluate_condition
 from domain.models.panel import PanelStatus
 from domain.models.price import PriceBar
-from domain.models.screener import SeriesRef, UniverseSpec
+from domain.models.screener import ComparisonValue, ScalarCondition, SeriesRef, UniverseSpec
 from domain.models.universe import TickerMetadata
 from infra.panel_frame import PanelFrame
 from infra.panel_market_data import (
@@ -228,3 +231,175 @@ class TestPanelReferenceDataPort:
             port.get_event_occurrences("AAA", "earnings", date(2024, 1, 1), date(2024, 12, 31))
             == []
         )
+
+    # ---- T-0025-1: sectors -------------------------------------------------
+
+    def test_sectors_any_of_filters_to_matching_tickers(self) -> None:
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0] * 5, start) + _daily_bars("BBB", [10.0] * 5, start)
+        meta = {
+            "AAA": TickerMetadata(ticker="AAA", sector="Technology", as_of=start),
+            "BBB": TickerMetadata(ticker="BBB", sector="Energy", as_of=start),
+        }
+        port = PanelReferenceDataPort(PanelFrame.from_bars(bars), meta)
+
+        members = port.get_universe_members(
+            start + timedelta(days=2), _universe(sectors=["Technology"])
+        )
+
+        assert members == ["AAA"], f"expected only the matching-sector ticker, got {members}"
+
+    def test_sectors_with_no_metadata_excludes_ticker(self) -> None:
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0] * 5, start)
+        port = PanelReferenceDataPort(PanelFrame.from_bars(bars), {})
+
+        members = port.get_universe_members(
+            start + timedelta(days=2), _universe(sectors=["Technology"])
+        )
+
+        assert members == [], f"expected no metadata to mean excluded, got {members}"
+
+    def test_exclusion_wins_over_a_matching_sector(self) -> None:
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0] * 5, start)
+        meta = {"AAA": TickerMetadata(ticker="AAA", sector="Technology", as_of=start)}
+        port = PanelReferenceDataPort(PanelFrame.from_bars(bars), meta)
+
+        members = port.get_universe_members(
+            start + timedelta(days=2),
+            _universe(sectors=["Technology"], excluded_tickers=["AAA"]),
+        )
+
+        assert members == [], f"expected the exclusion to win over the sector match, got {members}"
+
+    def test_sectors_and_market_cap_combine(self) -> None:
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0] * 5, start) + _daily_bars("BBB", [10.0] * 5, start)
+        meta = {
+            "AAA": TickerMetadata(ticker="AAA", sector="Technology", market_cap=1e9, as_of=start),
+            "BBB": TickerMetadata(ticker="BBB", sector="Technology", market_cap=1e6, as_of=start),
+        }
+        port = PanelReferenceDataPort(PanelFrame.from_bars(bars), meta)
+
+        members = port.get_universe_members(
+            start + timedelta(days=2),
+            _universe(sectors=["Technology"], min_market_cap=1e8),
+        )
+
+        assert members == ["AAA"], f"expected only the large-cap tech ticker, got {members}"
+
+    def test_unrecognized_sectors_names_values_not_in_loaded_metadata(self) -> None:
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0], start)
+        meta = {"AAA": TickerMetadata(ticker="AAA", sector="Technology", as_of=start)}
+        port = PanelReferenceDataPort(PanelFrame.from_bars(bars), meta)
+
+        result = port.unrecognized_sectors(["Technology", "Not-A-Sector"])
+
+        assert result == ["Not-A-Sector"], f"expected only the bad value named, got {result}"
+
+    def test_unrecognized_sectors_empty_when_all_recognized(self) -> None:
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0], start)
+        meta = {"AAA": TickerMetadata(ticker="AAA", sector="Technology", as_of=start)}
+        port = PanelReferenceDataPort(PanelFrame.from_bars(bars), meta)
+
+        assert port.unrecognized_sectors(["Technology"]) == [], "expected no unrecognized values"
+
+
+# ---- T-0025-1: field.price.change_pct ------------------------------------
+
+
+class TestChangePctField:
+    def test_resolves_via_params_form(self) -> None:
+        start = date(2024, 1, 1)
+        # Closes rise by 1.0/day: day0=10, day1=11, ..., day5=15.
+        bars = _daily_bars("AAA", [10.0, 11.0, 12.0, 13.0, 14.0, 15.0], start)
+        port = PanelPriceSeriesPort(PanelFrame.from_bars(bars), _status())
+        as_of = start + timedelta(days=5)
+
+        observed = port.get_series(
+            "AAA",
+            SeriesRef(catalog_id="field.price.change_pct", params={"lookback_sessions": 2}),
+            as_of,
+            as_of,
+        )
+
+        # (15 - 13) / 13 * 100
+        expected = (15.0 - 13.0) / 13.0 * 100.0
+        assert len(observed) == 1, f"expected exactly one observation, got {observed}"
+        assert observed[0].value == pytest.approx(expected), f"got {observed[0].value}"
+
+    def test_resolves_via_suffix_form(self) -> None:
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0, 11.0, 12.0, 13.0, 14.0, 15.0], start)
+        port = PanelPriceSeriesPort(PanelFrame.from_bars(bars), _status())
+        as_of = start + timedelta(days=5)
+
+        observed = port.get_series(
+            "AAA", SeriesRef(catalog_id="field.price.change_pct_2"), as_of, as_of
+        )
+
+        expected = (15.0 - 13.0) / 13.0 * 100.0
+        assert len(observed) == 1, f"expected exactly one observation, got {observed}"
+        assert observed[0].value == pytest.approx(expected), f"got {observed[0].value}"
+
+    def test_insufficient_history_is_not_evaluable(self) -> None:
+        # Only 3 stored sessions; a 5-session lookback has nowhere to land.
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0, 11.0, 12.0], start)
+        port = PanelPriceSeriesPort(PanelFrame.from_bars(bars), _status())
+        as_of = start + timedelta(days=2)
+
+        observed = port.get_series(
+            "AAA", SeriesRef(catalog_id="field.price.change_pct_5"), as_of, as_of
+        )
+
+        assert (
+            observed == []
+        ), f"expected [] (not evaluable) for insufficient history, got {observed}"
+
+    def test_unparseable_suffix_is_not_a_change_pct_field(self) -> None:
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0], start)
+        port = PanelPriceSeriesPort(PanelFrame.from_bars(bars), _status())
+
+        observed = port.get_series(
+            "AAA", SeriesRef(catalog_id="field.price.change_pct_not_a_number"), start, start
+        )
+
+        assert (
+            observed == []
+        ), f"expected an unparseable suffix to resolve to not-evaluable, got {observed}"
+
+    def test_fails_closed_end_to_end_through_the_evaluator(self) -> None:
+        """T-0025-1 AC2: the filter-tree evaluator (already-existing,
+        unmodified) folds an unresolvable field to False, never raising or
+        aborting the run -- confirms the port's [] contract actually reaches
+        that fold, not just that get_series itself returns []."""
+        start = date(2024, 1, 1)
+        bars = _daily_bars("AAA", [10.0, 11.0, 12.0], start)
+        port = PanelPriceSeriesPort(PanelFrame.from_bars(bars), _status())
+        as_of = start + timedelta(days=2)
+        condition = ScalarCondition(
+            field_id="field.price.change_pct_5", operator="op.greater_than", value=0.0
+        )
+
+        def _value_at(
+            ticker: str, catalog_id: str, params: dict[str, ComparisonValue], on_date: date
+        ) -> float | None:
+            ref = SeriesRef(catalog_id=catalog_id, params=params)
+            observed = port.get_series(ticker, ref, on_date, on_date)
+            return observed[-1].value if observed else None
+
+        resolver = FieldResolver(
+            value_at=_value_at,
+            average_at=lambda *args, **kwargs: None,
+            event_occurred=lambda *args, **kwargs: None,
+            recent_sessions=lambda *args, **kwargs: [],
+        )
+
+        result = evaluate_condition(condition, "AAA", as_of, resolver)
+
+        assert result is None, f"expected not-evaluable (None), got {result}"

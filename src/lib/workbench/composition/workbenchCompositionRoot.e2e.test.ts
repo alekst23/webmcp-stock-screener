@@ -1,31 +1,25 @@
-// T-0020-3: the full path an agent actually drives on /workbench, through
-// the REAL composition-root entry point -- registerWorkbenchComposition()
-// itself, the exact function +page.svelte calls, not a hand-reconstruction
-// of its internals (createWorkbenchSharedInfra -> createPanelShellRuntime ->
-// buildWorkbenchDeps/buildScreenerDeps -> the three register*Tools calls).
-// A future bug in that real function's call order or wiring would fail this
-// test; it would not have with a hand-copied reconstruction that could drift
-// from it and still pass.
+// T-0026-5 AC6: the full path an agent actually drives on /workbench today
+// -- define_screener -> run_screener -> get_screener_results -> create_panel
+// -- through the REAL composition-root entry point (registerWorkbenchComposition
+// itself, the exact function +page.svelte calls), with NO evaluationPort
+// override. Only `fetch` is stubbed, at the wire boundary T-0026-4's
+// HttpScreenerEvaluationPort actually calls (POST /api/screener/run) --
+// this is what proves the *default* wiring works (AC2), not just the port's
+// own unit behavior (httpEvaluationPort.test.ts already covers that) or an
+// evaluationPort override seam.
 //
-// One seam is substituted: ScreenerToolDeps.evaluationPort, via
-// registerWorkbenchComposition()'s own optional `overrides` parameter. No
-// real ScreenerMarketData adapter exists anywhere in this codebase yet
-// (every other screener test -- runScreener.test.ts, engine.test.ts -- fakes
-// this exact port for the same reason); the shipped honest-unavailable
-// default (unavailableMarketData.ts) resolves any universe to zero
-// instruments, which screener-core's own existing (unchanged,
-// out-of-scope-to-touch) validation always treats as a *blocking*
-// empty_universe problem -- so a real run against the honest default is
-// always refused, never a live demonstration of the auto-bind path.
-// Substituting only the evaluation port -- not the composition, not the
-// binding, not the panel/workbench wiring -- is how this test proves the
-// actually-new wiring (AC1) without re-testing or changing screener-core's
-// own matching/validation logic (explicitly out of scope for this epic).
+// Supersedes the old T-0020-3 skipped flow (create_screener ->
+// set_screener_universe -> edit_filter_tree -> run_screener), which exercised
+// tools this ticket deleted from the composition root (create_screener,
+// set_screener_universe, edit_filter_tree -- see group.ts's own T-0026-5
+// comment for why those modules survive elsewhere but not this route).
+//
+// hotfix/empty-grid-canvas landed after that old flow was written: the
+// default seed layout is now a single sparse filter_builder panel
+// (defaultLayout.ts), not a six-panel layout that already included a
+// results_table panel -- so this test creates one itself via create_panel
+// before running the screener, rather than assuming one is seeded.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { emptyFilterTree } from '../../screener/definition';
-import type { ScreenerEvaluationPort } from '../../screener/ports';
-import { makeScreenerRun, type ScreenerMatch } from '../../screener/run';
-import { makeProvenance, type MarketDataProvenance } from '../domain/provenance';
 import type { ToolResult, ToolSpec } from '../../webmcp/types';
 import { registerWorkbenchComposition } from './workbenchCompositionRoot';
 
@@ -37,71 +31,80 @@ async function textOf(result: ToolResult): Promise<unknown> {
 	return JSON.parse(result.content[0]!.text);
 }
 
-function fixtureProvenance(): MarketDataProvenance {
-	return makeProvenance({
-		asOf: '2026-09-02T14:30:00.000Z',
-		sourceId: 'src.screener.engine.fixture',
-		sourceLabel: 'Fixture screener engine (no real market-data adapter exists yet)',
-		liveness: 'end_of_day',
-		timezone: 'America/New_York'
-	});
+interface FetchCall {
+	url: string;
+	body: Record<string, unknown> | null;
 }
 
-function testMatch(instrumentId: string, rank: number): ScreenerMatch {
+function jsonResponse(payload: unknown): Response {
 	return {
-		instrumentId,
-		rank,
-		compositeScore: null,
-		rankingValues: {},
-		nodeEvaluations: {}
-	};
+		ok: true,
+		status: 200,
+		statusText: 'OK',
+		json: async () => payload,
+		text: async () => JSON.stringify(payload)
+	} as Response;
 }
 
-// Stands in for T-1009-7's real engine, exactly like runScreener.test.ts's
-// own makeFakePort -- proving orchestration and wiring, not re-testing
-// screener-core's own evaluation logic.
-function fakeEvaluationPort(): ScreenerEvaluationPort {
-	return {
-		async validate(definition) {
-			return {
-				screenerId: definition.screenerId,
-				screenerRevision: definition.revision,
-				valid: true,
-				problems: [],
-				skippedNodeIds: [],
-				costEstimate: null,
-				detectionExhaustive: false
-			};
-		},
-		async execute({ definition, runId }) {
-			return makeScreenerRun({
-				runId,
-				screenerId: definition.screenerId,
-				screenerRevision: definition.revision,
-				status: 'complete',
-				universeCount: 2,
-				matchedCount: 1,
-				returnedCount: 1,
-				truncated: false,
-				rankingApplied: false,
-				normalization: null,
-				warnings: [],
-				provenance: fixtureProvenance(),
-				matches: [testMatch('inst:XNAS:AAPL', 1)],
-				rejectedEvaluations: {},
-				filterTree: emptyFilterTree('filter_root'),
-				rankingSpec: null,
-				createdAt: '2026-09-02T14:30:05.000Z'
-			});
+// A minimal, valid WireScreenerRunResult (httpEvaluationPort.ts's own inbound
+// shape) for a 'complete' run with one match -- stands in for the real
+// backend /api/screener/run endpoint, exactly like httpEvaluationPort.test.ts's
+// own fixture body, so this test proves wiring, not screener-core's or the
+// backend's own evaluation logic.
+const COMPLETE_RUN_BODY = {
+	status: 'complete',
+	as_of: '2026-09-02T14:30:00.000Z',
+	universe_count: 2,
+	matched_count: 1,
+	returned_count: 1,
+	truncated: false,
+	ranking_applied: true,
+	matches: [
+		{
+			instrument: {
+				instrument_id: 'inst:XNAS:AAPL',
+				symbol: 'AAPL',
+				exchange: 'XNAS',
+				asset_type: 'equity'
+			},
+			rank: 1,
+			composite_score: 0.9,
+			ranking_values: { 'field.price.close': 12.5 },
+			node_evaluations: {}
 		}
-	};
+	],
+	problems: [],
+	provenance: {
+		as_of: '2026-09-02T14:30:00.000Z',
+		source_id: 'src.screener.backend.fixture',
+		source_label: 'Fixture backend (T-0026-5 e2e -- no real adapter exists yet)',
+		liveness: 'end_of_day',
+		timezone: 'America/New_York',
+		engine_version: 'v1'
+	}
+};
+
+function stubFetch(): { impl: typeof fetch; calls: FetchCall[] } {
+	const calls: FetchCall[] = [];
+	const impl = (async (url: string, init?: RequestInit) => {
+		calls.push({
+			url: String(url),
+			body: init?.body ? JSON.parse(String(init.body)) : null
+		});
+		return jsonResponse(COMPLETE_RUN_BODY);
+	}) as unknown as typeof fetch;
+	return { impl, calls };
 }
 
-async function registerSpecs(): Promise<Map<string, ToolSpec>> {
+async function registerSpecs(fetchImpl: typeof fetch): Promise<Map<string, ToolSpec>> {
 	const registerTool = vi.fn();
 	vi.stubGlobal('document', { modelContext: { registerTool } });
+	vi.stubGlobal('fetch', fetchImpl);
 
-	await registerWorkbenchComposition({ evaluationPort: fakeEvaluationPort() });
+	// No overrides -- in particular no evaluationPort override -- so
+	// buildScreenerDeps' own default (HttpScreenerEvaluationPort against
+	// resolveApiBaseUrl(undefined), i.e. DEV_API_BASE_URL) applies.
+	await registerWorkbenchComposition();
 
 	return new Map<string, ToolSpec>(
 		registerTool.mock.calls.map((args: unknown[]) => {
@@ -111,38 +114,124 @@ async function registerSpecs(): Promise<Map<string, ToolSpec>> {
 	);
 }
 
-// Chart-demo trim (see plan: "Trim the WebMCP tool surface to a chart-only
-// demo set"): registerWorkbenchComposition() no longer registers the
-// screener or workbench-core tool groups this whole flow depends on
-// (create_screener, set_screener_universe, edit_filter_tree, run_screener,
-// get_canvas_state) -- see workbenchCompositionRoot.ts. Skipped rather than
-// deleted or hand-edited, so un-skipping is the exact counterpart to
-// uncommenting those groups' call sites back in.
-describe.skip('T-0020-3: create_screener -> set_screener_universe -> edit_filter_tree -> run_screener -> panel read', () => {
-	it('the run_screener call succeeds and its matches are readable through the bound results_table panel', async () => {
-		const specs = await registerSpecs();
+describe('T-0026-5: define_screener -> run_screener -> get_screener_results -> create_panel', () => {
+	it('runs end to end against the real composition root, with only fetch stubbed at the HTTP boundary', async () => {
+		const { impl, calls } = stubFetch();
+		const specs = await registerSpecs(impl);
 		try {
-			// 1. create_screener
-			const createResult = await specs.get('create_screener')!.execute({ name: 'E2E Screener' });
-			expect(createResult.isError, JSON.stringify(createResult)).toBeFalsy();
-			const created = (await textOf(createResult)) as { affected_ids: string[] };
-			const screenerId = created.affected_ids[0]!;
+			// 0. The default seed layout no longer includes a results_table panel
+			// (hotfix/empty-grid-canvas) -- create one so run_screener's auto-bind
+			// (T-0020-2) has somewhere to bind to.
+			const resultsPanelResult = await specs
+				.get('create_panel')!
+				.execute({ kind: 'results_table' });
+			expect(
+				resultsPanelResult.isError,
+				`seeding a results_table panel failed: ${JSON.stringify(resultsPanelResult)}`
+			).toBeFalsy();
+			const resultsPanelId = ((await textOf(resultsPanelResult)) as { affected_ids: string[] })
+				.affected_ids[0]!;
 
-			// 2. set_screener_universe
-			const universeResult = await specs.get('set_screener_universe')!.execute({
-				screener_id: screenerId,
-				asset_class: 'equity',
-				exchanges: ['XNAS']
-			});
-			expect(universeResult.isError, JSON.stringify(universeResult)).toBeFalsy();
-
-			// 3. edit_filter_tree -- a real seeded catalog field id
-			// (src/lib/catalog/items.ts), matching editFilterTree.test.ts's own
+			// 1. define_screener -- one call, real seeded catalog field
+			// (src/lib/catalog/items.ts), matching defineScreener.test.ts's own
 			// fixture convention.
-			const editResult = await specs.get('edit_filter_tree')!.execute({
-				screener_id: screenerId,
-				operation: 'add',
-				condition: {
+			const defineResult = await specs.get('define_screener')!.execute({
+				universe: { asset_class: 'equity' },
+				conditions: {
+					type: 'scalar',
+					fieldId: 'field.price.close',
+					operator: 'op.greater_than',
+					value: 10,
+					unit: null
+				},
+				ranking: { fields: [{ field_id: 'field.price.close', direction: 'desc' }] },
+				limit: 20
+			});
+			expect(
+				defineResult.isError,
+				`define_screener failed: ${JSON.stringify(defineResult)}`
+			).toBeFalsy();
+			const defined = (await textOf(defineResult)) as { screener_id: string; valid: boolean };
+			expect(defined.valid, 'AC1: a well-formed definition must validate').toBe(true);
+
+			// 2. run_screener -- against the real, default HttpScreenerEvaluationPort.
+			const runResult = await specs
+				.get('run_screener')!
+				.execute({ screener_id: defined.screener_id });
+			expect(runResult.isError, `run_screener failed: ${JSON.stringify(runResult)}`).toBeFalsy();
+			const run = (await textOf(runResult)) as {
+				run_id: string;
+				status: string;
+				matched_count: number;
+			};
+			expect(run.status, 'AC2: a valid screener produces a completed run').toBe('complete');
+			expect(typeof run.run_id, 'the run must carry a pinned run_id').toBe('string');
+
+			// AC2/AC6: exactly one real HTTP call, to the backend's own endpoint,
+			// as a non-dry-run execute -- never an override, never a dry run.
+			expect(
+				calls.length,
+				'run_screener must call the real HTTP evaluation port exactly once'
+			).toBe(1);
+			expect(calls[0]!.url).toContain('/api/screener/run');
+			expect(calls[0]!.body?.dry_run, 'run_screener executes, it does not dry-run').toBe(false);
+
+			// 3. get_screener_results -- read back through the results_table panel
+			// run_screener auto-bound (T-0020-2), not a side channel.
+			const pageResult = await specs
+				.get('get_screener_results')!
+				.execute({ panel_id: resultsPanelId });
+			expect(
+				pageResult.isError,
+				`get_screener_results failed: ${JSON.stringify(pageResult)}`
+			).toBeFalsy();
+			const page = (await textOf(pageResult)) as {
+				run_id: string;
+				total: number;
+				rows: { instrument_id: string; symbol: string; exchange: string; asset_type: string }[];
+			};
+			expect(page.run_id, 'the panel read must resolve to the exact run just executed').toBe(
+				run.run_id
+			);
+			expect(page.total).toBe(run.matched_count);
+			expect(page.rows[0]!.instrument_id).toBe('inst:XNAS:AAPL');
+
+			// 4. create_panel -- "show me details for X": open a detail view for
+			// the top result, completing the use case's second step. The chart
+			// panel's 'instrument' source ref is { instrument: {...} }
+			// (chart/application/chartSource.ts's INSTRUMENT_REF_SCHEMA), matching
+			// registerPanelTools.test.ts's own bind_panel_source fixture.
+			const row = page.rows[0]!;
+			const chartPanelResult = await specs.get('create_panel')!.execute({
+				kind: 'chart',
+				source: {
+					type: 'instrument',
+					ref: {
+						instrument: {
+							instrument_id: row.instrument_id,
+							symbol: row.symbol,
+							exchange: row.exchange,
+							asset_type: row.asset_type
+						}
+					}
+				}
+			});
+			expect(
+				chartPanelResult.isError,
+				`create_panel failed: ${JSON.stringify(chartPanelResult)}`
+			).toBeFalsy();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it('run_screener still succeeds when no results_table panel exists (AC2: binding is best-effort)', async () => {
+		const { impl, calls } = stubFetch();
+		const specs = await registerSpecs(impl);
+		try {
+			const defineResult = await specs.get('define_screener')!.execute({
+				universe: { asset_class: 'equity' },
+				conditions: {
 					type: 'scalar',
 					fieldId: 'field.price.close',
 					operator: 'op.greater_than',
@@ -150,80 +239,19 @@ describe.skip('T-0020-3: create_screener -> set_screener_universe -> edit_filter
 					unit: null
 				}
 			});
-			expect(editResult.isError, JSON.stringify(editResult)).toBeFalsy();
+			expect(defineResult.isError, JSON.stringify(defineResult)).toBeFalsy();
+			const defined = (await textOf(defineResult)) as { screener_id: string };
 
-			// 4. run_screener
-			const runResult = await specs.get('run_screener')!.execute({ screener_id: screenerId });
-			expect(runResult.isError, JSON.stringify(runResult)).toBeFalsy();
-			const run = (await textOf(runResult)) as {
-				run_id: string;
-				status: string;
-				matched_count: number;
-			};
-			expect(run.status, 'AC3: a valid screener produces a completed run').toBe('complete');
-			expect(typeof run.run_id, 'AC3: the run must carry a pinned run_id').toBe('string');
-
-			// 5. The results_table panel's bound source resolves to that run --
-			// find it via get_canvas_state (workbench-core), the same tool group
-			// T-0020-1's own cross-group test already exercises. get_canvas_state
-			// reports EPIC-1006's own PanelRecord projection (panelState.ts's
-			// boundResourceId, its "best-effort display convenience" for a
-			// panel's source, not the full PanelSourceRef), so it reads back as
-			// the run_id string directly.
-			const canvas = (await textOf(await specs.get('get_canvas_state')!.execute({}))) as {
-				panels: { id: string; kind: string; boundResourceId: string | null }[];
-			};
-			const resultsPanel = canvas.panels.find((p) => p.kind === 'results_table')!;
-			expect(
-				resultsPanel.boundResourceId,
-				'AC4/AC6: the seeded results_table panel is auto-bound to the run, no separate bind_panel_source call'
-			).toBe(run.run_id);
-
-			// 6. And its matches are readable through the panel's own existing
-			// read path (get_screener_results), not a side channel.
-			const pageResult = await specs
-				.get('get_screener_results')!
-				.execute({ panel_id: resultsPanel.id });
-			expect(pageResult.isError, JSON.stringify(pageResult)).toBeFalsy();
-			const page = (await textOf(pageResult)) as {
-				run_id: string;
-				total: number;
-				rows: { instrument_id: string }[];
-			};
-			expect(page.run_id, 'AC6: the panel read resolves to the exact run just executed').toBe(
-				run.run_id
-			);
-			expect(page.total, 'AC6: the run matched_count is what the panel reads back').toBe(
-				run.matched_count
-			);
-			expect(page.rows[0]!.instrument_id).toBe('inst:XNAS:AAPL');
-		} finally {
-			vi.unstubAllGlobals();
-		}
-	});
-
-	it('run_screener still succeeds when the results_table panel was removed first (AC5/AC2)', async () => {
-		const specs = await registerSpecs();
-		try {
-			const canvasBefore = (await textOf(await specs.get('get_canvas_state')!.execute({}))) as {
-				panels: { id: string; kind: string }[];
-			};
-			const resultsPanel = canvasBefore.panels.find((p) => p.kind === 'results_table')!;
-			const removed = await specs.get('remove_panel')!.execute({ panel_id: resultsPanel.id });
-			expect(removed.isError, JSON.stringify(removed)).toBeFalsy();
-
-			const created = (await textOf(
-				await specs.get('create_screener')!.execute({ name: 'E2E Screener 2' })
-			)) as { affected_ids: string[] };
-			const screenerId = created.affected_ids[0]!;
-
-			const runResult = await specs.get('run_screener')!.execute({ screener_id: screenerId });
+			const runResult = await specs
+				.get('run_screener')!
+				.execute({ screener_id: defined.screener_id });
 			expect(
 				runResult.isError,
 				'binding is best-effort and never a precondition for the run itself'
 			).toBeFalsy();
 			const run = (await textOf(runResult)) as { run_id: string };
 			expect(typeof run.run_id).toBe('string');
+			expect(calls.length).toBe(1);
 		} finally {
 			vi.unstubAllGlobals();
 		}

@@ -23,6 +23,7 @@ these honest capability flags into an honest reported statement.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime, time, timezone
 
 import numpy as np
@@ -47,6 +48,36 @@ _OHLC_FIELDS = ("open", "high", "low", "close")
 # filter -- the same 20-session convention `own_moving_average` conditions
 # default to elsewhere in this engine's fixtures.
 _AVG_VOLUME_WINDOW = 20
+
+# T-0025-1: the catalog field id family for "percent change over N stored
+# sessions". `ScalarCondition`/`RangeCondition`/`RelativeCondition` (and
+# T-0025-2's `RankingField`) carry only a bare `field_id: str` --
+# `filter_evaluation.py` calls `resolver.value_at(ticker, field_id, {},
+# as_of)` for all of them, always with an empty params dict, so a lookback
+# expressed only through `SeriesRef.params` (the `series_comparison` path)
+# would be unreachable from those condition types. The `_N` suffix form
+# lets any field-id-only condition express a lookback without changing
+# `filter_evaluation.py`'s Condition models or its evaluation functions.
+_CHANGE_PCT_FIELD_ID = "field.price.change_pct"
+_CHANGE_PCT_SUFFIX_PREFIX = _CHANGE_PCT_FIELD_ID + "_"
+
+
+def _change_pct_lookback(catalog_id: str, params: Mapping[str, object]) -> int | None:
+    """The requested lookback_sessions for a `field.price.change_pct`
+    catalog id, or None if `catalog_id` does not name this field at all.
+    Accepts both the `SeriesRef.params` form (`catalog_id` exact,
+    `params["lookback_sessions"]`) and the id-suffix form
+    (`field.price.change_pct_<N>`) -- see the module-level note above."""
+    if catalog_id == _CHANGE_PCT_FIELD_ID:
+        raw = params.get("lookback_sessions")
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            return None
+        return int(raw) if raw > 0 else None
+    if catalog_id.startswith(_CHANGE_PCT_SUFFIX_PREFIX):
+        suffix = catalog_id[len(_CHANGE_PCT_SUFFIX_PREFIX) :]
+        if suffix.isdigit() and int(suffix) > 0:
+            return int(suffix)
+    return None
 
 
 def _row_range(panel: PanelFrame, ticker: str, from_date: date, to_date: date) -> tuple[int, int]:
@@ -105,6 +136,9 @@ class PanelPriceSeriesPort:
     def get_series(
         self, ticker: str, series_ref: SeriesRef, from_date: date, to_date: date
     ) -> list[SeriesObservation]:
+        lookback = _change_pct_lookback(series_ref.catalog_id, series_ref.params)
+        if lookback is not None:
+            return self._change_pct_series(ticker, lookback, from_date, to_date)
         # An unrecognized catalog_id (any price-derived study id this port
         # does not implement) returns [] -- the port's own documented
         # contract for "not evaluable," never a fabricated value.
@@ -114,6 +148,46 @@ class PanelPriceSeriesPort:
         column = self._panel.frame[series_ref.catalog_id].to_numpy()
         return [
             SeriesObservation(self._panel.date_at(i), float(column[i])) for i in range(start, stop)
+        ]
+
+    def _change_pct_series(
+        self, ticker: str, lookback_sessions: int, from_date: date, to_date: date
+    ) -> list[SeriesObservation]:
+        """T-0025-1 AC1/AC2: percent change between each session's close and
+        its close `lookback_sessions` stored sessions earlier, over
+        `[from_date, to_date]`. Vectorized: the whole requested row range is
+        diffed against its lookback-shifted counterpart in one array
+        operation, never a per-bar scalar fetch. A session with fewer than
+        `lookback_sessions` of its own prior history (the lookback row falls
+        before the ticker's first stored row) is dropped from the result --
+        `get_series`'s existing "not evaluable" contract, which
+        `_value_at`/`filter_evaluation.py` already fold to None/fails-closed
+        with no further change needed."""
+        bounds = self._panel.bounds(ticker)
+        if bounds is None:
+            return []
+        first_row, _last_row = bounds
+        start, stop = _row_range(self._panel, ticker, from_date, to_date)
+        if stop <= start:
+            return []
+        positions = np.arange(start, stop)
+        lookback_positions = positions - lookback_sessions
+        valid = lookback_positions >= first_row
+        if not valid.any():
+            return []
+        closes = self._panel.frame["close"].to_numpy()
+        dates = self._panel.frame["date"].to_numpy()
+        current = closes[positions[valid]]
+        past = closes[lookback_positions[valid]]
+        nonzero = past != 0
+        pct = np.divide(
+            (current - past) * 100.0, past, out=np.full_like(current, np.nan), where=nonzero
+        )
+        result_dates = dates[positions[valid]]
+        return [
+            SeriesObservation(date.fromordinal(int(result_dates[i])), float(pct[i]))
+            for i in range(len(pct))
+            if not np.isnan(pct[i])
         ]
 
     def provenance(self) -> MarketDataProvenance:
@@ -177,10 +251,14 @@ class PanelReferenceDataPort:
         return sorted(
             ticker
             for ticker in candidates
-            if ticker not in excluded and self._passes_liquidity(ticker, as_of, universe)
+            # Exclusions checked first, before any inclusion criterion --
+            # T-0025-1 AC3's "exclusions always win": an excluded ticker
+            # never reaches `_passes_criteria` no matter what else would
+            # have included it.
+            if ticker not in excluded and self._passes_criteria(ticker, as_of, universe)
         )
 
-    def _passes_liquidity(self, ticker: str, as_of: date, universe: UniverseSpec) -> bool:
+    def _passes_criteria(self, ticker: str, as_of: date, universe: UniverseSpec) -> bool:
         row = _row_on_or_before(self._panel, ticker, as_of)
         if row is None:
             return False
@@ -191,11 +269,22 @@ class PanelReferenceDataPort:
             and self._avg_volume(ticker, row) < universe.min_avg_volume
         ):
             return False
+        meta = self._universe_meta.get(ticker)
         if universe.min_market_cap is not None:
-            meta = self._universe_meta.get(ticker)
             if meta is None or meta.market_cap is None or meta.market_cap < universe.min_market_cap:
                 return False
+        if universe.sectors:
+            if meta is None or meta.sector is None or meta.sector not in universe.sectors:
+                return False
         return True
+
+    def unrecognized_sectors(self, sectors: list[str]) -> list[str]:
+        """T-0025-1 AC4: which of `sectors` never appears as any loaded
+        ticker's sector -- so an unmatched sector is surfaced as a request
+        problem naming the bad value, not silently dropped from the
+        universe by `_passes_criteria`'s any-of check."""
+        known = {meta.sector for meta in self._universe_meta.values() if meta.sector is not None}
+        return [sector for sector in sectors if sector not in known]
 
     def _avg_volume(self, ticker: str, as_of_row: int) -> float:
         bounds = self._panel.bounds(ticker)

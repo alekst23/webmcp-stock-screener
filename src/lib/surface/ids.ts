@@ -49,6 +49,21 @@ export function isInstrumentId(value: unknown): value is string {
 	return typeof value === 'string' && INSTRUMENT_ID.test(value);
 }
 
+// The inverse of makeInstrumentId, for a caller that has an instrument ID
+// and needs its parts back (T-0026-3: the in-browser screener engine has no
+// reference-data source to look symbol/exchange up in, so it recovers them
+// from the ID it already minted). Returns null -- never throws -- for any
+// value that isn't this application's own `inst:<MIC>:<SYMBOL>` construction
+// (e.g. a future reference-data source's opaque ID), matching this module's
+// "treat the value as opaque unless proven otherwise" stance.
+export function parseInstrumentId(value: string): { exchangeMic: string; symbol: string } | null {
+	if (!isInstrumentId(value)) {
+		return null;
+	}
+	const [, exchangeMic, symbol] = value.split(':');
+	return { exchangeMic: exchangeMic as string, symbol: symbol as string };
+}
+
 export function makeCatalogItemId(prefix: CatalogIdPrefix, path: string): string {
 	const id = `${prefix}.${path}`;
 	if (!CATALOG_ITEM_ID.test(id)) {

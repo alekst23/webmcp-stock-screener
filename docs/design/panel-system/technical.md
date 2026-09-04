@@ -326,6 +326,16 @@ fresh panel via `makePanel` → replace `state.panels` with the newly minted
 panels, `links` with `emptyLinkGraph()`, `selections` with `{}` → bump
 revision → envelope naming all newly minted panel ids as `affectedIds`.
 
+## Amendment (EPIC-0027): drag a result onto the canvas
+
+The human drag path calls the same `createPanel`/`bindPanelSource` use
+cases the agent tools call, with one difference: it passes an explicit
+`rect` (the dropped-on cell) rather than relying on `createPanel`'s
+auto-placement (first free cell), so the panel lands where the human
+actually dropped it. The agent path is unchanged — it has no cursor
+position to honor and keeps auto-placement as its default. Both paths
+converge on the same mutation shape once a `rect` is decided.
+
 ---
 
 _Product design: [spec.md](spec.md)_

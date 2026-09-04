@@ -23,6 +23,36 @@ export const NO_REFERENCE_DATA =
 	'index membership, exchanges, countries and market caps have no source here ' +
 	'and sourcing them is an open project decision.';
 
+// The vocabulary a `sectors` narrowing value is drawn from -- distinct from
+// whether this surface can currently *resolve* a given instrument's sector
+// (it cannot; see NO_REFERENCE_DATA above). The backend has no fixed sector
+// enum of its own: `backend/infra/nasdaq_screener.py` passes through
+// whatever string sits in the "Sector" column of a periodically-refreshed
+// Nasdaq screener CSV export, and EPIC-0025's universe resolution (T-0025-1)
+// validates a requested sector against that loaded, data-driven set at
+// runtime, not against a compiled schema. This list is the classic
+// twelve-category Nasdaq screener taxonomy that export has used for years
+// (confirmed here by the "Technology" / "Health Care" / "Finance" values in
+// backend/tests/unit/test_universe_eligibility.py's own fixture CSV) -- the
+// closest thing to a canonical source this project has today, not a value
+// verified against a live CSV. If a future load picks up a export column
+// using different category names, this list drifts from what the backend
+// actually accepts; there is no shared source of truth yet to prevent that.
+export const SECTOR_ENUM_VALUES = [
+	'Basic Industries',
+	'Capital Goods',
+	'Consumer Durables',
+	'Consumer Non-Durables',
+	'Consumer Services',
+	'Energy',
+	'Finance',
+	'Health Care',
+	'Miscellaneous',
+	'Public Utilities',
+	'Technology',
+	'Transportation'
+] as const;
+
 export const NO_FUNDAMENTALS =
 	'No fundamentals source is configured. The EODHD plan in use covers daily ' +
 	'OHLCV only; fundamentals and the earnings calendar sit on a tier this ' +
@@ -191,10 +221,11 @@ const REFERENCE_FIELDS: CatalogItem[] = [
 		id: 'field.sector',
 		kind: 'field',
 		label: 'Sector',
-		description: 'GICS-style sector classification.',
+		description: 'Sector classification, from the Nasdaq screener taxonomy.',
 		aliases: ['sector', 'gics sector'],
 		tags: ['classification', 'reference-data'],
 		valueType: 'enum',
+		enumValues: SECTOR_ENUM_VALUES,
 		nullable: true,
 		availability: unavailable(NO_REFERENCE_DATA, true)
 	},
