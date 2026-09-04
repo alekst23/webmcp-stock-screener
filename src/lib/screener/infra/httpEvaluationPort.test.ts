@@ -193,6 +193,10 @@ describe('createHttpScreenerEvaluationPort.execute', () => {
 		expect(run.matches).toEqual([
 			{
 				instrumentId: 'inst:XNAS:AAPL',
+				symbol: 'AAPL',
+				exchange: 'XNAS',
+				assetType: 'equity',
+				name: 'AAPL',
 				rank: 1,
 				compositeScore: 0.9,
 				rankingValues: { 'field.price.change_pct': 0.9 },

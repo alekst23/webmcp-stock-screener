@@ -347,12 +347,21 @@ function fromWireNodeEvaluations(
 	return out;
 }
 
-// Maps only the fields the backend's ScreenerMatch and the frontend's
-// ScreenerMatch (run.ts) both already carry -- T-0026-3 owns widening
-// ScreenerMatch's own shape, not this ticket.
+// UNKNOWN_EXCHANGE / name-falls-back-to-symbol mirrors engine.ts's
+// deriveInstrumentRef (T-0026-3): the backend's WireInstrumentRef already
+// carries a real symbol/exchange/assetType, but has no `name` field (no
+// reference-data source exists anywhere in this project), and exchange/
+// assetType are wire-optional -- same honest fallback, not a new gap.
+const UNKNOWN_EXCHANGE = 'XUNK';
+
 function fromWireMatch(match: WireScreenerMatch): ScreenerMatch {
+	const { instrument } = match;
 	return {
-		instrumentId: match.instrument.instrument_id,
+		instrumentId: instrument.instrument_id,
+		symbol: instrument.symbol,
+		exchange: instrument.exchange ?? UNKNOWN_EXCHANGE,
+		assetType: instrument.asset_type ?? 'equity',
+		name: instrument.symbol,
 		rank: match.rank,
 		compositeScore: match.composite_score,
 		rankingValues: match.ranking_values,
