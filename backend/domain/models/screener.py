@@ -206,20 +206,28 @@ GroupNode.model_rebuild()
 
 
 class UniverseSpec(BaseModel):
-    """The set of instruments a backtest walks. Deliberately smaller than
-    TS's `UniverseSpec` (no sectors/industries/indexes/exchanges -- nothing
-    on the Python side classifies those yet); extending it is additive and
-    does not require touching the engine's evaluation logic.
+    """The set of instruments a backtest or a screener run walks.
+    Deliberately smaller than TS's `UniverseSpec` (no industries/indexes/
+    exchanges -- nothing on the Python side classifies those yet); extending
+    it is additive and does not require touching the engine's evaluation
+    logic.
 
     `tickers=None` means "resolved by the reference-data port from the
     other fields, as of each rebalance date" -- the mechanism that makes
     the survivorship statement (AC2) describe real, point-in-time
     membership rather than today's membership applied retroactively.
+
+    `sectors` (T-0025-1): an any-of inclusion filter against the loaded
+    Nasdaq-screener metadata's sector classification
+    (`domain.models.universe.TickerMetadata.sector`). Like `min_market_cap`,
+    this is resolved by `infra.panel_market_data.PanelReferenceDataPort`,
+    not evaluated here -- this module only carries the shape.
     """
 
     universe_id: str
     label: str
     tickers: list[str] | None = None
+    sectors: list[str] | None = None
     min_price: float | None = None
     min_avg_volume: float | None = None
     min_market_cap: float | None = None

@@ -183,6 +183,28 @@ class ReferenceDataPort(Protocol):
         ...
 
 
+class SectorCatalog(Protocol):
+    """Read-only lookup of which sector values the loaded universe metadata
+    actually contains (T-0025-1 AC4) -- lets a caller tell "this sector was
+    never in the loaded data" apart from "this sector matched zero
+    instruments," which `ReferenceDataPort.get_universe_members` alone
+    cannot distinguish.
+
+    Deliberately a separate Protocol rather than a new `ReferenceDataPort`
+    method: `ReferenceDataPort` already has a structural implementer
+    (`test_backtest_engine.py`'s `FakeReferenceDataPort`) with no use for
+    this method -- adding it there would force that fake to grow a method
+    it never calls. `PanelReferenceDataPort` implements both Protocols; a
+    caller that needs both (T-0025-2's screener engine) takes both as
+    separate constructor parameters over the same concrete instance.
+    """
+
+    def unrecognized_sectors(self, sectors: list[str]) -> list[str]:
+        """Which of `sectors` do not appear as any ticker's sector in the
+        loaded metadata. Empty means every requested value is recognized."""
+        ...
+
+
 __all__ = [
     "SeriesObservation",
     "PriceSeriesPort",
@@ -191,6 +213,7 @@ __all__ = [
     "DelistingEvent",
     "EventOccurrence",
     "ReferenceDataPort",
+    "SectorCatalog",
     "ComparisonValue",
     "MarketDataProvenance",
 ]
