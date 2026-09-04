@@ -100,13 +100,45 @@ describe('createPinnedRunStore', () => {
 		}
 	});
 
-	it('test_getRun_defaultPolicy_neverEvicts', () => {
+	it('test_getRun_defaultPolicy_keepsTheOnlyStoredRun', () => {
 		const store = createPinnedRunStore();
 		store.putRun(run('run_1'));
 		const result = store.getRun('run_1');
-		expect('available' in result, 'keepAllRuns (the default) must never evict a stored run').toBe(
-			false
-		);
+		expect(
+			'available' in result,
+			'keepMostRecentRun (the default) must not evict the one run stored so far'
+		).toBe(false);
+	});
+
+	it('test_getRun_defaultPolicy_afterNRunsOnlyMostRecentIsQueryable', () => {
+		// AC1: a screener run, redefined, and run again N times must not
+		// accumulate a growing set of live runs -- only the most recently
+		// pinned run stays queryable, and every older run_id reports
+		// 'evicted', not a growing live set.
+		const store = createPinnedRunStore();
+		const runIds = ['run_1', 'run_2', 'run_3', 'run_4', 'run_5'];
+		for (const runId of runIds) {
+			store.putRun(run(runId));
+		}
+		const mostRecent = store.getRun('run_5');
+		expect(
+			'available' in mostRecent,
+			'the most recently pinned run must stay queryable under the default policy'
+		).toBe(false);
+
+		for (const runId of runIds.slice(0, -1)) {
+			const result = store.getRun(runId);
+			expect(
+				'available' in result,
+				`run ${runId} must be reclaimed once a more recent run is pinned`
+			).toBe(true);
+			if ('available' in result) {
+				expect(
+					result.reason,
+					`run ${runId} was pinned then superseded, so it is 'evicted', not 'unknown'`
+				).toBe('evicted');
+			}
+		}
 	});
 
 	it('test_getRun_withAlwaysEvictPolicy_reportsEvictedReason', () => {

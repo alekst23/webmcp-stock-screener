@@ -43,10 +43,10 @@ sequence.
 |---|--------|-------|------------|--------|
 | 1 | T-0026-1 | `define_screener` tool | — | Done |
 | 2 | T-0026-2 | `search_catalog` registration + sector enumeration | — | Done |
-| 3 | T-0026-3 | Full instrument ref on screener result rows | T-0026-1, T-0026-2 | Not started |
-| 4 | T-0026-4 | `HttpScreenerEvaluationPort` | T-0026-1, T-0026-2 | Not started |
-| 5 | T-0026-5 | Register the MVP tool set in the composition root | T-0026-3, T-0026-4 | Not started |
-| 6 | T-0026-6 | Run retention, dead-engine cleanup, status doc | T-0026-5 | Not started |
+| 3 | T-0026-3 | Full instrument ref on screener result rows | T-0026-1, T-0026-2 | Done |
+| 4 | T-0026-4 | `HttpScreenerEvaluationPort` | T-0026-1, T-0026-2 | Done |
+| 5 | T-0026-5 | Register the MVP tool set in the composition root | T-0026-3, T-0026-4 | Done |
+| 6 | T-0026-6 | Run retention, dead-engine cleanup, status doc | T-0026-5 | Done |
 
 ## Notes
 
