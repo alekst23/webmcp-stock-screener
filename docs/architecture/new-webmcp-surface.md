@@ -97,9 +97,8 @@ composition", not literally that URL.)
 The composition root resolved above wires the tool groups together; it does
 not by itself explain what a completed run does to the panel grid. A later
 ticket wave under this same epic (T-0020-10/T-0020-11) amended
-`run_screener`'s auto-bind behavior (`bindRunToResultsPanel`,
-`src/lib/webmcp/screener/runScreener.ts`) and added a human-facing
-equivalent (`runScreenerByHuman`, `src/lib/panels/shell/panelController.ts`):
+`run_screener`'s auto-bind behavior and added a human-facing equivalent
+(`runScreenerByHuman`, `src/lib/panels/shell/panelController.ts`):
 
 - if the workspace has no `results_table` panel when a run completes, one is
   created (2x1, auto-placed) and bound to that run, rather than the bind
@@ -112,8 +111,26 @@ equivalent (`runScreenerByHuman`, `src/lib/panels/shell/panelController.ts`):
   in the loop, going through the identical evaluate/pin/bind pipeline
   `run_screener` uses, just attributed to the human actor in the action log.
 
+A follow-up review pass (T-0020-15) found `bindRunToResultsPanel` living in
+`runScreener.ts` was a tool-layer module reaching backward to hold
+application-layer logic, since `panelController.ts` (panels/shell) needed to
+call it too. It now lives in `src/lib/panels/application/bindRunToResultsPanel.ts`,
+alongside `createPanel`/`bindPanelSource`, imported symmetrically by both
+`runScreener.ts` and `panelController.ts` — the same reviews pass also
+rekeyed `runScreenerByHuman`'s single-flight guard from an (unintentionally
+inert) object-identity `WeakMap` to a `Map<workspaceId, ...>`, and added
+user-visible messaging for a human-triggered run that is refused or errors,
+neither of which the button previously surfaced.
+
+The same ticket wave (T-0020-12/T-0020-13) also sharpened `run_screener`'s
+and `define_screener`'s revision-parameter descriptions and rejection text
+(distinguishing the workspace's own revision from the screener definition's
+own revision, which an agent had conflated live) and added the price
+source's data as-of date to chart "no data" refusals.
+
 The full behavioral spec for this amendment — including the "Create-if-absent
-results panel", "Human-triggered run", and "Recycled results panel"
+results panel", "Human-triggered run", "Recycled results panel",
+"Disambiguated revision parameters", and "Diagnosable chart data gaps"
 scenarios — lives in `docs/design/workbench-composition-root/spec.md`; this
 section only records that the composition root's binding behavior changed
 and where to find the details, rather than duplicating them.
