@@ -175,6 +175,51 @@ const PRICE_FIELDS: CatalogItem[] = (
 	availability: available()
 }));
 
+// backend/infra/panel_market_data.py resolves `field.price.change_pct_<N>`
+// by an id suffix rather than a runtime params dict -- FieldItem (unlike
+// study/indicator items) has no `parameters` field to declare a lookback on,
+// and RankingField/ScalarCondition/RangeCondition carry only a bare
+// field_id, so a params dict wouldn't reach the backend even if declared
+// here. Without a catalog entry an agent has no legitimate way to discover
+// this id via search_catalog -- it either guesses or falls back to
+// computing the answer itself outside the screener tools entirely (observed
+// live: an agent asked for "biggest gains" ran raw Python against the
+// backend instead of calling define_screener, because search_catalog had
+// nothing to offer it). Two concrete lookbacks cover the MVP's stated use
+// cases ("today"/"since last close" and "48 hrs" ~= 2 daily sessions);
+// add more only if a real query needs a different window.
+const CHANGE_PCT_FIELDS: CatalogItem[] = [
+	{
+		id: 'field.price.change_pct_1',
+		kind: 'field',
+		label: 'Price change % (1 session)',
+		description:
+			"Percent change from the prior session's close to the most recent close -- " +
+			'the closest available proxy for "today" or "in the last 24 hours" (data is ' +
+			'daily bars, not intraday).',
+		aliases: ['change', 'gain', 'gains', 'daily change', '% change', 'today', 'since close'],
+		tags: ['price', 'change', 'ranking'],
+		valueType: 'number',
+		unit: 'percent',
+		nullable: true,
+		availability: available()
+	},
+	{
+		id: 'field.price.change_pct_2',
+		kind: 'field',
+		label: 'Price change % (2 sessions)',
+		description:
+			'Percent change over the last 2 daily sessions -- the closest available proxy ' +
+			'for "48 hours" (data is daily bars, not intraday).',
+		aliases: ['48 hour change', '2-day change', 'gain', 'gains'],
+		tags: ['price', 'change', 'ranking'],
+		valueType: 'number',
+		unit: 'percent',
+		nullable: true,
+		availability: available()
+	}
+];
+
 const OTHER_MARKET_FIELDS: CatalogItem[] = [
 	{
 		id: 'field.volume',
@@ -829,6 +874,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
 	...INTERVALS,
 	...PRICE_FIELDS,
 	...OTHER_MARKET_FIELDS,
+	...CHANGE_PCT_FIELDS,
 	...REFERENCE_FIELDS,
 	...OPERATORS,
 	...STUDIES,

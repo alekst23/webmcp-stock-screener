@@ -170,6 +170,29 @@ describe('search_catalog', () => {
 		}
 	});
 
+	// Regression: field.price.change_pct_<N> (the field a "biggest gains" /
+	// "up X% today" screener needs) was never registered in the catalog, so
+	// search_catalog had nothing to return for it -- an agent had no
+	// legitimate way to discover the field id and could only guess or fall
+	// back to computing the answer itself outside the screener tools
+	// entirely (observed live, 2026-09-04). This proves it's discoverable
+	// by the vocabulary an actual query would use.
+	it('a "gains" query surfaces field.price.change_pct_1', async () => {
+		const { rows } = await search({ query: 'gains' });
+		const ids = rows.map((r) => r.id);
+		expect(ids, `expected field.price.change_pct_1 among: ${JSON.stringify(ids)}`).toContain(
+			'field.price.change_pct_1'
+		);
+	});
+
+	it('a "48 hour change" query surfaces field.price.change_pct_2', async () => {
+		const { rows } = await search({ query: '48 hour change' });
+		const ids = rows.map((r) => r.id);
+		expect(ids, `expected field.price.change_pct_2 among: ${JSON.stringify(ids)}`).toContain(
+			'field.price.change_pct_2'
+		);
+	});
+
 	describe('T-0026-2: enumerated field values', () => {
 		it('AC2: a lookup against field.sector returns its accepted values alongside the existing row fields', async () => {
 			const { rows } = await search({ query: 'sector' });
