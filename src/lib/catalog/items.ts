@@ -185,9 +185,10 @@ const PRICE_FIELDS: CatalogItem[] = (
 // computing the answer itself outside the screener tools entirely (observed
 // live: an agent asked for "biggest gains" ran raw Python against the
 // backend instead of calling define_screener, because search_catalog had
-// nothing to offer it). Two concrete lookbacks cover the MVP's stated use
-// cases ("today"/"since last close" and "48 hrs" ~= 2 daily sessions);
-// add more only if a real query needs a different window.
+// nothing to offer it). Three concrete lookbacks cover the MVP's stated use
+// cases ("today"/"since last close", "48 hrs" ~= 2 daily sessions, and
+// "last week" ~= 5 daily sessions); add more only if a real query needs a
+// different window.
 const CHANGE_PCT_FIELDS: CatalogItem[] = [
 	{
 		id: 'field.price.change_pct_1',
@@ -212,6 +213,21 @@ const CHANGE_PCT_FIELDS: CatalogItem[] = [
 			'Percent change over the last 2 daily sessions -- the closest available proxy ' +
 			'for "48 hours" (data is daily bars, not intraday).',
 		aliases: ['48 hour change', '2-day change', 'gain', 'gains'],
+		tags: ['price', 'change', 'ranking'],
+		valueType: 'number',
+		unit: 'percent',
+		nullable: true,
+		availability: available()
+	},
+	{
+		id: 'field.price.change_pct_5',
+		kind: 'field',
+		label: 'Price change % (5 sessions)',
+		description:
+			'Percent change over the last 5 daily sessions -- the closest available proxy ' +
+			'for "last week" or "this week" (5 trading sessions, not a calendar week; data ' +
+			'is daily bars, not intraday).',
+		aliases: ['last week', 'weekly change', '5-day change', 'week change', 'gain', 'gains'],
 		tags: ['price', 'change', 'ranking'],
 		valueType: 'number',
 		unit: 'percent',

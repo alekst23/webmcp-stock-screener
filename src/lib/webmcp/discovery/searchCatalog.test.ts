@@ -193,6 +193,28 @@ describe('search_catalog', () => {
 		);
 	});
 
+	// Regression: an agent asked "biggest gainers for last week" had no
+	// catalog field naming a multi-session window beyond 2 sessions, so it
+	// could only answer with a 2-session ranking mislabeled as "last week"
+	// (observed live, 2026-09-04). field.price.change_pct_5 is the closest
+	// available proxy (5 trading sessions), discoverable the way an agent
+	// would actually phrase the query.
+	it('a "last week" query surfaces field.price.change_pct_5', async () => {
+		const { rows } = await search({ query: 'last week' });
+		const ids = rows.map((r) => r.id);
+		expect(ids, `expected field.price.change_pct_5 among: ${JSON.stringify(ids)}`).toContain(
+			'field.price.change_pct_5'
+		);
+	});
+
+	it('a "weekly change" query surfaces field.price.change_pct_5', async () => {
+		const { rows } = await search({ query: 'weekly change' });
+		const ids = rows.map((r) => r.id);
+		expect(ids, `expected field.price.change_pct_5 among: ${JSON.stringify(ids)}`).toContain(
+			'field.price.change_pct_5'
+		);
+	});
+
 	describe('T-0026-2: enumerated field values', () => {
 		it('AC2: a lookup against field.sector returns its accepted values alongside the existing row fields', async () => {
 			const { rows } = await search({ query: 'sector' });
