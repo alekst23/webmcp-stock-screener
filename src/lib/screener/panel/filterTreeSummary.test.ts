@@ -13,7 +13,10 @@ function scalarCondition(): Condition {
 	return { type: 'scalar', fieldId: 'field.market_cap', operator: 'gt', value: 1000, unit: 'USD' };
 }
 
-function conditionNode(condition: Condition, overrides: Partial<ConditionNode> = {}): ConditionNode {
+function conditionNode(
+	condition: Condition,
+	overrides: Partial<ConditionNode> = {}
+): ConditionNode {
 	return { nodeId: 'filter_1', kind: 'condition', condition, enabled: true, ...overrides };
 }
 

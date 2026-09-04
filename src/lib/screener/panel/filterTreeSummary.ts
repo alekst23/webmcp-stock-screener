@@ -127,7 +127,9 @@ export function summarizeUniverse(universe: UniverseSpec): string[] {
 		universe.exclusions.instrumentIds.length > 0
 			? `${universe.exclusions.instrumentIds.length} instruments`
 			: '',
-		universe.exclusions.sectorIds.length > 0 ? `${universe.exclusions.sectorIds.length} sectors` : '',
+		universe.exclusions.sectorIds.length > 0
+			? `${universe.exclusions.sectorIds.length} sectors`
+			: '',
 		universe.exclusions.industryIds.length > 0
 			? `${universe.exclusions.industryIds.length} industries`
 			: ''

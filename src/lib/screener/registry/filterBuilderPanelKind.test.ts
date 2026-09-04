@@ -64,9 +64,10 @@ describe('createFilterBuilderPanelKindDefinition', () => {
 	it('the default config validates successfully', () => {
 		const definition = createFilterBuilderPanelKindDefinition({ useCaseDeps: harness() });
 		const result = definition.validateConfig(definition.defaultConfig());
-		expect(result.ok, `expected the default config to validate, got ${JSON.stringify(result)}`).toBe(
-			true
-		);
+		expect(
+			result.ok,
+			`expected the default config to validate, got ${JSON.stringify(result)}`
+		).toBe(true);
 	});
 
 	it('validateConfig rejects an unrecognized field', () => {
