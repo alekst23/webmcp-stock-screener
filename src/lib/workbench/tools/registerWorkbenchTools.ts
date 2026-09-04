@@ -84,3 +84,31 @@ export async function registerWorkbenchTools(
 		});
 	}
 }
+
+// T-0026-5: the MVP's only workbench-core tool (capability H,
+// tool-surface-mvp.md #7) is get_canvas_state. Every other tool this
+// group's own buildWorkbenchTools builds (get_app_context, create_workspace,
+// save_workspace, undo_change, get_change_history,
+// restore_workspace_revision) plus both of buildSafetyTools' tools
+// (preview_workspace_changes, apply_previewed_changes) are listed as
+// "Deliberately absent" in tool-surface-mvp.md -- workspace lifecycle and
+// safety aren't exercised by the MVP use case. Registering the whole group
+// via registerWorkbenchTools above would register those too, so the
+// composition root calls this narrower export instead -- independent of
+// WORKBENCH_TOOLS_ENABLED, since get_canvas_state must be live regardless of
+// whether the rest of this group ever is.
+export async function registerCanvasStateTool(
+	deps: DefaultWorkbenchDeps = createDefaultWorkbenchDeps()
+): Promise<void> {
+	const spec = buildWorkbenchTools(deps).find((s) => s.name === 'get_canvas_state');
+	if (!spec) {
+		throw new Error('get_canvas_state tool spec not found in buildWorkbenchTools output.');
+	}
+	const mc = ensureModelContext();
+	await mc.registerTool({
+		name: spec.name,
+		description: spec.description,
+		inputSchema: spec.inputSchema,
+		execute: spec.execute
+	});
+}

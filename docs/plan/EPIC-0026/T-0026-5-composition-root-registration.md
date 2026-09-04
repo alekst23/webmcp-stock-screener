@@ -2,7 +2,7 @@
 
 **Epic**: EPIC-0026 (Agent Screener Loop)
 **Design**: docs/design/screener-core/, docs/architecture/tool-surface-mvp.md
-**Status**: Not started
+**Status**: Done
 **Depends on**: T-0026-3, T-0026-4
 **Blocks**: T-0026-6 (engine deletion/status doc need the final registered set to know what's actually dead)
 **Resolves**: #26
@@ -75,3 +75,64 @@ so that what's live matches what's documented, and an agent calling
   registrations that call it) — T-0026-6.
 - `PinnedRunStore` retention policy — T-0026-6.
 - `docs/architecture/tool-surface-status.md` — T-0026-6.
+
+## Solution Approach
+
+**Screener group (`webmcp/screener/group.ts`).** `buildScreenerTools`
+currently assembles `create_screener`, `set_screener_universe`,
+`edit_filter_tree`, `set_screener_ranking`, `validate_screener`, and
+`run_screener`. Replace the five legacy tools with `define_screener`
+(`createDefineScreenerTool`, T-0026-1) and keep `run_screener` as-is.
+`ScreenerToolDeps` keeps extending `SetScreenerUniverseDeps` (still needed
+by `setScreenerUniverse.ts` itself, which is not deleted — see below) —
+`DefineScreenerDeps` (`WorkbenchDeps` + optional `catalog`/`marketData`/
+`costBudget`) is structurally a subset of `ScreenerToolDeps`, so no new
+deps type or constructor is needed. `SCREENER_TOOL_NAMES` becomes
+`['define_screener', 'run_screener']`.
+
+**What actually gets deleted vs. kept.** Checked every legacy tool
+module's importers before deleting anything:
+- `createScreener.ts`, `setScreenerUniverse.ts`, `setScreenerRanking.ts`,
+  `editFilterTree.ts` are each still imported by out-of-scope test
+  fixtures this ticket must not break (`backtest/tools/backtestScreener.test.ts`,
+  `followup/tools/testFixtures.ts`, `followup/tools/followupAuthoringFlow.e2e.test.ts`,
+  and `runScreener.test.ts`'s own fixtures). **Kept as source files**,
+  just no longer registered by `group.ts`.
+- `validateScreener.ts` is imported nowhere except `group.ts` and its own
+  test. **Deleted**, along with `validateScreener.test.ts`.
+
+**`get_canvas_state` (workbench-core group).** Every other tool
+`registerWorkbenchTools` builds (`get_app_context`, `create_workspace`,
+`save_workspace`, `undo_change`, `get_change_history`,
+`restore_workspace_revision`) plus both safety tools
+(`preview_workspace_changes`, `apply_previewed_changes`) are listed as
+"Deliberately absent" in `tool-surface-mvp.md` — workspace lifecycle and
+safety aren't exercised by the MVP use case. Restoring the full
+`registerWorkbenchTools()` call site would register all of those too, so
+instead `registerWorkbenchTools.ts` gets one new narrow export,
+`registerCanvasStateTool(deps)`, that registers exactly the
+`get_canvas_state` spec out of `buildWorkbenchTools`'s output. The
+composition root calls this instead of the whole group.
+
+**`set_panel_layout`: kept.** It's already registered unconditionally via
+`registerPanelTools` (panel tool group, out of this ticket's scope to
+touch) and is harmless per the ticket's own framing — no action needed,
+just documenting the call here.
+
+**Composition root.** `registerWorkbenchComposition` now calls, in order:
+`registerPanelTools` (unchanged), `registerCanvasStateTool(buildWorkbenchDeps(shared))`,
+`registerScreenerTools(buildScreenerDeps(shared, panelRuntime.deps, overrides))`,
+`registerResolveTickerTool()`, `registerSearchCatalogTool()`. Chart/
+similarity/follow-up-authoring imports and call sites are untouched
+(still commented).
+
+**E2E test.** `workbenchCompositionRoot.e2e.test.ts`'s old
+`describe.skip` block (the five-legacy-tool flow) is replaced with a new,
+active test that drives `define_screener → run_screener →
+get_screener_results → create_panel` through the real, non-overridden
+composition root. The default layout no longer seeds a `results_table`
+panel (hotfix/empty-grid-canvas), so the test creates one itself via
+`create_panel` before running the screener. Only `fetch` is stubbed
+(matching `POST /api/screener/run`'s wire contract) — no
+`evaluationPort` override — so this exercises T-0026-4's actual default
+wiring.
