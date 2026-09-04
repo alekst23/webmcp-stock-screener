@@ -1,11 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { CatalogRegistry } from '../../catalog/registry';
 import {
 	builtinCatalogRegistry,
 	listCatalogItems,
 	MAX_CATALOG_RESULTS
 } from '../../catalog/registry';
-import { CATALOG_KINDS } from '../../catalog/types';
-import { createSearchCatalogTool } from './searchCatalog';
+import { SECTOR_ENUM_VALUES } from '../../catalog/items';
+import {
+	CATALOG_KINDS,
+	type CatalogItem,
+	type CatalogMatch,
+	type CatalogQuery
+} from '../../catalog/types';
+import { createSearchCatalogTool, registerSearchCatalogTool } from './searchCatalog';
 import { payload } from './testSupport';
 
 const tool = createSearchCatalogTool(builtinCatalogRegistry);
@@ -18,11 +25,29 @@ interface Row {
 	score: number;
 	matchedOn: string;
 	availability: { status: string; reason: string | null; requiresReferenceData: boolean };
+	enumValues?: readonly string[];
 }
 
 async function search(input: unknown): Promise<{ body: Record<string, unknown>; rows: Row[] }> {
 	const body = payload(await tool.execute(input));
 	return { body, rows: body.items as Row[] };
+}
+
+// A small fixed inventory, independent of the real catalog, so the
+// enumValues passthrough is proven as a general mechanism -- not just true
+// of "field.sector" by coincidence of hand-checking that one item.
+function fakeRegistryWith(items: readonly CatalogItem[]): CatalogRegistry {
+	return {
+		getCatalogItem: (id) => items.find((item) => item.id === id),
+		listCatalogItems: (kind) => (kind ? items.filter((item) => item.kind === kind) : items),
+		searchCatalogItems: (query: CatalogQuery): CatalogMatch[] =>
+			items
+				.filter((item) => !query.kinds || query.kinds.includes(item.kind))
+				.map((item) => ({ item, score: 100, matchedOn: 'id' as const })),
+		isOperatorValidForField: () => ({ valid: true }),
+		resolveStudy: () => undefined,
+		suggestCatalogIds: () => []
+	};
 }
 
 describe('search_catalog', () => {
@@ -143,5 +168,118 @@ describe('search_catalog', () => {
 		for (const key of ['expected_revision', 'idempotency_key', 'undo_token']) {
 			expect(key in schema.properties, `a read-only tool must not declare "${key}"`).toBe(false);
 		}
+	});
+
+	describe('T-0026-2: enumerated field values', () => {
+		it('AC2: a lookup against field.sector returns its accepted values alongside the existing row fields', async () => {
+			const { rows } = await search({ query: 'sector' });
+			const sector = rows.find((r) => r.id === 'field.sector');
+			expect(sector, 'field.sector must still be findable').toBeDefined();
+			expect(sector?.kind, 'the existing kind field must still be reported').toBe('field');
+			expect(sector?.label, 'the existing label field must still be reported').toBeTruthy();
+			expect(
+				sector?.description,
+				'the existing description field must still be reported'
+			).toBeTruthy();
+			expect(
+				sector?.enumValues,
+				'field.sector must carry its accepted values, not force a second describe_catalog_item call'
+			).toEqual(SECTOR_ENUM_VALUES);
+		});
+
+		it("AC4: the sector values offered match items.ts's own SECTOR_ENUM_VALUES -- the one place this project declares them", async () => {
+			// Guards against the row-shaping code silently drifting from (or
+			// re-deriving a second, disagreeing copy of) the catalog's own
+			// declared vocabulary. It does not, and cannot, prove the list
+			// matches EPIC-0025's backend: see items.ts's SECTOR_ENUM_VALUES
+			// comment -- the backend accepts whatever sector strings are in its
+			// currently-loaded reference-data CSV, an open runtime set with no
+			// shared canonical source this test (or this ticket) can check
+			// against.
+			const { rows } = await search({ query: 'field.sector' });
+			const sector = rows.find((r) => r.id === 'field.sector');
+			expect(sector?.enumValues).toEqual(SECTOR_ENUM_VALUES);
+		});
+
+		it('AC2 (general mechanism): any enumerated field the catalog declares surfaces its enumValues, not just sector', async () => {
+			const enumField = {
+				id: 'field.test_enum',
+				kind: 'field' as const,
+				label: 'Test enum field',
+				description: 'A synthetic enumerated field for the general-mechanism test.',
+				aliases: [],
+				tags: [],
+				valueType: 'enum' as const,
+				enumValues: ['alpha', 'beta'],
+				nullable: false,
+				availability: {
+					status: 'available' as const,
+					requiresReferenceData: false,
+					intervalIds: []
+				}
+			};
+			const fakeTool = createSearchCatalogTool(fakeRegistryWith([enumField]));
+			const body = payload(await fakeTool.execute({ query: 'test_enum' }));
+			const row = (body.items as Row[])[0];
+			expect(row?.enumValues, 'a non-sector enumerated field must also expose its values').toEqual([
+				'alpha',
+				'beta'
+			]);
+		});
+
+		it('AC3: a field with no declared enum values carries no enumValues key at all', async () => {
+			const plainField = {
+				id: 'field.test_plain',
+				kind: 'field' as const,
+				label: 'Test plain field',
+				description: 'A synthetic non-enumerated field.',
+				aliases: [],
+				tags: [],
+				valueType: 'number' as const,
+				nullable: false,
+				availability: {
+					status: 'available' as const,
+					requiresReferenceData: false,
+					intervalIds: []
+				}
+			};
+			const fakeTool = createSearchCatalogTool(fakeRegistryWith([plainField]));
+			const body = payload(await fakeTool.execute({ query: 'test_plain' }));
+			const row = (body.items as Row[])[0] as unknown as Record<string, unknown>;
+			expect(
+				'enumValues' in row,
+				'a field with no enumValues declared must not gain the key at all'
+			).toBe(false);
+		});
+
+		it('AC3: every non-field catalog kind is unchanged -- no enumValues key appears on any of them', async () => {
+			for (const kind of CATALOG_KINDS) {
+				if (kind === 'field') {
+					continue;
+				}
+				const { rows } = await search({ kinds: [kind], limit: MAX_CATALOG_RESULTS });
+				for (const row of rows) {
+					expect(
+						'enumValues' in (row as unknown as Record<string, unknown>),
+						`kind "${kind}" (item ${row.id}) must not gain an enumValues key`
+					).toBe(false);
+				}
+			}
+		});
+	});
+
+	describe('T-0026-2 AC1: registration on the live composition root', () => {
+		it('registerSearchCatalogTool registers search_catalog against document.modelContext', async () => {
+			const registerTool = vi.fn();
+			vi.stubGlobal('document', { modelContext: { registerTool } });
+			try {
+				await registerSearchCatalogTool();
+				expect(registerTool).toHaveBeenCalledTimes(1);
+				const registered = registerTool.mock.calls[0]![0] as { name: string };
+				expect(registered.name).toBe('search_catalog');
+			} finally {
+				vi.unstubAllGlobals();
+			}
+		});
 	});
 });
