@@ -110,6 +110,33 @@ describe('theme tokens', () => {
 		}
 	});
 
+	// hotfix/grid-line-lighten: the empty-grid outline (gridLine) shipped by
+	// hotfix/panel-default-width-grid-lines was tuned so dark it read as
+	// invisible rather than "faint" against bgApp. It stays exempt from the
+	// contrast floor (it's decorative, not meaningful), but it must still be
+	// perceptibly lighter than bgApp -- and, per the design intent, dimmer
+	// than separator's clearly-visible panel-chrome dividers.
+	it('test_grid_line_is_lighter_than_before_and_still_dimmer_than_separator', () => {
+		const OLD_GRID_LINE = '#0c1119';
+		const distanceFromOld = colourDistance(theme.colors.gridLine, OLD_GRID_LINE);
+		expect(distanceFromOld, 'gridLine was not changed from its old, too-dark value').toBeGreaterThan(
+			0
+		);
+
+		const distanceFromBg = colourDistance(theme.colors.gridLine, theme.colors.bgApp);
+		const oldDistanceFromBg = colourDistance(OLD_GRID_LINE, theme.colors.bgApp);
+		expect(
+			distanceFromBg,
+			'gridLine is not more distinguishable from bgApp than the old value was'
+		).toBeGreaterThan(oldDistanceFromBg);
+
+		const separatorDistanceFromBg = colourDistance(theme.colors.separator, theme.colors.bgApp);
+		expect(
+			distanceFromBg,
+			'gridLine is no longer dimmer than separator -- it would read as a visible divider'
+		).toBeLessThan(separatorDistanceFromBg);
+	});
+
 	it('test_space_radius_and_font_scales_are_populated', () => {
 		expect(Object.keys(theme.space).sort()).toEqual(['lg', 'md', 'sm', 'xl', 'xs']);
 		expect(Object.keys(theme.radius).sort()).toEqual(['md', 'sm']);
