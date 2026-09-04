@@ -33,11 +33,9 @@ export function panelFrameStyle(rect: GridRect): string {
 	);
 }
 
-// CONTRACT STUB -- hotfix/panel-default-width-grid-lines. Implemented per
-// docs/design/panel-system/technical.md's "Illustrate the empty grid"
-// amendment: a dotted border in the new, darker `--grid-line` token,
-// replacing the outline's old solid `--separator` border so it blends
-// further into the background. Body replaced by the implementing agent.
+// hotfix/panel-default-width-grid-lines: a dotted border in the darker
+// `--grid-line` token, replacing the outline's old solid `--separator`
+// border so it blends further into the background.
 export function emptyCellBorderStyle(): string {
-	throw new Error('not implemented');
+	return 'border: 1px dotted var(--grid-line);';
 }
