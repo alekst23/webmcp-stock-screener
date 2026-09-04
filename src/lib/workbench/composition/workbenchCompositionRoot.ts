@@ -56,6 +56,12 @@ import {
 // 	registerFollowupAuthoringTools
 // } from '../followup/tools/registerFollowupTools';
 import { registerResolveTickerTool } from '../chart/tools/resolveTicker';
+// T-0026-2: search_catalog existed but was never registered on this route --
+// the one live composition root /workbench's real entry point drives. Added
+// standalone (registerSearchCatalogTool, not the three-tool discovery group)
+// so this stays the minimal additive change; T-0026-3 folds it into the
+// exact-seven-tool MVP registration this file settles into.
+import { registerSearchCatalogTool } from '../../webmcp/discovery/searchCatalog';
 
 // T-0020-9: only `createWorkbenchSharedInfra` (the value) is ever imported
 // from this module -- no importer anywhere in the codebase reaches for the
@@ -156,6 +162,7 @@ export async function registerWorkbenchComposition(
 	// );
 	// await registerFollowupAuthoringTools(createFollowupAuthoringDeps(shared));
 	await registerResolveTickerTool();
+	await registerSearchCatalogTool();
 
 	return panelRuntime;
 }

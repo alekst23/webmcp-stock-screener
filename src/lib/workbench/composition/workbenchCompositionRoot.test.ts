@@ -246,7 +246,7 @@ describe('registerWorkbenchComposition', () => {
 	// 	}
 	// });
 
-	it('registers only the trimmed-down chart-demo tool set: the panel tool group plus resolve_ticker', async () => {
+	it('registers only the trimmed-down chart-demo tool set: the panel tool group plus resolve_ticker and search_catalog', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		try {
@@ -255,6 +255,9 @@ describe('registerWorkbenchComposition', () => {
 			expect(names).toContain('create_panel');
 			expect(names).toContain('bind_panel_source');
 			expect(names).toContain(RESOLVE_TICKER_TOOL_NAME);
+			// T-0026-2 AC1: search_catalog existed but was never reachable through
+			// this route's real registration path before this ticket.
+			expect(names).toContain('search_catalog');
 			for (const trimmedName of OUT_OF_SCOPE_TOOL_NAMES_TRIMMED_FOR_DEMO) {
 				expect(
 					names,

@@ -5,11 +5,13 @@
 // logic lives so EPIC-1009 and EPIC-1011 can reuse it.
 
 import {
+	builtinCatalogRegistry,
 	clampCatalogLimit,
 	MAX_CATALOG_RESULTS,
 	type CatalogRegistry
 } from '../../catalog/registry';
 import { CATALOG_KINDS, type CatalogKind } from '../../catalog/types';
+import { ensureModelContext } from '../bridge';
 import type { ToolResult, ToolSpec } from '../types';
 import {
 	catalogProvenance,
@@ -89,6 +91,12 @@ async function execute(registry: CatalogRegistry, input: unknown): Promise<ToolR
 			reason: match.item.availability.reason ?? null,
 			requiresReferenceData: match.item.availability.requiresReferenceData
 		},
+		// Only a field declares accepted values, and only some fields are
+		// enumerated -- every other kind keeps its exact current row shape
+		// (no key at all) rather than growing a null nobody asked for.
+		...(match.item.kind === 'field' && match.item.enumValues
+			? { enumValues: match.item.enumValues }
+			: {}),
 		score: match.score,
 		matchedOn: match.matchedOn
 	}));
@@ -137,4 +145,23 @@ export function createSearchCatalogTool(registry: CatalogRegistry): ToolSpec {
 		available: () => true,
 		execute: (input) => execute(registry, input)
 	};
+}
+
+// Registers search_catalog alone against the live bridge -- deliberately not
+// buildDiscoveryTools' full three-tool group (group.ts), which also builds
+// search_instruments and describe_catalog_item against an InstrumentDirectory
+// this ticket has no reason to wire up. T-0026-3 folds this into the MVP
+// composition root's exact-seven-tool registration; until then this is the
+// smallest additive change that makes search_catalog reachable.
+export async function registerSearchCatalogTool(
+	registry: CatalogRegistry = builtinCatalogRegistry
+): Promise<void> {
+	const mc = ensureModelContext();
+	const spec = createSearchCatalogTool(registry);
+	await mc.registerTool({
+		name: spec.name,
+		description: spec.description,
+		inputSchema: spec.inputSchema,
+		execute: spec.execute
+	});
 }
