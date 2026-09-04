@@ -220,6 +220,19 @@ Instead:_
   alongside `panelFrameStyle(cell)`, replacing the `.empty-cell` class's
   `border: 1px solid var(--separator);` rule._
 
+_Amended by hotfix/grid-line-lighten — `gridLine` (`#0c1119`, RGB
+12,17,25) landed only ~4-6 per channel above `bgApp` (`#080b12`, RGB
+8,11,18), which read as effectively invisible rather than "barely-there."
+`gridLine` moves to `#101720` (RGB 16,23,32) — roughly double the margin
+from `bgApp`, while staying clearly under `separator` (`#18202c`, RGB
+24,32,44) on every channel, so the outline stays subordinate to
+`PanelFrame`'s dividers. `paletteGuard.ts` restricts literal hex values to
+`tokens.ts`, so this is the only file that changes; `gridStyle.ts` and
+`PanelContainer.svelte` consume the value indirectly via the `--grid-line`
+CSS custom property and need no changes. `gridLine` remains exempt from
+`terminal-ui-theme`'s contrast floor — this tunes the token's existing
+exempt value, it does not lift the exemption._
+
 ### Tool surface (`src/lib/webmcp/v2/panelTools.ts`)
 
 Fourteen `ToolSpec`s (`create_panel`, `duplicate_panel`, `remove_panel`,
