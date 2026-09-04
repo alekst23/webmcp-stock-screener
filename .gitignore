@@ -46,10 +46,8 @@ vite.config.ts.timestamp-*
 # Dev files
 .dev/
 
-# Claude working files
-.claude/scheduled_tasks.lock
-# Agent worktrees (isolation: worktree)
-.claude/worktrees/
+# Claude working files (run manifests, locks, agent worktrees)
+.claude/
 
 # Terraform (the .terraform.lock.hcl provider lockfile IS committed)
 terraform/**/.terraform/

@@ -2,9 +2,22 @@
 
 **Epic**: EPIC-1015 (Legacy Surface Cutover)
 **Design**: docs/design/legacy-surface-cutover/
-**Status**: Done
+**Status**: Done, AC2 superseded (see note below)
 **Depends on**: T-1015-9, T-1015-11
 **Blocks**: T-1015-6
+
+> **AC2 superseded 2026-09-03 by `hotfix/empty-grid-canvas`** (PR #24,
+> landed ~2 hours after this epic closed). That hotfix reverted the
+> six-panel default seed this ticket delivered back down to a single
+> `filter_builder` panel — see `docs/design/panel-system/spec.md`'s
+> "Seed a new workspace with the default layout" (amended), which states
+> explicitly that it "reverses the more-populated-default-layout intent
+> stated in `docs/design/legacy-surface-cutover/spec.md`'s route
+> migration feature." The two new panel kinds this ticket added
+> (`watchlist`, `alert_draft`, AC1/AC3/AC4) are unaffected and remain
+> registered — only the default-seed composition (AC2, AC5's six-panel
+> browser check) no longer reflects current behavior. Do not treat AC2/AC5
+> as still-true when reasoning about the current default workspace.
 
 ## Description
 

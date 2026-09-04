@@ -1,6 +1,6 @@
 // hotfix/panel-system: replaces whatever panel arrangement currently exists
 // with the canonical default seed (domain/defaultLayout.ts's
-// DEFAULT_SEED_PANELS) -- the same six panels seedDefaultWorkspace creates
+// DEFAULT_SEED_PANELS) -- the same panels seedDefaultWorkspace creates
 // for a brand-new workspace, minted fresh here rather than reusing the
 // existing panels' ids, since the current arrangement may have a different
 // panel count or kinds than the seed. One commitPanelChange call, so the

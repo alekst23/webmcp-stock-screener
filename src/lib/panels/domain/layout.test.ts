@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GRID_COLUMNS, GRID_ROWS, type GridRect } from './grid';
 import {
 	applyLayout,
+	computeEmptyCells,
 	findFreeRect,
 	fullGridRect,
 	rectsOverlap,
@@ -417,5 +418,60 @@ describe('fullGridRect (T-1007-8 AC5)', () => {
 	it('never overlaps nothing — is a valid placement candidate against an empty grid', () => {
 		const result = validatePlacement({ rect: fullGridRect(), minSize: NO_MIN, occupied: [] });
 		expect(result.ok, `expected ok, got ${JSON.stringify(result)}`).toBe(true);
+	});
+});
+
+// hotfix/empty-grid-canvas: the set of unit cells (1x1 rects) not covered by
+// any occupied rect, used to render the empty-grid illustration. Every
+// returned rect must itself be a unit cell (colSpan/rowSpan === 1) — the
+// illustration outlines individual cells, not free regions.
+describe('computeEmptyCells', () => {
+	function cellKey(r: GridRect): string {
+		return `${r.col},${r.row}`;
+	}
+
+	function sortedKeys(rects: GridRect[]): string[] {
+		return rects.map(cellKey).sort();
+	}
+
+	it('returns all 24 cells for a fully empty grid', () => {
+		const result = computeEmptyCells([]);
+		expect(result, 'expected every returned rect to be a unit cell').toSatisfy(
+			(rects: GridRect[]) => rects.every((r) => r.colSpan === 1 && r.rowSpan === 1)
+		);
+		expect(result.length, `expected 24 empty cells, got ${result.length}`).toBe(
+			GRID_COLUMNS * GRID_ROWS
+		);
+	});
+
+	it('returns no cells when a single panel fully tiles the grid', () => {
+		const occupied: OccupiedRect[] = [{ panelId: 'p1', rect: fullGridRect() }];
+		expect(computeEmptyCells(occupied)).toEqual([]);
+	});
+
+	it('returns exactly the complement of one occupied rect', () => {
+		const occupied: OccupiedRect[] = [{ panelId: 'filter_builder', rect: rect(0, 0, 2, 4) }];
+		const result = computeEmptyCells(occupied);
+		expect(result.length, 'expected 16 empty cells outside the 2x4 occupied rect').toBe(16);
+
+		for (const cell of result) {
+			expect(
+				rectsOverlap(cell, occupied[0]!.rect),
+				`expected empty cell ${JSON.stringify(cell)} not to overlap the occupied rect`
+			).toBe(false);
+		}
+
+		const expectedKeys: string[] = [];
+		for (let row = 0; row < GRID_ROWS; row++) {
+			for (let col = 2; col < GRID_COLUMNS; col++) {
+				expectedKeys.push(`${col},${row}`);
+			}
+		}
+		expect(sortedKeys(result)).toEqual(expectedKeys.sort());
+	});
+
+	it('honors a caller-supplied grid size instead of always using GRID_COLUMNS x GRID_ROWS', () => {
+		const result = computeEmptyCells([], 2, 2);
+		expect(sortedKeys(result)).toEqual(['0,0', '0,1', '1,0', '1,1']);
 	});
 });

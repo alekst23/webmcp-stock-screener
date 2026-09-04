@@ -14,7 +14,7 @@ function ctx() {
 }
 
 describe('resetLayout', () => {
-	it('spec.md "Reset the workspace layout to the default seed" / happy path: restores the default six-panel seed from a modified arrangement', () => {
+	it('spec.md "Reset the workspace layout to the default seed" / happy path: restores the default seed from a modified arrangement', () => {
 		const deps = createPanelTestHarness();
 		createPanel(deps, { context: ctx(), kind: 'chart', rect: { col: 0, row: 0, colSpan: 6, rowSpan: 4 } });
 

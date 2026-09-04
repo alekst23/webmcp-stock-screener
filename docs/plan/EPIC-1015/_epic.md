@@ -89,7 +89,7 @@ overlapping ones, with no capability silently lost and no broken deploy.
 | 9 | T-1015-9 | Build the new shared shell and consolidate onto one URL | T-1015-3 | Done |
 | 10 | T-1015-10 | Restore panel-close and action-log UI affordances | T-1015-9 | Done |
 | 11 | T-1015-11 | Fix get_canvas_state's panel-state blind spot | — | Done |
-| 12 | T-1015-12 | Enrich the default workspace layout | T-1015-9, T-1015-11 | Done |
+| 12 | T-1015-12 | Enrich the default workspace layout | T-1015-9, T-1015-11 | Done, AC2 superseded 2026-09-03 by `hotfix/empty-grid-canvas` — see ticket note |
 | 13 | T-1015-13 | Restore the full new-surface tool registration | — | **Open — tracked follow-up, does not gate this PR** |
 | 14 | T-1015-14 | Epic review follow-ups | — | **Open — tracked follow-up, does not gate this PR** |
 

@@ -14,13 +14,13 @@ definitions or from any component.
 
 ## Consumed from EPIC-1006 (not defined here)
 
-| Contract | Provided by | Used for |
-|----------|-------------|----------|
-| `WorkspaceId`, `Revision`, stable-ID minting | EPIC-1006 | panel IDs (`panel_<kind>_<n>`) |
-| `MutationEnvelope` | EPIC-1006 | every panel mutation's return value |
-| `MutationRequest` (`expected_revision`, `idempotency_key`) | EPIC-1006 | conflict + replay handling |
-| `UndoToken` / inverse-operation registration | EPIC-1006 | `remove_panel` and friends being reversible |
-| `Provenance` (`as_of`, source, delayed/live) | EPIC-1006 | passed through by panel bodies; not produced here |
+| Contract                                                   | Provided by | Used for                                          |
+| ---------------------------------------------------------- | ----------- | ------------------------------------------------- |
+| `WorkspaceId`, `Revision`, stable-ID minting               | EPIC-1006   | panel IDs (`panel_<kind>_<n>`)                    |
+| `MutationEnvelope`                                         | EPIC-1006   | every panel mutation's return value               |
+| `MutationRequest` (`expected_revision`, `idempotency_key`) | EPIC-1006   | conflict + replay handling                        |
+| `UndoToken` / inverse-operation registration               | EPIC-1006   | `remove_panel` and friends being reversible       |
+| `Provenance` (`as_of`, source, delayed/live)               | EPIC-1006   | passed through by panel bodies; not produced here |
 
 EPIC-1007 must not re-implement any of these. If EPIC-1006 has not
 landed, T-1007-4 is blocked.
@@ -32,28 +32,28 @@ landed, T-1007-4 is blocked.
 The plug-point sibling epics use. A sibling registers its kind at module
 load; the panel container never imports the sibling's module directly.
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `PanelKindDefinition<TConfig>` | interface | everything the container needs to create, validate, place, link, and render a panel of one kind |
-| `registerPanelKind` | `(def: PanelKindDefinition) => void` | throws on duplicate `kind` rather than overwriting |
-| `getPanelKind` | `(kind: string) => PanelKindDefinition \| undefined` | lookup for validation and rendering |
-| `listPanelKinds` | `() => PanelKindDefinition[]` | powers the "unknown kind" error and catalog discovery |
-| `createPanelRegistry` | `() => PanelRegistry` | isolated registry instance so tests never touch module-global state |
+| Symbol                         | Signature                                            | Description                                                                                     |
+| ------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `PanelKindDefinition<TConfig>` | interface                                            | everything the container needs to create, validate, place, link, and render a panel of one kind |
+| `registerPanelKind`            | `(def: PanelKindDefinition) => void`                 | throws on duplicate `kind` rather than overwriting                                              |
+| `getPanelKind`                 | `(kind: string) => PanelKindDefinition \| undefined` | lookup for validation and rendering                                                             |
+| `listPanelKinds`               | `() => PanelKindDefinition[]`                        | powers the "unknown kind" error and catalog discovery                                           |
+| `createPanelRegistry`          | `() => PanelRegistry`                                | isolated registry instance so tests never touch module-global state                             |
 
 `PanelKindDefinition<TConfig>` fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `kind` | `string` | unique key, e.g. `'chart'` |
-| `defaultTitle` | `string` | title given to a new panel of this kind |
-| `defaultSize` | `GridSize` | logical cells, used when `create_panel` omits a size |
-| `minSize` | `GridSize` | rejected below this by `set_panel_layout` and `split_panel` |
-| `defaultConfig` | `() => TConfig` | configuration for a freshly added panel |
+| Field            | Type                                            | Description                                                                                                                                                                                                           |
+| ---------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`           | `string`                                        | unique key, e.g. `'chart'`                                                                                                                                                                                            |
+| `defaultTitle`   | `string`                                        | title given to a new panel of this kind                                                                                                                                                                               |
+| `defaultSize`    | `GridSize`                                      | logical cells, used when `create_panel` omits a size                                                                                                                                                                  |
+| `minSize`        | `GridSize`                                      | rejected below this by `set_panel_layout` and `split_panel`                                                                                                                                                           |
+| `defaultConfig`  | `() => TConfig`                                 | configuration for a freshly added panel                                                                                                                                                                               |
 | `validateConfig` | `(input: unknown) => ConfigValidation<TConfig>` | `{ ok: true, value }` or `{ ok: false, errors }` — errors carry field paths and reasons; for a data-bearing kind this delegates to the active renderer's own `validateConfig` from the source/renderer registry below |
-| `configSchema` | `object` | JSON Schema fragment merged into `create_panel`'s per-kind schema and returned by catalog discovery |
-| `linkChannels` | `PanelLinkChannel[]` | channels this kind may join |
-| `bindingTypes` | `string[]` | source type names (registered in the source/renderer registry below) that `bind_panel_source` accepts for this kind (empty = not bindable) |
-| `component` | `() => Promise<Component>` | lazy loader for the panel body |
+| `configSchema`   | `object`                                        | JSON Schema fragment merged into `create_panel`'s per-kind schema and returned by catalog discovery                                                                                                                   |
+| `linkChannels`   | `PanelLinkChannel[]`                            | channels this kind may join                                                                                                                                                                                           |
+| `bindingTypes`   | `string[]`                                      | source type names (registered in the source/renderer registry below) that `bind_panel_source` accepts for this kind (empty = not bindable)                                                                            |
+| `component`      | `() => Promise<Component>`                      | lazy loader for the panel body                                                                                                                                                                                        |
 
 Sibling epics call `registerPanelKind` from their own module; EPIC-1007
 ships all eight kinds as placeholder definitions (real `defaultSize`,
@@ -69,15 +69,15 @@ above: a panel's kind rarely changes after creation, but its source and
 renderer change routinely, so they are looked up and revalidated on every
 relevant mutation rather than fixed at creation time like a kind is.
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `SourceTypeDefinition` | interface | `name`; the shape a valid source reference of that type must have (e.g. `screener_results` references a `run_id`, `panel_reference` references another panel's stable ID); a compatibility predicate deciding whether a given panel kind/renderer pair accepts it |
-| `RendererTypeDefinition<TConfig>` | interface | `name`; `configSchema`; `validateConfig`; `defaultConfig`; the source types it accepts |
-| `registerSourceType` | `(def: SourceTypeDefinition) => void` | throws on duplicate `name` rather than overwriting |
-| `registerRendererType` | `(def: RendererTypeDefinition) => void` | throws on duplicate `name` rather than overwriting |
-| `getSourceType` / `getRendererType` | `(name: string) => Definition \| undefined` | lookup for validation |
-| `listSourceTypes` / `listRendererTypes` | `() => Definition[]` | powers the "unsupported source/renderer" error and catalog discovery |
-| `createSourceRendererRegistry` | `() => SourceRendererRegistry` | isolated registry instance so tests never touch module-global state |
+| Symbol                                  | Signature                                   | Description                                                                                                                                                                                                                                                       |
+| --------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SourceTypeDefinition`                  | interface                                   | `name`; the shape a valid source reference of that type must have (e.g. `screener_results` references a `run_id`, `panel_reference` references another panel's stable ID); a compatibility predicate deciding whether a given panel kind/renderer pair accepts it |
+| `RendererTypeDefinition<TConfig>`       | interface                                   | `name`; `configSchema`; `validateConfig`; `defaultConfig`; the source types it accepts                                                                                                                                                                            |
+| `registerSourceType`                    | `(def: SourceTypeDefinition) => void`       | throws on duplicate `name` rather than overwriting                                                                                                                                                                                                                |
+| `registerRendererType`                  | `(def: RendererTypeDefinition) => void`     | throws on duplicate `name` rather than overwriting                                                                                                                                                                                                                |
+| `getSourceType` / `getRendererType`     | `(name: string) => Definition \| undefined` | lookup for validation                                                                                                                                                                                                                                             |
+| `listSourceTypes` / `listRendererTypes` | `() => Definition[]`                        | powers the "unsupported source/renderer" error and catalog discovery                                                                                                                                                                                              |
+| `createSourceRendererRegistry`          | `() => SourceRendererRegistry`              | isolated registry instance so tests never touch module-global state                                                                                                                                                                                               |
 
 `bind_panel_source`, `set_panel_renderer`, `configure_panel_view`, and
 `configure_chart_grid` all resolve through this registry rather than
@@ -101,17 +101,17 @@ sizing is proportional, not fixed-pixel, so it holds at any viewport size
 without introducing scroll — consistent with the spec's existing
 pixel-layout/responsive-behavior non-goal.
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `GridPosition` | `{ col: number; row: number }` | zero-based, `col` in `[0, GRID_COLUMNS)`, `row` in `[0, GRID_ROWS)` |
-| `GridSize` | `{ colSpan: number; rowSpan: number }` | both `>= 1`; `colSpan <= GRID_COLUMNS`, `rowSpan <= GRID_ROWS` |
-| `GridRect` | `GridPosition & GridSize` | a panel's footprint |
-| `GRID_COLUMNS` | `6` | |
-| `GRID_ROWS` | `4` | |
-| `rectsOverlap` | `(a: GridRect, b: GridRect) => boolean` | half-open interval intersection |
-| `validatePlacement` | `(rect, kind, occupied) => PlacementResult` | bounds, min-size, and overlap checks in one pass; error names the offending panel or bound |
-| `findFreeRect` | `(size: GridSize, occupied: OccupiedRect[]) => GridRect \| null` | deterministic top-left-first auto-placement for `create_panel`; returns `null` — not a throw — when no free rect of that size exists anywhere in the bounded grid, so the caller reports "grid is full" rather than the search overflowing past `GRID_ROWS` |
-| `applyLayout` | `(panels, placements) => LayoutResult` | all-or-nothing batch move/resize |
+| Symbol              | Signature                                                        | Description                                                                                                                                                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GridPosition`      | `{ col: number; row: number }`                                   | zero-based, `col` in `[0, GRID_COLUMNS)`, `row` in `[0, GRID_ROWS)`                                                                                                                                                                                         |
+| `GridSize`          | `{ colSpan: number; rowSpan: number }`                           | both `>= 1`; `colSpan <= GRID_COLUMNS`, `rowSpan <= GRID_ROWS`                                                                                                                                                                                              |
+| `GridRect`          | `GridPosition & GridSize`                                        | a panel's footprint                                                                                                                                                                                                                                         |
+| `GRID_COLUMNS`      | `6`                                                              |                                                                                                                                                                                                                                                             |
+| `GRID_ROWS`         | `4`                                                              |                                                                                                                                                                                                                                                             |
+| `rectsOverlap`      | `(a: GridRect, b: GridRect) => boolean`                          | half-open interval intersection                                                                                                                                                                                                                             |
+| `validatePlacement` | `(rect, kind, occupied) => PlacementResult`                      | bounds, min-size, and overlap checks in one pass; error names the offending panel or bound                                                                                                                                                                  |
+| `findFreeRect`      | `(size: GridSize, occupied: OccupiedRect[]) => GridRect \| null` | deterministic top-left-first auto-placement for `create_panel`; returns `null` — not a throw — when no free rect of that size exists anywhere in the bounded grid, so the caller reports "grid is full" rather than the search overflowing past `GRID_ROWS` |
+| `applyLayout`       | `(panels, placements) => LayoutResult`                           | all-or-nothing batch move/resize                                                                                                                                                                                                                            |
 
 `occupied` excludes hidden panels (spec Open Question 5).
 
@@ -119,28 +119,28 @@ pixel-layout/responsive-behavior non-goal.
 
 Undirected groups, one set per channel (spec Open Question 2).
 
-| Symbol | Signature | Description |
-|--------|-----------|-------------|
-| `PanelLinkChannel` | `'symbol' \| 'timeframe' \| 'result_selection' \| 'crosshair' \| 'filters'` | |
-| `PanelLinkGroup` | `{ id: string; channel: PanelLinkChannel; panelIds: string[] }` | |
-| `linkPanels` | `(graph, channel, panelIds) => LinkResult` | merges the panels' existing groups on that channel into one; rejects self-links and kinds that do not declare the channel |
-| `unlinkPanel` | `(graph, channel, panelId) => LinkResult` | dissolves a group left with `< 2` members |
-| `removePanelFromGraph` | `(graph, panelId) => LinkResult` | every-channel cleanup for `remove_panel` |
-| `propagationTargets` | `(graph, channel, sourceId) => string[]` | who receives a broadcast; excludes the source |
+| Symbol                 | Signature                                                                   | Description                                                                                                               |
+| ---------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `PanelLinkChannel`     | `'symbol' \| 'timeframe' \| 'result_selection' \| 'crosshair' \| 'filters'` |                                                                                                                           |
+| `PanelLinkGroup`       | `{ id: string; channel: PanelLinkChannel; panelIds: string[] }`             |                                                                                                                           |
+| `linkPanels`           | `(graph, channel, panelIds) => LinkResult`                                  | merges the panels' existing groups on that channel into one; rejects self-links and kinds that do not declare the channel |
+| `unlinkPanel`          | `(graph, channel, panelId) => LinkResult`                                   | dissolves a group left with `< 2` members                                                                                 |
+| `removePanelFromGraph` | `(graph, panelId) => LinkResult`                                            | every-channel cleanup for `remove_panel`                                                                                  |
+| `propagationTargets`   | `(graph, channel, sourceId) => string[]`                                    | who receives a broadcast; excludes the source                                                                             |
 
 ### Panel entity (`src/lib/panels/panel.ts`)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | stable, minted via EPIC-1006 |
-| `kind` | `string` | must resolve in the registry |
-| `title` | `string` | |
-| `config` | `unknown` | validated by the kind, opaque to the container |
-| `rect` | `GridRect` | |
-| `hidden` | `boolean` | |
-| `collapsed` | `boolean` | |
-| `source` | `{ type: string; ref: unknown } \| null` | resolved and validated via the source/renderer registry; spec Open Question 3 |
-| `renderer` | `string \| null` | active renderer name, resolved via the source/renderer registry; `null` until a source is bound |
+| Field       | Type                                     | Description                                                                                     |
+| ----------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `id`        | `string`                                 | stable, minted via EPIC-1006                                                                    |
+| `kind`      | `string`                                 | must resolve in the registry                                                                    |
+| `title`     | `string`                                 |                                                                                                 |
+| `config`    | `unknown`                                | validated by the kind, opaque to the container                                                  |
+| `rect`      | `GridRect`                               |                                                                                                 |
+| `hidden`    | `boolean`                                |                                                                                                 |
+| `collapsed` | `boolean`                                |                                                                                                 |
+| `source`    | `{ type: string; ref: unknown } \| null` | resolved and validated via the source/renderer registry; spec Open Question 3                   |
+| `renderer`  | `string \| null`                         | active renderer name, resolved via the source/renderer registry; `null` until a source is bound |
 
 ### Use cases (`src/lib/panels/application/`)
 
@@ -156,15 +156,42 @@ AC10).
 
 ### Default workspace layout (seeding, not a tool)
 
-Owned entirely by this epic, no change to EPIC-1006's `create_workspace`
-required: the composition root (T-1007-6) watches for a newly created,
-still-empty workspace becoming the active one and immediately runs three
-`createPanel` calls (`filter_builder` left, `results_table` center,
-`chart` right, footprints fitting the 6x4 grid) before first paint, so the
-human never sees the blank intermediate state. Not registered as a named
-layout template — `apply_layout_template` has no entry for it, since
-re-applying it later is a distinct, explicit action (agent lays it out or
-picks an actual template), not this create-time default.
+Owned entirely by this feature, no change to EPIC-1006's `create_workspace`
+required: `seedDefaultWorkspace` in `src/lib/panels/shell/panelController.ts`
+runs for a newly created, still-empty workspace (`justCreated === true`)
+before first paint, so the human never sees the blank intermediate state.
+Not registered as a named layout template — `apply_layout_template` has no
+entry for it, since re-applying it later is a distinct, explicit action
+(agent lays it out or picks an actual template), not this create-time
+default.
+
+_Amended by hotfix/empty-grid-canvas — `DEFAULT_SEED_PANELS` in
+`panelController.ts` is reduced to a single entry, `filter_builder` at
+`{ col: 0, row: 0, colSpan: 2, rowSpan: 4 }`. This replaces the six-panel
+full-tile seed (`filter_builder`, `chart`, `similar_opportunities`,
+`results_table`, `watchlist`, `alert_draft`) that T-1015-12 grew the
+original three-panel seed into — see spec.md's amended "Seed a new
+workspace with the default layout" section for the product intent behind
+the change._
+
+### Illustrate the empty grid
+
+New in hotfix/empty-grid-canvas. A pure function,
+`computeEmptyCells(occupied: OccupiedRect[], columns = GRID_COLUMNS, rows = GRID_ROWS): GridRect[]`,
+added to `src/lib/panels/domain/layout.ts` alongside `findFreeRect` and
+reusing its `rectsOverlap` check: walks all `columns * rows` unit cells and
+returns the ones not covered by any occupied rect, each as a `{ col, row,
+colSpan: 1, rowSpan: 1 }`. No Protocol — a single implementation, no test
+fake needed.
+
+`PanelContainer.svelte` calls `computeEmptyCells(snapshot.rects)` and
+renders one outline element per result as a sibling to each `PanelFrame`,
+positioned with the same `panelFrameStyle`-style grid-line mapping
+`gridStyle.ts` already uses for occupied panels. Each outline element
+carries `data-testid="empty-cell"` (the contract `PanelContainer.test.ts`
+asserts against) and `pointer-events: none`, styled with the existing
+`--separator` token (already used for `PanelFrame`'s subtle borders),
+stacked behind panel content.
 
 ### Tool surface (`src/lib/webmcp/v2/panelTools.ts`)
 
@@ -183,16 +210,16 @@ source/renderer registries at build time, not written out by hand.
 
 Shipped by EPIC-1007; a sibling epic may widen its own kind's row.
 
-| Kind | symbol | timeframe | result_selection | crosshair | filters |
-|------|:------:|:---------:|:----------------:|:---------:|:-------:|
-| `filter_builder` | | | | | ✓ |
-| `chart` | ✓ | ✓ | ✓ | ✓ | |
-| `study_library` | ✓ | | | | |
-| `results_table` | ✓ | | ✓ | | ✓ |
-| `similar_opportunities` | ✓ | ✓ | ✓ | | |
-| `watchlist` | ✓ | | ✓ | | |
-| `alerts` | ✓ | | | | |
-| `symbol_details` | ✓ | | | | |
+| Kind                    | symbol | timeframe | result_selection | crosshair | filters |
+| ----------------------- | :----: | :-------: | :--------------: | :-------: | :-----: |
+| `filter_builder`        |        |           |                  |           |    ✓    |
+| `chart`                 |   ✓    |     ✓     |        ✓         |     ✓     |         |
+| `study_library`         |   ✓    |           |                  |           |         |
+| `results_table`         |   ✓    |           |        ✓         |           |    ✓    |
+| `similar_opportunities` |   ✓    |     ✓     |        ✓         |           |         |
+| `watchlist`             |   ✓    |           |        ✓         |           |         |
+| `alerts`                |   ✓    |           |                  |           |         |
+| `symbol_details`        |   ✓    |           |                  |           |         |
 
 ## Data Flow
 
@@ -221,7 +248,7 @@ each target's config by that target's kind, not by the container.
 
 A header control (human) and a `reset_layout` tool (agent) both replace the
 workspace's current panels with the canonical default seed
-(`domain/defaultLayout.ts`'s `DEFAULT_SEED_PANELS` — the same six panels
+(`domain/defaultLayout.ts`'s `DEFAULT_SEED_PANELS` — the same panels
 `seedDefaultWorkspace` creates for a brand-new workspace) as one revisioned,
 undoable mutation. Unlike `apply_layout_template`, this is not a named
 template application against caller-supplied panel ids — it replaces the
@@ -242,7 +269,7 @@ of truth both `seedDefaultWorkspace` and `resetLayout` build from.
 
 | Symbol | Signature | Description |
 |--------|-----------|-------------|
-| `DEFAULT_SEED_PANELS` | `readonly SeedPanelSpec[]` (`domain/defaultLayout.ts`) | the six `{kind, rect}` seed specs; already existed, moved from `panelController.ts` and exported |
+| `DEFAULT_SEED_PANELS` | `readonly SeedPanelSpec[]` (`domain/defaultLayout.ts`) | the `{kind, rect}` seed specs (currently a single `filter_builder` entry, per hotfix/empty-grid-canvas); already existed, moved from `panelController.ts` and exported |
 | `resetLayout` | `(deps: PanelUseCaseDeps, request: ResetLayoutRequest) => MutationEnvelope` (`application/resetLayout.ts`) | mints one fresh panel per `DEFAULT_SEED_PANELS` entry (id via `deps.ids.next('panel', kind)`, title/config/renderer from the kind's own registry definition, same as `createPanel`), replaces `state.panels` wholesale, resets `links`/`selections` to empty, commits as one `commitPanelChange('panels.reset_layout', ...)` call |
 | `resetLayoutByHuman` | `(deps: PanelUseCaseDeps) => MutationEnvelope` (`shell/panelController.ts`) | calls `resetLayout` with `context: { actor: 'human' }`, same shape as `removePanelByHuman` |
 | `reset_layout` tool | `resetLayoutSchema()` in `tools/schemas.ts`; wired in `tools/layoutTools.ts` | no panel-specific input, just `expected_revision`/`idempotency_key` via `revisionFields()`; calls `resetLayout` with `context: parseContext(input)` |
@@ -268,10 +295,10 @@ of truth both `seedDefaultWorkspace` and `resetLayout` build from.
 `reset_layout` / header Reset → for each `DEFAULT_SEED_PANELS` entry, look
 up the panel kind in `deps.kinds` (throws `unknown_panel_kind` if a seed
 kind is somehow unregistered — should never happen in practice) → mint a
-fresh panel via `makePanel` → replace `state.panels` with the six new
+fresh panel via `makePanel` → replace `state.panels` with the newly minted
 panels, `links` with `emptyLinkGraph()`, `selections` with `{}` → bump
-revision → envelope naming all six new panel ids as `affectedIds`.
+revision → envelope naming all newly minted panel ids as `affectedIds`.
 
 ---
 
-*Product design: [spec.md](spec.md)*
+_Product design: [spec.md](spec.md)_

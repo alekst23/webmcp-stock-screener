@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolSpec } from '../../webmcp/types';
+import { DEFAULT_SEED_PANELS } from '../domain/defaultLayout';
 import { buildLayoutTools } from './layoutTools';
 import { buildLifecycleTools } from './lifecycleTools';
 import { createPanelToolTestHarness, resultPayload } from './testSupport';
@@ -196,9 +197,10 @@ describe('layoutTools', () => {
 			const result = await spec.execute({});
 			expect(result.isError, `expected success, got ${JSON.stringify(result)}`).not.toBe(true);
 			const payload = resultPayload(result) as { affected_ids: string[] };
-			expect(payload.affected_ids.length, 'expected the default six-panel seed named as affected').toBe(
-				6
-			);
+			expect(
+				payload.affected_ids.length,
+				'expected the default seed named as affected'
+			).toBe(DEFAULT_SEED_PANELS.length);
 		});
 	});
 });
