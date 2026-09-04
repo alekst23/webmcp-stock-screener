@@ -8,6 +8,8 @@
 // Not called from app startup by this ticket -- flip the flag (or make it a
 // real runtime toggle) once the program's surface is complete.
 import { ensureModelContext } from '../../webmcp/bridge';
+import type { PanelWorkspaceObserver } from '../../panels/shell/panelController';
+import { wrapToolsWithNotify } from '../../panels/shell/panelController';
 import {
 	createWorkbenchSharedInfra,
 	type WorkbenchSharedInfra
@@ -97,13 +99,18 @@ export async function registerWorkbenchTools(
 // composition root calls this narrower export instead -- independent of
 // WORKBENCH_TOOLS_ENABLED, since get_canvas_state must be live regardless of
 // whether the rest of this group ever is.
+// `observer`, when passed, notifies PanelContainer's shell observer after a
+// successful call -- see registerScreenerTools.ts's identical note; this
+// tool was registered via the same separate call site and had the same gap.
 export async function registerCanvasStateTool(
-	deps: DefaultWorkbenchDeps = createDefaultWorkbenchDeps()
+	deps: DefaultWorkbenchDeps = createDefaultWorkbenchDeps(),
+	observer?: PanelWorkspaceObserver
 ): Promise<void> {
-	const spec = buildWorkbenchTools(deps).find((s) => s.name === 'get_canvas_state');
-	if (!spec) {
+	const found = buildWorkbenchTools(deps).find((s) => s.name === 'get_canvas_state');
+	if (!found) {
 		throw new Error('get_canvas_state tool spec not found in buildWorkbenchTools output.');
 	}
+	const spec = observer ? wrapToolsWithNotify([found], observer)[0]! : found;
 	const mc = ensureModelContext();
 	await mc.registerTool({
 		name: spec.name,

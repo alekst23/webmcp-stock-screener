@@ -163,8 +163,13 @@ export async function registerWorkbenchComposition(
 	// tools); search_catalog and resolve_ticker below.
 	const workbenchDeps = buildWorkbenchDeps(shared);
 	const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps, overrides);
-	await registerCanvasStateTool(workbenchDeps);
-	await registerScreenerTools(screenerDeps);
+	// Bug fix: these two were registered without panelRuntime.observer,
+	// so define_screener/run_screener/get_canvas_state mutated the shared
+	// repository but never notified PanelContainer -- the FilterBuilder
+	// panel (and any results panel) stayed stale until an unrelated tool
+	// call happened to notify. See each function's own note.
+	await registerCanvasStateTool(workbenchDeps, panelRuntime.observer);
+	await registerScreenerTools(screenerDeps, panelRuntime.observer);
 
 	// Chart-authoring, similarity, and follow-up-authoring groups below stay
 	// commented out (see plan: "Trim the WebMCP tool surface to a chart-only

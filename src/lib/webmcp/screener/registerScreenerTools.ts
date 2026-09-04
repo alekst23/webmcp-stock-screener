@@ -26,6 +26,8 @@ import {
 import { operationRegistry } from '../../workbench/application/operationRegistry';
 import { NOT_CONFIGURED_PROVENANCE } from '../../workbench/domain/provenance';
 import { ensureModelContext } from '../bridge';
+import type { PanelWorkspaceObserver } from '../../panels/shell/panelController';
+import { wrapToolsWithNotify } from '../../panels/shell/panelController';
 import { buildScreenerTools, type ScreenerToolDeps } from './group';
 
 // T-0020-1: on for real -- /workbench's shared composition root
@@ -79,14 +81,25 @@ export function createDefaultScreenerToolDeps(): ScreenerToolDeps {
 	return createScreenerDeps(createWorkbenchSharedInfra());
 }
 
+// `observer`, when passed, wraps every tool so a successful call notifies
+// PanelContainer's shell observer -- the same mechanism registerPanelTools.ts
+// applies to the panel/results tools (AC5: "PanelContainer re-renders
+// without a reload after any agent-driven mutation"). This group was
+// registered via a separate call site from registerPanelTools (T-0026-5),
+// which meant define_screener/run_screener mutated the shared repository
+// but never notified the observer -- the FilterBuilder panel and any
+// results panel silently went stale until an unrelated notify happened to
+// fire. workbenchCompositionRoot.ts now passes its shared observer here.
 export async function registerScreenerTools(
-	deps: ScreenerToolDeps = createDefaultScreenerToolDeps()
+	deps: ScreenerToolDeps = createDefaultScreenerToolDeps(),
+	observer?: PanelWorkspaceObserver
 ): Promise<void> {
 	if (!SCREENER_TOOLS_ENABLED) {
 		return;
 	}
 	const mc = ensureModelContext();
-	const specs = buildScreenerTools(deps);
+	const built = buildScreenerTools(deps);
+	const specs = observer ? wrapToolsWithNotify(built, observer) : built;
 	for (const spec of specs) {
 		await mc.registerTool({
 			name: spec.name,

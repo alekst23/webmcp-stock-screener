@@ -21,6 +21,7 @@
 // before running the screener, rather than assuming one is seeded.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolResult, ToolSpec } from '../../webmcp/types';
+import type { PanelShellRuntime } from '../../panels/shell/registerPanelTools';
 import { registerWorkbenchComposition } from './workbenchCompositionRoot';
 
 beforeEach(() => {
@@ -96,7 +97,12 @@ function stubFetch(): { impl: typeof fetch; calls: FetchCall[] } {
 	return { impl, calls };
 }
 
-async function registerSpecs(fetchImpl: typeof fetch): Promise<Map<string, ToolSpec>> {
+interface RegisteredSpecs {
+	specs: Map<string, ToolSpec>;
+	runtime: PanelShellRuntime;
+}
+
+async function registerSpecs(fetchImpl: typeof fetch): Promise<RegisteredSpecs> {
 	const registerTool = vi.fn();
 	vi.stubGlobal('document', { modelContext: { registerTool } });
 	vi.stubGlobal('fetch', fetchImpl);
@@ -104,20 +110,21 @@ async function registerSpecs(fetchImpl: typeof fetch): Promise<Map<string, ToolS
 	// No overrides -- in particular no evaluationPort override -- so
 	// buildScreenerDeps' own default (HttpScreenerEvaluationPort against
 	// resolveApiBaseUrl(undefined), i.e. DEV_API_BASE_URL) applies.
-	await registerWorkbenchComposition();
+	const runtime = await registerWorkbenchComposition();
 
-	return new Map<string, ToolSpec>(
+	const specs = new Map<string, ToolSpec>(
 		registerTool.mock.calls.map((args: unknown[]) => {
 			const tool = args[0] as ToolSpec;
 			return [tool.name, tool];
 		})
 	);
+	return { specs, runtime };
 }
 
 describe('T-0026-5: define_screener -> run_screener -> get_screener_results -> create_panel', () => {
 	it('runs end to end against the real composition root, with only fetch stubbed at the HTTP boundary', async () => {
 		const { impl, calls } = stubFetch();
-		const specs = await registerSpecs(impl);
+		const { specs } = await registerSpecs(impl);
 		try {
 			// 0. The default seed layout no longer includes a results_table panel
 			// (hotfix/empty-grid-canvas) -- create one so run_screener's auto-bind
@@ -225,9 +232,57 @@ describe('T-0026-5: define_screener -> run_screener -> get_screener_results -> c
 		}
 	});
 
+	// Bug fix regression: registerScreenerTools/registerCanvasStateTool were
+	// registered without panelRuntime.observer, so a successful call never
+	// notified PanelContainer -- the FilterBuilder panel (and any results
+	// panel) stayed stale until an unrelated tool call happened to notify.
+	// The tests above only assert on tool-call results, which is exactly
+	// why they never caught this -- this test asserts on the observer
+	// directly, spying on it after registration (wrapToolsWithNotify closes
+	// over the observer object, not a bound method, so a spy installed
+	// after registration is still seen at call time).
+	it('define_screener, run_screener, and get_canvas_state all notify the shell observer (UI re-render)', async () => {
+		const { impl } = stubFetch();
+		const { specs, runtime } = await registerSpecs(impl);
+		const notify = vi.spyOn(runtime.observer, 'notify');
+		try {
+			notify.mockClear();
+			const defineResult = await specs.get('define_screener')!.execute({
+				universe: { asset_class: 'equity' },
+				conditions: {
+					type: 'scalar',
+					fieldId: 'field.price.close',
+					operator: 'op.greater_than',
+					value: 10,
+					unit: null
+				},
+				ranking: { fields: [{ field_id: 'field.price.close', direction: 'desc' }] },
+				limit: 20
+			});
+			expect(defineResult.isError, `define_screener failed: ${JSON.stringify(defineResult)}`).toBeFalsy();
+			expect(notify, 'define_screener must notify the observer so FilterBuilderPanel re-renders').toHaveBeenCalled();
+
+			notify.mockClear();
+			const defined = (await textOf(defineResult)) as { screener_id: string };
+			const runResult = await specs
+				.get('run_screener')!
+				.execute({ screener_id: defined.screener_id });
+			expect(runResult.isError, `run_screener failed: ${JSON.stringify(runResult)}`).toBeFalsy();
+			expect(notify, 'run_screener must notify the observer so a bound results panel re-renders').toHaveBeenCalled();
+
+			notify.mockClear();
+			const canvasResult = await specs.get('get_canvas_state')!.execute({});
+			expect(canvasResult.isError, `get_canvas_state failed: ${JSON.stringify(canvasResult)}`).toBeFalsy();
+			expect(notify, 'get_canvas_state is wrapped the same way as every other panel-affecting tool').toHaveBeenCalled();
+		} finally {
+			notify.mockRestore();
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it('run_screener still succeeds when no results_table panel exists (AC2: binding is best-effort)', async () => {
 		const { impl, calls } = stubFetch();
-		const specs = await registerSpecs(impl);
+		const { specs } = await registerSpecs(impl);
 		try {
 			const defineResult = await specs.get('define_screener')!.execute({
 				universe: { asset_class: 'equity' },
