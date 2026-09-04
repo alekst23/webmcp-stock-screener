@@ -68,6 +68,13 @@ source type, or a renderer type into.
     arrangement is currently in place and restore the workspace to the
     same default seeded arrangement (item 8's single-panel seed) a
     brand-new workspace gets — as a single reversible change.
+11. **Drag a result onto the canvas** *(EPIC-0027)* — a human drags a row
+    from a results panel onto an empty grid cell to create a chart panel
+    there, or onto an existing chart panel to rebind its source — without
+    going through the agent. The drop composes the same "add a panel"
+    and "bind or rebind a panel's source" behaviors items 1 and 3 already
+    define; it is a second entry point into them, not new mutation
+    semantics.
 
 ## Supported panel kinds
 
@@ -230,6 +237,15 @@ intent is superseded by this change._
 | Undo | a workspace just reset to the default seed | the human or agent undoes the reset with the returned undo token | the workspace's panels return to exactly the arrangement they had immediately before the reset |
 | Already at default | a workspace whose panels already match the default seeded arrangement | the reset action is invoked | the call still succeeds and reports no effective change, rather than failing |
 
+### Drag a result onto the canvas *(EPIC-0027)*
+
+| Scenario | Given | When | Then |
+|----------|-------|------|------|
+| Happy path, empty cell | a results row and an empty grid cell | the human drags the row onto that cell | a chart panel is created at that exact cell, bound to the row's instrument — the same outcome `create_panel` would produce, at the position dropped rather than auto-placed |
+| Happy path, existing chart | a results row and an existing chart panel, empty or already bound to a different instrument | the human drags the row onto it | the panel's source is rebound to the dropped instrument; no new panel is created — `bind_panel_source`'s existing bind-or-rebind semantics, unchanged |
+| Incompatible target | a results row and a panel/renderer whose accepted source types do not include an instrument | the human drags the row onto it | the drop is rejected (shown as a not-allowed target) and nothing changes — the same source-type validation `bind_panel_source` already enforces |
+| Grid full | a results row and a grid with no empty cell | the human attempts to drop it as a new panel | the drop is rejected with the same "grid is full" case already defined for agent-driven `create_panel` |
+
 ## Non-Goals
 
 - The contents of any panel — the filter builder's tree, the similarity
@@ -247,6 +263,8 @@ intent is superseded by this change._
 - Saving/restoring named workspace revisions.
 - Retiring the existing 11-tool pattern-research surface — the panel
   system is built alongside it in new files.
+- Dragging multiple selected rows at once *(EPIC-0027)* — "make charts
+  from the top 5" stays a text/agent path; drag is a single-row gesture.
 
 ## Open Questions
 
@@ -300,5 +318,5 @@ that the grid has a hard capacity._
 ---
 
 _Implemented by: EPIC-1007, hotfix/empty-grid-canvas, hotfix/panel-system
-(reset-to-default feature). Depends on the common workspace contract from
-EPIC-1006._
+(reset-to-default feature), EPIC-0027 (drag a result onto the canvas).
+Depends on the common workspace contract from EPIC-1006._

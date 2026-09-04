@@ -62,7 +62,12 @@
 	});
 </script>
 
-<section class="panel-frame panel-card" style={panelFrameStyle(rect)}>
+<section
+	class="panel-frame panel-card"
+	style={panelFrameStyle(rect)}
+	data-panel-id={panel.id}
+	data-panel-kind={panel.kind}
+>
 	<header class="panel-header">
 		<h3>{panel.title}</h3>
 		<div class="controls">
