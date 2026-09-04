@@ -57,3 +57,6 @@ terraform/**/*.tfplan
 terraform/**/crash.log
 terraform/**/override.tf
 terraform/**/override.tf.json
+
+# Agent worktrees (isolation: worktree)
+.claude/worktrees/
