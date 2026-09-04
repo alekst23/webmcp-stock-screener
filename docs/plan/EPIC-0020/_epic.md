@@ -41,10 +41,10 @@ actually usable end-to-end.
 | 7   | T-0020-7  | Add assertion messages to the composition root's identity test                    | —                    | Done   |
 | 8   | T-0020-8  | Test idempotency-replay interaction with panel-binding                            | —                    | Done   |
 | 9   | T-0020-9  | Guard against duplicate /workbench composition on remount                         | —                    | Done   |
-| 10  | T-0020-10 | Auto-create the results_table panel when absent, and recycle it on every rerun    | —                    | Open   |
+| 10  | T-0020-10 | Auto-create the results_table panel when absent, and recycle it on every rerun    | —                    | Done   |
 | 11  | T-0020-11 | Human-triggered "Run" action in the filter panel                                  | T-0020-10             | Open   |
-| 12  | T-0020-12 | Disambiguate screener-revision vs. workspace-revision in the tool surface          | —                    | Open   |
-| 13  | T-0020-13 | State the data as-of date on chart "no data" refusals                             | —                    | Open   |
+| 12  | T-0020-12 | Disambiguate screener-revision vs. workspace-revision in the tool surface          | —                    | Done   |
+| 13  | T-0020-13 | State the data as-of date on chart "no data" refusals                             | —                    | Done   |
 | 14  | T-0020-14 | End-to-end integration test and doc update for the amended results-panel pipeline | T-0020-10, T-0020-11 | Open   |
 
 Follow-up tickets 4-9 were filed by this epic's review (2026-09-02) and are
