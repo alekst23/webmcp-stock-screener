@@ -33,7 +33,7 @@ instead of refusing every time.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-0025-1 | Universe and field resolution for server-side evaluation | — | Not started |
+| 1 | T-0025-1 | Universe and field resolution for server-side evaluation | — | Done |
 | 2 | T-0025-2 | `POST /screener/run` endpoint | T-0025-1 | Not started |
 
 ## Notes
