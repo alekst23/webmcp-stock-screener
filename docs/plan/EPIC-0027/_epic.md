@@ -44,8 +44,8 @@ the agent.
 
 | # | Ticket | Title | Depends On | Status |
 |---|--------|-------|------------|--------|
-| 1 | T-0027-1 | Read-only screener widget body | — | Not started |
-| 2 | T-0027-2 | Drag a results row onto the canvas | — | Not started |
+| 1 | T-0027-1 | Read-only screener widget body | — | Done |
+| 2 | T-0027-2 | Drag a results row onto the canvas | — | Done |
 
 ## Notes
 
