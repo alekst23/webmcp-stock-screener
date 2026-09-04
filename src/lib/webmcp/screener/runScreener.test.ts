@@ -227,6 +227,33 @@ describe('run_screener', () => {
 			/workspace/i.test(expectedRevisionDescription),
 			`T-0020-12: expected_revision's description must name it as the workspace's own revision, got: "${expectedRevisionDescription}"`
 		).toBe(true);
+		expect(
+			/screener_revision/.test(expectedRevisionDescription),
+			`T-0020-12: expected_revision's description must name screener_revision by name to contrast against it, got: "${expectedRevisionDescription}"`
+		).toBe(true);
+	});
+
+	// T-0020-12: the other half of the same disambiguation -- screener_revision
+	// must likewise name itself as the screener definition's own revision and
+	// name expected_revision by name, not just describe its own behavior.
+	it('test_inputSchema_screenerRevisionDescription_namesItAsTheScreenerDefinitionsRevision', () => {
+		const tool = createRunScreenerTool(deps);
+		const schema = tool.inputSchema as {
+			properties: Record<string, { description?: string }>;
+		};
+		const screenerRevisionDescription = schema.properties.screener_revision?.description ?? '';
+		expect(
+			screenerRevisionDescription.length,
+			'T-0020-12: screener_revision must have a non-empty description distinguishing it from expected_revision'
+		).toBeGreaterThan(0);
+		expect(
+			/screener definition/i.test(screenerRevisionDescription),
+			`T-0020-12: screener_revision's description must name it as the screener definition's own revision, got: "${screenerRevisionDescription}"`
+		).toBe(true);
+		expect(
+			/expected_revision/.test(screenerRevisionDescription),
+			`T-0020-12: screener_revision's description must name expected_revision by name to contrast against it, got: "${screenerRevisionDescription}"`
+		).toBe(true);
 	});
 
 	// A real mutation through the shipped write path -- AC2's "editing the
@@ -361,7 +388,7 @@ describe('run_screener', () => {
 			screener_id: screenerId,
 			screener_revision: 999
 		});
-		const json = jsonOf(result) as { error?: string };
+		const json = jsonOf(result) as { error?: string; message?: string; issues?: string[] };
 
 		expect(result.isError, 'AC3: an unretained explicit revision must be rejected').toBe(true);
 		expect(json.error, 'the failure must be reported as an operation validation error').toBe(
@@ -370,6 +397,25 @@ describe('run_screener', () => {
 		expect(fake.callCount(), 'AC3: a rejected revision must never reach the evaluation port').toBe(
 			0
 		);
+
+		// T-0020-12: the rejection must plainly name which revision concept
+		// (screener_revision, not the workspace's expected_revision) was
+		// expected, and the value that was actually received (999) -- so an
+		// agent that conflated the two can tell what went wrong without a
+		// second failed guess.
+		const message = json.issues?.[0] ?? json.message ?? '';
+		expect(
+			/screener_revision/.test(message),
+			`T-0020-12: the rejection must name screener_revision by name, got: "${message}"`
+		).toBe(true);
+		expect(
+			/expected_revision/.test(message),
+			`T-0020-12: the rejection must name expected_revision by name to rule it out, got: "${message}"`
+		).toBe(true);
+		expect(
+			message.includes('999'),
+			`T-0020-12: the rejection must state the received value (999), got: "${message}"`
+		).toBe(true);
 	});
 
 	it('test_runScreener_readRunAfterExecute_doesNotReexecute', async () => {

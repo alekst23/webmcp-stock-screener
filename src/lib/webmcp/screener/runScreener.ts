@@ -72,10 +72,18 @@ const INPUT_SCHEMA = {
 		screener_revision: {
 			type: 'integer',
 			description:
-				'Optional. Runs this exact screener revision instead of the current one; rejected ' +
-				'if that revision is no longer retained.'
+				"Optional. The screener definition's own revision counter -- not the workspace's " +
+				'own revision (see expected_revision, a separate parameter). Runs this exact ' +
+				'screener revision instead of the current one; rejected if that revision is no ' +
+				'longer retained.'
 		},
-		expected_revision: { type: 'number' },
+		expected_revision: {
+			type: 'number',
+			description:
+				"Optional. The workspace's own revision, used for optimistic concurrency -- not " +
+				"the screener definition's revision (see screener_revision, a separate parameter). " +
+				'Rejected with a revision conflict if the workspace is no longer at this revision.'
+		},
 		idempotency_key: { type: 'string' }
 	},
 	required: ['screener_id']
@@ -133,7 +141,9 @@ function resolveScreenerRevision(
 		}
 	}
 	throw new OperationValidationError([
-		`Screener revision ${requestedRevision} for screener "${screenerId}" is no longer retained.`
+		"screener_revision must be the screener definition's own revision, not the workspace's " +
+			`expected_revision -- revision ${requestedRevision} for screener "${screenerId}" is no ` +
+			'longer retained.'
 	]);
 }
 
