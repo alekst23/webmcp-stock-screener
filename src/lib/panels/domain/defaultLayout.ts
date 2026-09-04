@@ -22,5 +22,5 @@ export interface SeedPanelSpec {
 // "reset to default" always reproduces exactly this seed, not the six-panel
 // arrangement T-1015-12 originally shipped.
 export const DEFAULT_SEED_PANELS: readonly SeedPanelSpec[] = [
-	{ kind: 'filter_builder', rect: { col: 0, row: 0, colSpan: 2, rowSpan: 4 } }
+	{ kind: 'filter_builder', rect: { col: 0, row: 0, colSpan: 1, rowSpan: 4 } }
 ];

@@ -20,8 +20,8 @@ const BODY_TEXT_ROLES: SemanticRole[] = [...BODY_TEXT, 'warning', 'accent', 'acc
 // indicator, and the state indicators. The three status colours are here
 // because they are drawn as 1px borders as well as text, and the chart
 // anchor and crosshair because they indicate state with no label at all.
-// `border`, `separator` and `chartGrid` are deliberately absent -- the spec
-// exempts purely decorative rules.
+// `border`, `separator`, `gridLine` and `chartGrid` are deliberately absent
+// -- the spec exempts purely decorative rules.
 const MEANINGFUL_NON_TEXT: SemanticRole[] = [
 	'borderStrong',
 	'focusRing',
@@ -70,6 +70,7 @@ describe('theme tokens', () => {
 			'border',
 			'borderStrong',
 			'separator',
+			'gridLine',
 			'textPrimary',
 			'textSecondary',
 			'textMuted',

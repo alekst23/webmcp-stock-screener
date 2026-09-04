@@ -95,6 +95,20 @@ describe('registerDefaultPanelKinds', () => {
 		}
 	});
 
+	// hotfix/panel-default-width-grid-lines: the default seed and the
+	// registry's own default size must agree that filter_builder is one
+	// column wide, not two -- see spec.md's amended "Seed a new workspace
+	// with the default layout".
+	it('gives filter_builder a default size of one column, full grid height', () => {
+		const registry = createPanelRegistry();
+		registerDefaultPanelKinds(registry);
+
+		expect(
+			registry.require('filter_builder').defaultSize,
+			'expected filter_builder to default to a single column, full grid height'
+		).toEqual({ colSpan: 1, rowSpan: 4 });
+	});
+
 	it('leaves filter_builder with no binding types since it is not data-bound', () => {
 		const registry = createPanelRegistry();
 		registerDefaultPanelKinds(registry);

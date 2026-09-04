@@ -75,7 +75,10 @@ describe('seedDefaultWorkspace', () => {
 
 		const filterBuilder = state.panels[0]!;
 		expect(filterBuilder.kind).toBe('filter_builder');
-		expect(filterBuilder.rect).toEqual({ col: 0, row: 0, colSpan: 2, rowSpan: 4 });
+		// hotfix/panel-default-width-grid-lines: colSpan corrected from 2 to 1
+		// -- see spec.md's amended "Seed a new workspace with the default
+		// layout".
+		expect(filterBuilder.rect).toEqual({ col: 0, row: 0, colSpan: 1, rowSpan: 4 });
 		expect(
 			state.panels.every((p) => p.source === null),
 			'expected every seeded panel to start unbound'
