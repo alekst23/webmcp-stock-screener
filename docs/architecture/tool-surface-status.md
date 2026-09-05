@@ -6,15 +6,14 @@ Source of truth: `src/lib/workbench/composition/workbenchCompositionRoot.ts`
 [New WebMCP Surface](new-webmcp-surface.md) for the broader design — that doc
 predates the chart-demo trim below and is stale on tool counts.
 
-## Active (21 tools)
+## Active (9 tools)
 
-**Panel tools (14)** — `registerPanelTools()`, always on:
-`create_panel`, `duplicate_panel`, `remove_panel`, `set_panel_layout`,
-`apply_layout_template`, `split_panel`, `maximize_panel`, `bind_panel_source`,
-`set_panel_renderer`, `configure_chart_grid`, `configure_panel_view`,
-`link_panels`, `unlink_panels`, `set_panel_selection`
+**Panel tools (3 of 15)** — `registerPanelTools()`, filtered by
+`TOOLS_OFF_MVP_SURFACE` (`registerPanelTools.ts`) against
+[tool-surface-mvp.md](tool-surface-mvp.md)'s served set:
+`create_panel`, `remove_panel`, `set_panel_layout`
 
-**Results tools (2)** — same call: `get_screener_results`, `explain_result`
+**Results tools (1 of 2)** — same call, same filter: `get_screener_results`
 
 **Chart (1)** — `registerResolveTickerTool()`, always on: `resolve_ticker`
 
@@ -30,6 +29,25 @@ output rather than registering that group wholesale: `get_canvas_state`
 (`define_screener` absorbed the five sequential mutation tools this group
 used to register — see `group.ts`'s own header) — this call is no longer
 commented out: `define_screener`, `run_screener`
+
+## Filtered at `registerPanelTools()` (13 tools)
+
+`buildPanelTools()`/`buildResultsTools()` still build their full rosters —
+each tool stays defined and unit-tested at its own module
+(`panelTools.test.ts`, `resultsTools.test.ts`, etc.) — but `TOOLS_OFF_MVP_SURFACE`
+drops these before registration, matching
+[tool-surface-mvp.md](tool-surface-mvp.md)'s "deliberately absent" table:
+
+| Tool | Doc's reason |
+|---|---|
+| `duplicate_panel`, `apply_layout_template`, `split_panel`, `maximize_panel`, `reset_layout` | Expressible via `create_panel` + `set_panel_layout`, or client-only UI state |
+| `bind_panel_source`, `set_panel_renderer`, `configure_chart_grid`, `configure_panel_view` | Mutate-in-place config; MVP creates with the right source/renderer and recreates if it changes |
+| `link_panels`, `unlink_panels`, `set_panel_selection` | List → chart is a copy-out, not a live link; selection stays a human UI affordance |
+| `explain_result` | Correct and valuable, but not exercised by the MVP use case — first candidate after MVP |
+
+`reset_layout` (added by #23, after this doc's last tool-count sync) was
+never in the 14/21-tool counts above — a genuine gap this pass closed, not
+just a rename.
 
 ## Commented out in `workbenchCompositionRoot.ts` (3 groups)
 
@@ -78,7 +96,10 @@ anywhere in the app (only its own tests exercise it). Not referenced from
 
 ## Restoring the full surface
 
-Uncomment the three import blocks and call sites in
+Drop a name from `TOOLS_OFF_MVP_SURFACE` (`registerPanelTools.ts`) to restore
+one panel/results tool — no other change needed, its module and tests are
+untouched. For the other three groups: uncomment the three import blocks and
+call sites in
 `registerWorkbenchComposition()` (`workbenchCompositionRoot.ts`) for
 chart-authoring/similarity/follow-up-authoring. For the rest of
 workbench-core, call `registerWorkbenchTools(workbenchDeps)` instead of (or

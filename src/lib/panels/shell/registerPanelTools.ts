@@ -233,14 +233,47 @@ export function createDefaultPanelShellRuntime(
 	return createPanelShellRuntime(createWorkbenchSharedInfra(), options);
 }
 
+// Tools off docs/architecture/tool-surface-mvp.md's served surface --
+// present in buildPanelTools()/buildResultsTools()'s full output (each
+// group's own tests still exercise the whole roster) but filtered out here,
+// the actual registration boundary, so restoring one is a one-line removal
+// from this list rather than a code change to any tool's own module. Each
+// line names the doc's "deliberately absent" rationale:
+//   - expressible via create_panel + set_panel_layout, or client-only UI
+//     state: duplicate_panel, apply_layout_template, split_panel,
+//     maximize_panel, reset_layout
+//   - mutate-in-place config; MVP creates with the right source/renderer
+//     and recreates if it changes: bind_panel_source, set_panel_renderer,
+//     configure_chart_grid, configure_panel_view
+//   - list -> chart is a copy-out, not a live link; selection stays a
+//     human UI affordance: link_panels, unlink_panels, set_panel_selection
+//   - correct and valuable, but not exercised by the MVP use case, first
+//     candidate after MVP: explain_result
+const TOOLS_OFF_MVP_SURFACE = new Set([
+	'duplicate_panel',
+	'apply_layout_template',
+	'split_panel',
+	'maximize_panel',
+	'reset_layout',
+	'bind_panel_source',
+	'set_panel_renderer',
+	'configure_chart_grid',
+	'configure_panel_view',
+	'link_panels',
+	'unlink_panels',
+	'set_panel_selection',
+	'explain_result'
+]);
+
 // Registers the fourteen panel tools plus the two Results tools this epic
-// registers directly (T-1010-8: get_screener_results, explain_result) --
-// each wrapped so a successful call notifies the shell's observer, which is
-// how PanelContainer re-renders without a reload after any agent-driven
-// mutation (AC5). Wrapping the two read-only Results tools the same way is
-// harmless: notifying after a read that changed nothing just re-renders
-// already-current state. Returns the runtime so the caller (the /workbench
-// route) can hand the same deps/observer to PanelContainer.
+// registers directly (T-1010-8: get_screener_results, explain_result),
+// minus TOOLS_OFF_MVP_SURFACE above -- each wrapped so a successful call
+// notifies the shell's observer, which is how PanelContainer re-renders
+// without a reload after any agent-driven mutation (AC5). Wrapping the
+// read-only Results tool the same way is harmless: notifying after a read
+// that changed nothing just re-renders already-current state. Returns the
+// runtime so the caller (the /workbench route) can hand the same
+// deps/observer to PanelContainer.
 export async function registerPanelTools(
 	runtime: PanelShellRuntime = createDefaultPanelShellRuntime()
 ): Promise<PanelShellRuntime> {
@@ -248,7 +281,7 @@ export async function registerPanelTools(
 	const allTools = [
 		...buildPanelTools(runtime.deps),
 		...buildResultsTools({ ...runtime.deps, runs: runtime.runs })
-	];
+	].filter((spec) => !TOOLS_OFF_MVP_SURFACE.has(spec.name));
 	const tools = wrapToolsWithNotify(allTools, runtime.observer);
 	for (const spec of tools) {
 		await mc.registerTool({

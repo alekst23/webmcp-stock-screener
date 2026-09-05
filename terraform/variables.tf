@@ -36,9 +36,9 @@ variable "apprunner_port" {
 }
 
 variable "cors_allowed_origins" {
-  description = "CORS_ALLOWED_ORIGINS equivalent to render.yaml's (AC5). Defaults to the current live frontend origin (docs/reference/deployment.md); T-0016-10 repoints the frontend itself."
+  description = "CORS_ALLOWED_ORIGINS equivalent to render.yaml's (AC5), comma-separated per backend/main.py's _allowed_origins(). Defaults to every live frontend origin (docs/reference/deployment.md): the workers.dev URL plus marketpane.creocortex.com, the custom domain the app is actually served from in production -- both must stay listed, or the custom domain's browser requests fail CORS with an opaque 'Failed to fetch' even though the backend itself is healthy."
   type        = string
-  default     = "https://webmcp-stock-screener.alekst23.workers.dev"
+  default     = "https://webmcp-stock-screener.alekst23.workers.dev,https://marketpane.creocortex.com"
 }
 
 variable "rate_limit_default" {

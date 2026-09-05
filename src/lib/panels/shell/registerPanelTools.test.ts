@@ -217,22 +217,29 @@ describe('createDefaultPanelShellRuntime', () => {
 	});
 });
 
-// T-1010-8 AC1/AC8: registerPanelTools() (not just the sync runtime builder
-// above) registers the two Results tools this epic adds directly, alongside
-// the fifteen existing panel tools (hotfix/panel-system added reset_layout)
-// -- neither surface crowds out the other, and the table-renderer contract
-// stays reachable only through configure_panel_view/set_panel_selection,
-// never as its own listed tool.
+// T-1010-8 AC1/AC8, narrowed by TOOLS_OFF_MVP_SURFACE (registerPanelTools.ts):
+// registerPanelTools() registers only docs/architecture/tool-surface-mvp.md's
+// served subset of the fifteen panel tools and two Results tools --
+// create_panel, remove_panel, set_panel_layout, get_screener_results -- with
+// the rest (duplicate_panel, apply_layout_template, split_panel,
+// maximize_panel, reset_layout, bind_panel_source, set_panel_renderer,
+// configure_chart_grid, configure_panel_view, link_panels, unlink_panels,
+// set_panel_selection, explain_result) filtered out at this registration
+// boundary, not removed from their own modules -- each still has its own
+// full-roster test (panelTools.test.ts, resultsTools.test.ts, etc.).
 describe('registerPanelTools', () => {
-	it('registers get_screener_results and explain_result alongside the fifteen existing panel tools', async () => {
+	it('registers exactly the MVP subset of panel and Results tools', async () => {
 		const registerTool = vi.fn();
 		vi.stubGlobal('document', { modelContext: { registerTool } });
 		try {
 			await registerPanelTools();
 			const names = registerTool.mock.calls.map(([tool]) => tool.name as string);
-			expect(names).toHaveLength(17);
-			expect(names).toContain('get_screener_results');
-			expect(names).toContain('explain_result');
+			expect(names.sort()).toEqual(
+				['create_panel', 'remove_panel', 'set_panel_layout', 'get_screener_results'].sort()
+			);
+			expect(names).not.toContain('duplicate_panel');
+			expect(names).not.toContain('explain_result');
+			expect(names).not.toContain('bind_panel_source');
 			expect(names).not.toContain('configure_results_table');
 			expect(names).not.toContain('select_result');
 			expect(names).not.toContain('table');

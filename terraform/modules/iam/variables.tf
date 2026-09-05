@@ -24,9 +24,9 @@ variable "panel_bucket_arn" {
 }
 
 variable "panel_object_keys" {
-  description = "Exact object keys the app role may read/write -- matches load_panel.py's PANEL_KEY and UNIVERSE_KEY."
+  description = "Exact object keys the app role may read/write -- matches load_panel.py's PANEL_KEY and UNIVERSE_KEY, plus universe_eligibility.py's ELIGIBILITY_KEY that the nightly delta's eligibility gate reads and writes every run."
   type        = list(string)
-  default     = ["panel.parquet", "universe.csv"]
+  default     = ["panel.parquet", "universe.csv", "universe_eligibility.csv"]
 }
 
 variable "tags" {

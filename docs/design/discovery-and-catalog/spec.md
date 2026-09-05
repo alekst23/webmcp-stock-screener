@@ -47,6 +47,13 @@ Questions below and implemented as stated.
 5. **Honest unavailability**: anything depending on reference data this
    project has no source for is reported as unavailable with a reason,
    never omitted and never faked.
+6. **5-session price-change field**: `field.price.change_pct_5` is
+   registered in the catalog alongside the existing 1- and 2-session
+   lookbacks, giving the agent a 5-trading-session proxy for "last week"
+   style ranking and filter queries. True calendar-week (holiday-aware)
+   resampling stays out of scope — `interval.1w` remains unavailable for
+   resampling; this field names its window as sessions, not a calendar
+   week.
 
 ## Behavioral Specifications
 
@@ -154,4 +161,4 @@ Questions below and implemented as stated.
 
 ---
 
-*Implemented by: EPIC-1008*
+*Implemented by: EPIC-1008, hotfix/screener-5-session-field*
