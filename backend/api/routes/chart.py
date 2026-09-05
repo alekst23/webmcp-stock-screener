@@ -59,7 +59,15 @@ def get_bars(
     if not port.has_ticker(ticker):
         raise HTTPException(
             status_code=404,
-            detail={"message": f'Unknown ticker "{ticker}": no bars for it in the loaded panel.'},
+            detail={
+                "message": f'Unknown ticker "{ticker}": no bars for it in the loaded panel.',
+                # T-0020-13: the panel's own as-of date, so a caller can tell
+                # "this ticker will never be in this panel" apart from "this
+                # panel simply hasn't been ingested through a recent enough
+                # date yet." Same provenance the panel already tracks for
+                # every successful read (PanelPriceSeriesPort.provenance()).
+                "as_of": port.provenance().as_of.date().isoformat(),
+            },
         )
     bars = port.get_bars(ticker, start, end)
     return ChartBarsResponse(ticker=ticker, start=start, end=end, bars=bars)

@@ -1,5 +1,8 @@
-// Barrel for the thirteen revisioned use cases plus maximize_panel's pure
-// helper -- the composition surface T-1007-5's tool schemas build on.
+// Barrel for the thirteen revisioned use cases, maximize_panel's pure
+// helper, and bindRunToResultsPanel's cross-actor screener-run binding --
+// the composition surface T-1007-5's tool schemas (and, since EPIC-0020's
+// post-review layering fix, panelController.ts's human-triggered run) build
+// on.
 export type { PanelUseCaseDeps, PanelMutationResult } from './support';
 export { PanelOperationError, type PanelOperationErrorCode } from './errors';
 export {
@@ -25,3 +28,8 @@ export { linkPanels, type LinkPanelsRequest } from './linkPanels';
 export { unlinkPanels, type UnlinkPanelsRequest } from './unlinkPanels';
 export { setPanelSelection, type SetPanelSelectionRequest } from './setPanelSelection';
 export { resetLayout, type ResetLayoutRequest } from './resetLayout';
+export {
+	bindRunToResultsPanel,
+	type PanelBindingDeps,
+	type BindRunToResultsPanelDeps
+} from './bindRunToResultsPanel';

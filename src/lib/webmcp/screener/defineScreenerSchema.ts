@@ -95,7 +95,13 @@ export const DEFINE_SCREENER_INPUT_SCHEMA = {
 			description: 'Omit (or pass an empty "fields") for the documented default order.'
 		},
 		limit: { type: 'integer', minimum: 1, description: 'Maximum matches a run returns.' },
-		expected_revision: { type: 'number' },
+		expected_revision: {
+			type: 'number',
+			description:
+				"Optional. The workspace's own revision, used for optimistic concurrency -- not the " +
+				"screener definition's revision (returned as screener_revision in the response, but " +
+				'not accepted as input here -- define_screener always writes the next revision).'
+		},
 		idempotency_key: { type: 'string' }
 	}
 };

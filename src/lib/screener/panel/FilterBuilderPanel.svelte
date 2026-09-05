@@ -5,12 +5,17 @@
 	// body already uses (PanelContainer.svelte's own refresh() re-mounts
 	// every body with fresh `panel` prop data on each notify -- see
 	// ResultsTablePanel.svelte for the established precedent this follows).
-	// No controls that mutate the screener (AC4): redefinition stays
-	// agent-driven only for MVP (docs/design/screener-core/spec.md's
-	// amendment, "Non-Goal (added)").
+	// No controls that mutate the screener DEFINITION (AC4 of T-0027-1):
+	// redefinition stays agent-driven only for MVP (docs/design/screener-core/
+	// spec.md's amendment, "Non-Goal (added)"). T-0020-11's "Run" control
+	// below is exempt from that non-goal by design -- it's scoped to
+	// *running* the existing definition, not editing it (see that ticket's
+	// own Goal section).
 	import type { PanelBodyProps } from '../../panels/shell/panelController';
+	import { runScreenerByHuman } from '../../panels/shell/panelController';
 	import { readScreener } from '../state';
 	import { summarizeFilterTree, summarizeRanking, summarizeUniverse } from './filterTreeSummary';
+	import { runOutcomeMessage } from './runOutcomeMessage';
 	import {
 		getFilterBuilderPanelRuntimeDeps,
 		type FilterBuilderPanelRuntimeDeps
@@ -39,12 +44,90 @@
 	let universeLines = $derived(screener ? summarizeUniverse(screener.universe) : []);
 	let filterLines = $derived(screener ? summarizeFilterTree(screener.filterTree) : []);
 	let rankingLine = $derived(screener ? summarizeRanking(screener.ranking) : '');
+
+	// T-0020-11: local-only UI state, never a workspace mutation -- mirrors
+	// this codebase's existing "local component state" convention for
+	// non-persistent UI affordances (PanelContainer.svelte's own
+	// `linkedValues`). The actual guard against a second concurrent run is
+	// panelController.ts's own single-flight promise cache (runScreenerByHuman
+	// is safe to call twice regardless); this flag only drives the
+	// disabled/spinner affordance the AC also asks for.
+	let running = $state(false);
+
+	// Transient, local-only feedback for a non-successful human run (post-
+	// review fix, EPIC-0020: runScreenerByHuman's return value used to be
+	// discarded entirely, so a refused or errored run left the button
+	// reverting to "Run" with zero explanation). Cleared at the start of
+	// every new run and left in place afterward until the next run attempt
+	// -- there is no other transient-message precedent elsewhere in this
+	// panel system to match (checked panels/shell/ and results/panel/), so
+	// this follows the same "local component state, never a workspace
+	// mutation" convention `running` above already uses.
+	let runMessage = $state<string | null>(null);
+
+	// Explains why the control is disabled, or null when it's enabled --
+	// covers all three AC states (no screener defined; a run is already in
+	// flight; the run deps were never wired up) with one derived value the
+	// markup below reads for both the `disabled` attribute and the tooltip,
+	// so the two can never drift apart. The `!deps.run` branch is defense in
+	// depth -- unreachable today because the composition root sets `run`
+	// synchronously before this panel ever mounts -- but folding it in here
+	// means the tooltip can never silently disagree with `disabled`.
+	let disabledReason = $derived(
+		!screener
+			? 'Define a screener before it can be run.'
+			: running
+				? 'A run is already in progress.'
+				: !deps.run
+					? 'The run control is not available yet.'
+					: null
+	);
+
+	async function handleRun(): Promise<void> {
+		if (disabledReason || !deps.run) {
+			return;
+		}
+		const run = deps.run;
+		running = true;
+		runMessage = null;
+		try {
+			const result = await runScreenerByHuman({
+				useCaseDeps: deps.useCaseDeps,
+				evaluationPort: run.evaluationPort,
+				runStore: run.runStore
+			});
+			runMessage = runOutcomeMessage(result);
+		} finally {
+			running = false;
+			// Notified regardless of outcome (success, refusal, or an
+			// evaluation-port error): mirrors PanelContainer.svelte's own
+			// handlers, which always refresh() after calling a human action --
+			// rendering derives entirely from a fresh read, so a no-op mutation
+			// (e.g. a refusal that stored nothing) just re-renders unchanged
+			// state.
+			run.observer.notify();
+		}
+	}
 </script>
 
-{#if screener === null}
-	<p class="empty">No screener yet.</p>
-{:else}
-	<div class="filter-builder-panel">
+<div class="filter-builder-panel">
+	<div class="toolbar">
+		<button
+			type="button"
+			class="run-button"
+			disabled={disabledReason !== null}
+			title={disabledReason ?? undefined}
+			onclick={handleRun}
+		>
+			{running ? 'Running…' : 'Run'}
+		</button>
+	</div>
+	{#if runMessage !== null}
+		<p class="run-message">{runMessage}</p>
+	{/if}
+	{#if screener === null}
+		<p class="empty">No screener yet.</p>
+	{:else}
 		<section>
 			<h4>Universe</h4>
 			<ul>
@@ -65,8 +148,8 @@
 			<h4>Ranking &amp; limit</h4>
 			<p>{rankingLine}</p>
 		</section>
-	</div>
-{/if}
+	{/if}
+</div>
 
 <style>
 	.filter-builder-panel {
@@ -76,6 +159,16 @@
 		height: 100%;
 		min-height: 0;
 		overflow: auto;
+	}
+
+	.toolbar {
+		display: flex;
+		justify-content: flex-end;
+		flex: 0 0 auto;
+	}
+
+	.run-button {
+		flex: 0 0 auto;
 	}
 
 	h4 {
@@ -103,5 +196,14 @@
 	.empty {
 		color: var(--text-muted);
 		font-style: italic;
+	}
+
+	.run-message {
+		flex: 0 0 auto;
+		color: var(--error);
+		background: var(--error-bg);
+		border: 1px solid var(--error);
+		border-radius: var(--radius-sm);
+		padding: var(--space-xs) var(--space-sm);
 	}
 </style>

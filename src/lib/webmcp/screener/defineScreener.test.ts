@@ -108,6 +108,31 @@ describe('define_screener', () => {
 		return createDefineScreenerTool(deps);
 	}
 
+	// T-0020-12: define_screener has no screener_revision input (it always
+	// writes the next revision), but its expected_revision parameter is still
+	// easy to conflate with the screener_revision this same call *returns* in
+	// its response -- the schema must name expected_revision as the
+	// workspace's own revision so an agent does not pass the returned
+	// screener_revision back in as expected_revision on a later call.
+	it('test_inputSchema_expectedRevisionDescription_namesItAsTheWorkspaceRevision', () => {
+		const schema = tool().inputSchema as {
+			properties: Record<string, { description?: string }>;
+		};
+		const description = schema.properties.expected_revision?.description ?? '';
+		expect(
+			description.length,
+			'T-0020-12: expected_revision must have a non-empty description distinguishing it from screener_revision'
+		).toBeGreaterThan(0);
+		expect(
+			/workspace/i.test(description),
+			`T-0020-12: expected_revision's description must name it as the workspace's own revision, got: "${description}"`
+		).toBe(true);
+		expect(
+			/screener_revision/.test(description),
+			`T-0020-12: expected_revision's description must name screener_revision by name to contrast against it, got: "${description}"`
+		).toBe(true);
+	});
+
 	// AC1
 	it('createsANewScreenerAtRevision1_andSetsItAsTheWorkspacesCurrentScreener', async () => {
 		const workspaceId = seedWorkspace();

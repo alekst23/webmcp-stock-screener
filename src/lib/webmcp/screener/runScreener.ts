@@ -4,7 +4,11 @@
 // ScreenerEvaluationPort, stores the outcome in a PinnedRunStore, and shapes
 // the wire response. Every field a completed run reports (matches, warnings,
 // provenance, ranking) comes straight from run.ts's own contract; this file
-// never re-derives any of it.
+// never re-derives any of it. The post-run results-panel binding itself
+// (bindRunToResultsPanel) is pure application-layer logic with no wire
+// concerns, so as of EPIC-0020's post-review layering fix it lives in
+// panels/application/bindRunToResultsPanel.ts and is only called from here,
+// not defined here.
 //
 // The run does not advance the workspace revision the way a definition edit
 // does, so -- like save_workspace (workbench/tools/index.ts) -- it bypasses
@@ -14,10 +18,7 @@
 // must not change idempotency.ts's shared type to fit.
 
 import { builtinCatalogRegistry, type CatalogRegistry } from '../../catalog/registry';
-import { bindPanelSource, readPanelState, type PanelUseCaseDeps } from '../../panels/application';
-import type { LayoutTemplateRegistry } from '../../panels/domain/layoutTemplates';
-import type { PanelRegistry } from '../../panels/registry/panelKindRegistry';
-import type { SourceRendererRegistry } from '../../panels/registry/sourceRendererRegistry';
+import { bindRunToResultsPanel, type PanelBindingDeps } from '../../panels/application';
 import { createScreenerEngine } from '../../screener/engine/engine';
 import { createUnavailableMarketData } from '../../screener/engine/unavailableMarketData';
 import { createPinnedRunStore } from '../../screener/runStore';
@@ -72,10 +73,18 @@ const INPUT_SCHEMA = {
 		screener_revision: {
 			type: 'integer',
 			description:
-				'Optional. Runs this exact screener revision instead of the current one; rejected ' +
-				'if that revision is no longer retained.'
+				"Optional. The screener definition's own revision counter -- not the workspace's " +
+				'own revision (see expected_revision, a separate parameter). Runs this exact ' +
+				'screener revision instead of the current one; rejected if that revision is no ' +
+				'longer retained.'
 		},
-		expected_revision: { type: 'number' },
+		expected_revision: {
+			type: 'number',
+			description:
+				"Optional. The workspace's own revision, used for optimistic concurrency -- not " +
+				"the screener definition's revision (see screener_revision, a separate parameter). " +
+				'Rejected with a revision conflict if the workspace is no longer at this revision.'
+		},
 		idempotency_key: { type: 'string' }
 	},
 	required: ['screener_id']
@@ -133,7 +142,9 @@ function resolveScreenerRevision(
 		}
 	}
 	throw new OperationValidationError([
-		`Screener revision ${requestedRevision} for screener "${screenerId}" is no longer retained.`
+		"screener_revision must be the screener definition's own revision, not the workspace's " +
+			`expected_revision -- revision ${requestedRevision} for screener "${screenerId}" is no ` +
+			'longer retained.'
 	]);
 }
 
@@ -145,57 +156,6 @@ interface RunReplayCache {
 	// typed to MutationEnvelope and a ScreenerRun is not one.
 	lookup(key: string, fingerprint: string): ToolResult | null;
 	remember(key: string, fingerprint: string, result: ToolResult): void;
-}
-
-// T-0020-2: the three panel-only registries PanelUseCaseDeps needs besides
-// the six fields WorkbenchDeps already carries (repository/revisions/
-// history/clock/ids/idempotency) -- injected so this module never builds
-// its own registry instances, only reuses whichever ones the shared
-// composition root already built (T-0020-1).
-export interface PanelBindingDeps {
-	kinds: PanelRegistry;
-	sourceRenderer: SourceRendererRegistry;
-	templates: LayoutTemplateRegistry;
-}
-
-// AC1/AC3/AC4/AC5: binds the workspace's first results_table panel (by
-// existing panel order) to the just-completed run, via the exact same
-// bindPanelSource application function every other panel source change
-// uses -- so replacing a prior binding, and recording the change through
-// RevisionService/change-history, both come for free. Best-effort (AC2):
-// any failure here (no results_table panel, a rejected source, a workspace
-// that vanished between the run and this call) is swallowed by the caller,
-// never surfacing as a run_screener failure.
-function bindRunToResultsPanel(
-	deps: WorkbenchDeps,
-	panelBinding: PanelBindingDeps,
-	workspaceId: string,
-	runId: string
-): void {
-	const doc = deps.repository.get(workspaceId);
-	if (!doc) {
-		return;
-	}
-	const target = readPanelState(doc).panels.find((p) => p.kind === 'results_table');
-	if (!target) {
-		return;
-	}
-	const panelDeps: PanelUseCaseDeps = {
-		workspaceId,
-		repository: deps.repository,
-		revisions: deps.revisions,
-		history: deps.history,
-		clock: deps.clock,
-		ids: deps.ids,
-		kinds: panelBinding.kinds,
-		sourceRenderer: panelBinding.sourceRenderer,
-		templates: panelBinding.templates
-	};
-	bindPanelSource(panelDeps, {
-		context: { actor: 'agent' },
-		panelId: target.id,
-		source: { type: 'screener_results', ref: { run_id: runId } }
-	});
 }
 
 function createRunReplayCache(): RunReplayCache {
@@ -306,7 +266,7 @@ async function execute(
 		result = ok(toWireScreenerRun(outcome));
 		if (panelBinding) {
 			try {
-				bindRunToResultsPanel(deps, panelBinding, workspaceId, runId);
+				bindRunToResultsPanel(deps, panelBinding, workspaceId, runId, 'agent');
 			} catch (err) {
 				// AC2/AC5: best-effort -- binding never blocks or alters
 				// run_screener's own already-built success response. Still logged

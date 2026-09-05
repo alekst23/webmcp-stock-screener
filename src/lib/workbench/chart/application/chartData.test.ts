@@ -567,4 +567,29 @@ describe('refusals before any fetch', () => {
 		const bad = await refusal(h);
 		expect(bad.reason, 'a source failure is not a caller mistake').toBe('series_unavailable');
 	});
+
+	// T-0020-13: httpChartSeries.ts's unknown_instrument message states the
+	// source's data as-of date when the backend reports one; chartData.ts's
+	// series_unavailable refusal forwards error.message verbatim, so the date
+	// reaches the caller unchanged. A bespoke port double stands in for
+	// httpChartSeries here because the in-memory fixture's own `failure` path
+	// wraps the given value as `cause` behind a fixed message of its own
+	// (inMemoryChartSeries.ts) -- it is not the message pass-through this
+	// test exercises.
+	it('test_a_source_failure_carrying_an_as_of_date_forwards_it_into_the_refusal_message', async () => {
+		const port: ChartSeriesPort = {
+			fetchSeries: () => {
+				throw new Error(
+					'This price source carries no data for instrument "inst:XNAS:NVDA". ' +
+						"This price source's data runs through 2026-08-30."
+				);
+			}
+		};
+		const h = harness(chartState({}), port);
+		const bad = await refusal(h);
+		expect(bad.reason).toBe('series_unavailable');
+		expect(bad.message, 'the as-of date survives the pass-through unchanged').toContain(
+			'2026-08-30'
+		);
+	});
 });

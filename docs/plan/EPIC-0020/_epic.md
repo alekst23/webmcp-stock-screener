@@ -30,30 +30,57 @@ actually usable end-to-end.
 
 ## Ticket Summary
 
-| #   | Ticket   | Title                                                                            | Depends On         | Status |
-| --- | -------- | -------------------------------------------------------------------------------- | ------------------ | ------ |
-| 1   | T-0020-1 | Shared composition root; flip WORKBENCH_TOOLS_ENABLED and SCREENER_TOOLS_ENABLED | —                  | Done   |
-| 2   | T-0020-2 | Auto-bind a completed screener run to the default results_table panel            | T-0020-1           | Done   |
-| 3   | T-0020-3 | End-to-end integration test and architecture doc update                          | T-0020-1, T-0020-2 | Done   |
-| 4   | T-0020-4 | Test the first-wins rule when multiple results_table panels exist               | —                  | Open   |
-| 5   | T-0020-5 | Negative test — other tool-group flags stay unregistered                        | —                  | Open   |
-| 6   | T-0020-6 | De-duplicate FIXED_PROVENANCE; align the deps-split pattern across all 3 modules | —                  | Open   |
-| 7   | T-0020-7 | Add assertion messages to the composition root's identity test                  | —                  | Open   |
-| 8   | T-0020-8 | Test idempotency-replay interaction with panel-binding                          | —                  | Open   |
-| 9   | T-0020-9 | Guard against duplicate /workbench composition on remount                       | —                  | Open   |
+| #   | Ticket    | Title                                                                             | Depends On          | Status |
+| --- | --------- | ---------------------------------------------------------------------------------- | -------------------- | ------ |
+| 1   | T-0020-1  | Shared composition root; flip WORKBENCH_TOOLS_ENABLED and SCREENER_TOOLS_ENABLED   | —                    | Done   |
+| 2   | T-0020-2  | Auto-bind a completed screener run to the default results_table panel              | T-0020-1             | Done   |
+| 3   | T-0020-3  | End-to-end integration test and architecture doc update                            | T-0020-1, T-0020-2   | Done   |
+| 4   | T-0020-4  | Test the first-wins rule when multiple results_table panels exist                 | —                    | Done   |
+| 5   | T-0020-5  | Negative test — other tool-group flags stay unregistered                          | —                    | Done   |
+| 6   | T-0020-6  | De-duplicate FIXED_PROVENANCE; align the deps-split pattern across all 3 modules   | —                    | Done   |
+| 7   | T-0020-7  | Add assertion messages to the composition root's identity test                    | —                    | Done   |
+| 8   | T-0020-8  | Test idempotency-replay interaction with panel-binding                            | —                    | Done   |
+| 9   | T-0020-9  | Guard against duplicate /workbench composition on remount                         | —                    | Done   |
+| 10  | T-0020-10 | Auto-create the results_table panel when absent, and recycle it on every rerun    | —                    | Done   |
+| 11  | T-0020-11 | Human-triggered "Run" action in the filter panel                                  | T-0020-10             | Done   |
+| 12  | T-0020-12 | Disambiguate screener-revision vs. workspace-revision in the tool surface          | —                    | Done   |
+| 13  | T-0020-13 | State the data as-of date on chart "no data" refusals                             | —                    | Done   |
+| 14  | T-0020-14 | End-to-end integration test and doc update for the amended results-panel pipeline | T-0020-10, T-0020-11 | Done   |
+| 15  | T-0020-15 | Post-review fixes for tickets 10-14 (human-run wiring)                            | T-0020-10, T-0020-11 | Done   |
 
-Follow-up tickets 4-9 were filed by this epic's review (2026-09-02) — all
-non-blocking, none required before merge.
+Follow-up tickets 4-9 were filed by this epic's review (2026-09-02) and are
+now Done (their status here was previously stale — corrected during the
+tickets-10-14 design pass below, 2026-09-04).
+
+Tickets 10-14 were added 2026-09-04 to fold in a change order observed live
+against a running session: the results panel never appeared for a completed
+run when none existed yet, there was no human-triggerable run action, screener
+vs. workspace revision confusion, and unexplained chart "no data" refusals.
+See `docs/design/workbench-composition-root/spec.md`'s Features 4-8 for the
+full behavioral spec these tickets implement.
+
+T-0020-15 was filed by an epic review of the tickets-10-14 wave (2026-09-04):
+a dead single-flight guard and a silently-dropped human-run failure outcome
+(both blocking), plus a `panels/shell` -> `webmcp/*` layering violation,
+two functions modestly over this project's size guidance, and a disabled/
+tooltip drift nit. All five are Done — see that ticket for the full
+per-finding resolution.
 
 ## Dependency Graph
 
 ```
 T-0020-1 ──> T-0020-2 ──> T-0020-3
+
+T-0020-10 ──> T-0020-11 ──> T-0020-14
+T-0020-12 (independent)
+T-0020-13 (independent)
 ```
 
-Small and tightly coupled by design — each ticket only makes sense once the
-prior one exists, so this epic runs as three sequential waves of one ticket
-each rather than a parallel fan-out.
+The original three tickets are small and tightly coupled by design — each
+only makes sense once the prior one exists, so they ran as three sequential
+waves. Tickets 10-14 follow the same pattern for the create-if-absent/recycle
+seam (10 → 11 → 14); 12 and 13 are independent of that seam and of each
+other, and can run in parallel with it.
 
 ## Acceptance Criteria
 
@@ -71,8 +98,10 @@ each rather than a parallel fan-out.
    `results_table` panel is automatically bound to that run — no separate
    `bind_panel_source` call needed — and its rendered rows reflect the run's
    matches.
-5. If no `results_table` panel exists, `run_screener` still succeeds;
-   binding is best-effort and never blocks the run itself.
+5. If no `results_table` panel exists, `run_screener` creates one (2x1) and
+   binds it to the run (amended 2026-09-04, T-0020-10 — previously this
+   silently no-oped); binding still never blocks the run itself from
+   succeeding.
 6. One integration test proves the full path end-to-end:
    `create_screener` → `set_screener_universe` → `edit_filter_tree` →
    `run_screener` → the `results_table` panel's bound source resolves to
@@ -82,21 +111,31 @@ each rather than a parallel fan-out.
 8. Full CI gate passes on the epic branch: typecheck, lint, format, frontend
    tests, backend tests (backend is untouched by this epic but must stay
    green), and a production build.
+9. (Added 2026-09-04) A human can trigger the current screener's run directly
+   from the filter panel and see the same results panel produced/recycled a
+   `run_screener` tool call would produce (T-0020-11).
+10. (Added 2026-09-04) Rerunning the same screener, by agent or human, always
+    updates the same `results_table` panel in place — it never accumulates
+    additional panels (T-0020-10).
 
 ## Known Limitation
 
-Because no real `ScreenerMarketData` adapter exists yet anywhere in this
-codebase, a live `run_screener` call today is refused (`empty_universe`)
-rather than returning real matches. This epic's own tests substitute a fake
-evaluation port to prove the composition-root wiring is correct — they do
-not and cannot demonstrate real market data flowing through yet. A real
-adapter is a separate, future piece of work.
+*(Stale as of 2026-09-04 — corrected below.)* At the time this epic's original
+three tickets landed, no real `ScreenerMarketData` adapter existed and
+`run_screener` was refused with `empty_universe` against real data; this
+epic's own tests substituted a fake evaluation port to prove the
+composition-root wiring alone. EPIC-0025 (server-side screener evaluation
+endpoint) subsequently shipped `HttpScreenerEvaluationPort`, which the live
+composition root (`workbenchCompositionRoot.ts`'s `buildScreenerDeps`) now
+uses in place of the in-browser fake — `run_screener` returns real matches
+today, over the same backend `PanelPriceSeriesPort` charts also read from.
 
 ## Out of Scope
 
 - Chart, similarity, backtest, alert, watchlist, and followup tool groups —
   their flags stay off.
 - Choosing which panel to bind when more than one `results_table` panel
-  exists — the first one found is bound.
+  exists through manual human creation — the first one found is bound (the
+  "no panel exists yet" case is no longer out of scope — see T-0020-10).
 - Any change to screener-core's own validation, matching, or ranking logic.
 - EPIC-1015's legacy-surface-cutover work — untouched, still paused.

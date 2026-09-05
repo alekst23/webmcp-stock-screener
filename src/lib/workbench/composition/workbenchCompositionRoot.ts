@@ -34,7 +34,7 @@ import {
 	registerScreenerTools
 } from '../../webmcp/screener/registerScreenerTools';
 import type { ScreenerToolDeps } from '../../webmcp/screener/group';
-import type { PanelBindingDeps } from '../../webmcp/screener/runScreener';
+import type { PanelBindingDeps } from '../../panels/application';
 import type { ScreenerEvaluationPort } from '../../screener/ports';
 import { createHttpScreenerEvaluationPort } from '../../screener/infra/httpEvaluationPort';
 import {
@@ -43,6 +43,16 @@ import {
 	type DefaultWorkbenchDeps
 } from '../tools/registerWorkbenchTools';
 import { resolveApiBaseUrl } from '../../workspace/apiConfig';
+// T-0020-11: the filter panel's human "Run" control needs the exact same
+// evaluationPort/runStore this composition wires run_screener to (so a
+// human-triggered run pins into the same PinnedRunStore an agent's run
+// would) plus this route's own shared observer -- all three only exist once
+// screenerDeps is built below, strictly after the filter_builder kind is
+// registered (createPanelShellRuntime, inside registerPanelTools), so this
+// is a second-phase call rather than something createFilterBuilderPanelKindDefinition
+// itself could set. See filterBuilderPanelContext.ts's own comment for why
+// that ordering is still safe.
+import { setFilterBuilderPanelRunDeps } from '../../screener/panel/filterBuilderPanelContext';
 // T-1015-3: the chart, similarity, and follow-up-authoring tool groups were
 // merged, tested, and flag-gated off pending exactly this -- a route that
 // calls them. Each one still builds its own default deps (its own
@@ -162,7 +172,28 @@ export async function registerWorkbenchComposition(
 	// that same call (results/tools/resultsTools.ts, folded into panel
 	// tools); search_catalog and resolve_ticker below.
 	const workbenchDeps = buildWorkbenchDeps(shared);
-	const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps, overrides);
+	// T-0020-11: resolved once, here, rather than left to buildScreenerDeps'
+	// own default -- so the exact same ScreenerEvaluationPort instance
+	// run_screener gets is also what the filter panel's human Run control
+	// gets below (setFilterBuilderPanelRunDeps), instead of building two
+	// separate adapters that happen to behave the same way.
+	const evaluationPort =
+		overrides?.evaluationPort ??
+		createHttpScreenerEvaluationPort({ baseUrl: resolveApiBaseUrl(overrides?.chartBaseUrl) });
+	const screenerDeps = buildScreenerDeps(shared, panelRuntime.deps, { ...overrides, evaluationPort });
+
+	// T-0020-11: fill in the filter_builder kind's Run-control dependencies
+	// now that they exist -- runStore is the same PinnedRunStore instance
+	// run_screener itself is given below (shared.runs), evaluationPort is the
+	// exact instance just resolved above, and observer is this route's shared
+	// notification hub, so a human-triggered run re-renders the panel grid
+	// the same way an agent-triggered one does.
+	setFilterBuilderPanelRunDeps({
+		evaluationPort,
+		runStore: shared.runs,
+		observer: panelRuntime.observer
+	});
+
 	// Bug fix: these two were registered without panelRuntime.observer,
 	// so define_screener/run_screener/get_canvas_state mutated the shared
 	// repository but never notified PanelContainer -- the FilterBuilder

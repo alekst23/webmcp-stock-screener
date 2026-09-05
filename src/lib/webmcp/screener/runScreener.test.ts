@@ -32,7 +32,8 @@ import { createLocalWorkspaceRepository } from '../../workbench/infra/workspaceR
 import { memoryStorage } from '../../workbench/testSupport';
 import type { WorkbenchDeps } from '../../workbench/tools/index';
 import { createCreateScreenerTool } from './createScreener';
-import { createRunScreenerTool, type PanelBindingDeps } from './runScreener';
+import { createRunScreenerTool } from './runScreener';
+import type { PanelBindingDeps } from '../../panels/application';
 import { createSetScreenerRankingTool } from './setScreenerRanking';
 import type { ToolResult } from '../types';
 
@@ -209,6 +210,53 @@ describe('run_screener', () => {
 		return { workspaceId, screenerId };
 	}
 
+	// T-0020-12: an agent conflated expected_revision (the workspace's own
+	// revision) with screener_revision (the screener definition's own
+	// revision) live, 2026-09-04 -- expected_revision's schema description
+	// was empty, giving the agent nothing to disambiguate the two from.
+	it("test_inputSchema_expectedRevisionDescription_namesItAsTheWorkspaceRevision", () => {
+		const tool = createRunScreenerTool(deps);
+		const schema = tool.inputSchema as {
+			properties: Record<string, { description?: string }>;
+		};
+		const expectedRevisionDescription = schema.properties.expected_revision?.description ?? '';
+		expect(
+			expectedRevisionDescription.length,
+			'T-0020-12: expected_revision must have a non-empty description distinguishing it from screener_revision'
+		).toBeGreaterThan(0);
+		expect(
+			/workspace/i.test(expectedRevisionDescription),
+			`T-0020-12: expected_revision's description must name it as the workspace's own revision, got: "${expectedRevisionDescription}"`
+		).toBe(true);
+		expect(
+			/screener_revision/.test(expectedRevisionDescription),
+			`T-0020-12: expected_revision's description must name screener_revision by name to contrast against it, got: "${expectedRevisionDescription}"`
+		).toBe(true);
+	});
+
+	// T-0020-12: the other half of the same disambiguation -- screener_revision
+	// must likewise name itself as the screener definition's own revision and
+	// name expected_revision by name, not just describe its own behavior.
+	it('test_inputSchema_screenerRevisionDescription_namesItAsTheScreenerDefinitionsRevision', () => {
+		const tool = createRunScreenerTool(deps);
+		const schema = tool.inputSchema as {
+			properties: Record<string, { description?: string }>;
+		};
+		const screenerRevisionDescription = schema.properties.screener_revision?.description ?? '';
+		expect(
+			screenerRevisionDescription.length,
+			'T-0020-12: screener_revision must have a non-empty description distinguishing it from expected_revision'
+		).toBeGreaterThan(0);
+		expect(
+			/screener definition/i.test(screenerRevisionDescription),
+			`T-0020-12: screener_revision's description must name it as the screener definition's own revision, got: "${screenerRevisionDescription}"`
+		).toBe(true);
+		expect(
+			/expected_revision/.test(screenerRevisionDescription),
+			`T-0020-12: screener_revision's description must name expected_revision by name to contrast against it, got: "${screenerRevisionDescription}"`
+		).toBe(true);
+	});
+
 	// A real mutation through the shipped write path -- AC2's "editing the
 	// screener afterwards" needs the screener's own revision to actually
 	// advance, not a hand-rolled document edit.
@@ -341,7 +389,7 @@ describe('run_screener', () => {
 			screener_id: screenerId,
 			screener_revision: 999
 		});
-		const json = jsonOf(result) as { error?: string };
+		const json = jsonOf(result) as { error?: string; message?: string; issues?: string[] };
 
 		expect(result.isError, 'AC3: an unretained explicit revision must be rejected').toBe(true);
 		expect(json.error, 'the failure must be reported as an operation validation error').toBe(
@@ -350,6 +398,25 @@ describe('run_screener', () => {
 		expect(fake.callCount(), 'AC3: a rejected revision must never reach the evaluation port').toBe(
 			0
 		);
+
+		// T-0020-12: the rejection must plainly name which revision concept
+		// (screener_revision, not the workspace's expected_revision) was
+		// expected, and the value that was actually received (999) -- so an
+		// agent that conflated the two can tell what went wrong without a
+		// second failed guess.
+		const message = json.issues?.[0] ?? json.message ?? '';
+		expect(
+			/screener_revision/.test(message),
+			`T-0020-12: the rejection must name screener_revision by name, got: "${message}"`
+		).toBe(true);
+		expect(
+			/expected_revision/.test(message),
+			`T-0020-12: the rejection must name expected_revision by name to rule it out, got: "${message}"`
+		).toBe(true);
+		expect(
+			message.includes('999'),
+			`T-0020-12: the rejection must state the received value (999), got: "${message}"`
+		).toBe(true);
 	});
 
 	it('test_runScreener_readRunAfterExecute_doesNotReexecute', async () => {
@@ -617,6 +684,72 @@ describe('run_screener: auto-bind to the results_table panel (T-0020-2)', () => 
 
 		expect(result.isError, 'AC2: binding is best-effort, never a precondition').toBeFalsy();
 		expect(typeof json.run_id, 'AC2: the run must still return its run_id').toBe('string');
+	});
+
+	// T-0020-10: previously bindRunToResultsPanel silently no-oped when no
+	// results_table panel existed (test above), leaving nothing for a user
+	// to see. Now it creates one via the same createPanel() path an agent's
+	// create_panel call would use, then binds it -- see
+	// docs/design/workbench-composition-root/spec.md's "Create-if-absent
+	// results panel".
+	it('test_runScreener_noResultsTablePanel_createsOneAndBindsIt', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, panelBinding });
+
+		const result = await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const json = jsonOf(result) as { run_id: string };
+
+		expect(result.isError, 'the run itself must still succeed').toBeFalsy();
+		const doc = deps.repository.get(workspaceId);
+		const resultsPanels = doc
+			? readPanelState(doc).panels.filter((p) => p.kind === 'results_table')
+			: [];
+		expect(
+			resultsPanels,
+			'T-0020-10: exactly one results_table panel must be auto-created'
+		).toHaveLength(1);
+		const panel = resultsPanels[0];
+		expect(panel?.rect.colSpan, 'T-0020-10: the auto-created panel is 2 columns wide').toBe(2);
+		expect(panel?.rect.rowSpan, 'T-0020-10: the auto-created panel is 1 row tall').toBe(1);
+		expect(
+			panel?.source,
+			"T-0020-10: the new panel's source resolves to the new run"
+		).toEqual({
+			type: 'screener_results',
+			ref: { run_id: json.run_id }
+		});
+	});
+
+	it('test_runScreener_rerunAfterAutoCreate_recyclesSamePanelRatherThanCreatingAnother', async () => {
+		const { workspaceId, screenerId } = await seedScreener();
+		const fake = makeFakePort((input) => completeRunFor(input));
+		const tool = createRunScreenerTool(deps, { evaluationPort: fake.port, panelBinding });
+
+		await tool.execute({ workspace_id: workspaceId, screener_id: screenerId });
+		const docAfterFirst = deps.repository.get(workspaceId);
+		const firstPanelId = docAfterFirst
+			? readPanelState(docAfterFirst).panels.find((p) => p.kind === 'results_table')?.id
+			: undefined;
+		expect(firstPanelId, 'T-0020-10: the first run must have auto-created a panel').toBeTruthy();
+
+		const second = jsonOf(
+			await tool.execute({ workspace_id: workspaceId, screener_id: screenerId })
+		) as { run_id: string };
+
+		const docAfterSecond = deps.repository.get(workspaceId);
+		const resultsPanels = docAfterSecond
+			? readPanelState(docAfterSecond).panels.filter((p) => p.kind === 'results_table')
+			: [];
+		expect(resultsPanels, 'T-0020-10: rerunning must never create a second panel').toHaveLength(1);
+		expect(resultsPanels[0]?.id, 'T-0020-10: the same panel id is recycled').toBe(firstPanelId);
+		expect(
+			resultsPanels[0]?.source,
+			'T-0020-10: the recycled panel is rebound to the new run'
+		).toEqual({
+			type: 'screener_results',
+			ref: { run_id: second.run_id }
+		});
 	});
 
 	it('test_runScreener_secondRunAgainstBoundPanel_replacesBindingRatherThanDuplicating', async () => {
